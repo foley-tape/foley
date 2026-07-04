@@ -55,6 +55,27 @@ function isLoop(h: HealthCard): boolean {
   return h.maxSameSigRepeat >= 4;
 }
 
+// smooth 放宽（船长指示）：保留"平静=低失败率"的内核，松开时长/事件/repeat/收束点。
+// 每卷标注它未过的严格判据（缺项），排序=缺项少→失败率低，供船长带信息圈选。
+const SMOOTH_LOOSE = { activeMin: [5, 60] as const, eventCount: 30, failRate: 0.08 };
+function smoothMisses(h: HealthCard): string[] {
+  const miss: string[] = [];
+  if (!(h.activeMin >= 10 && h.activeMin <= 40)) miss.push('时长');
+  if (h.eventCount < 40) miss.push('事件<40');
+  if (h.failRate >= 0.05) miss.push('失败率≥5%');
+  if (!(h.hasSave || h.hasResolveProxy)) miss.push('无收束点');
+  if (h.maxSameSigRepeat > 1) miss.push('有重复签名');
+  return miss;
+}
+function isSmoothLoose(h: HealthCard): boolean {
+  return (
+    h.activeMin >= SMOOTH_LOOSE.activeMin[0] && h.activeMin <= SMOOTH_LOOSE.activeMin[1] &&
+    h.eventCount >= SMOOTH_LOOSE.eventCount &&
+    h.failRate < SMOOTH_LOOSE.failRate &&
+    h.maxSameSigRepeat <= 2
+  );
+}
+
 function fmt(n: number, d = 1): string {
   return n.toFixed(d);
 }
@@ -102,6 +123,11 @@ export function runScan(): void {
   const smooth = cards.filter((c) => isSmooth(c.health))
     .sort((a, b) => b.health.eventCount - a.health.eventCount || a.health.failRate - b.health.failRate)
     .slice(0, 3);
+  // smooth 放宽层：近失候选，标注缺项（严格候选自动纳入且缺项为空）
+  const strictShorts = new Set(smooth.map((c) => c.short));
+  const smoothLoose = cards.filter((c) => isSmoothLoose(c.health) && !strictShorts.has(c.short))
+    .sort((a, b) => smoothMisses(a.health).length - smoothMisses(b.health).length || a.health.failRate - b.health.failRate)
+    .slice(0, 5);
   const hell = cards.filter((c) => isHell(c.health))
     .sort((a, b) => b.health.failCount - a.health.failCount || b.health.distinctSigs - a.health.distinctSigs)
     .slice(0, 3);
@@ -113,6 +139,13 @@ export function runScan(): void {
   const nomBlock = (title: string, cs: FileCard[], note: string): string => {
     if (cs.length === 0) return `### ${title}\n\n_（无候选满足判据）_ ${note}\n`;
     return `### ${title}\n\n${TABLE_HEAD}\n${cs.map(healthRow).join('\n')}\n\n${note}\n`;
+  };
+  // 放宽层带"缺项"列
+  const looseBlock = (title: string, cs: FileCard[], note: string): string => {
+    if (cs.length === 0) return `### ${title}\n\n_（无近失候选）_ ${note}\n`;
+    const head = TABLE_HEAD.replace(' |\n', ' | 缺项 |\n').replace(/\|---\|$/, '|---|---|');
+    const rows = cs.map((c) => `${healthRow(c)} ${smoothMisses(c.health).join('/') || '—'} |`).join('\n');
+    return `### ${title}\n\n${head}\n${rows}\n\n${note}\n`;
   };
 
   const now = new Date();
@@ -131,8 +164,10 @@ export function runScan(): void {
     `# 标准带候选体检表\n\n` +
     `> 扫描 ${cards.length} 卷。船长各圈选 1 卷，复制入 \`tapes/\` 重命名 smooth/hell/loop.jsonl。\n` +
     `> \`RESOLVE*\` 为 M0 代理（test-tagged RUN-OK 存在）；精确 RESOLVE 属 M1 引擎。\n\n` +
-    nomBlock('顺风带 smooth（3 提名）', smooth,
+    nomBlock('顺风带 smooth（严格判据）', smooth,
       '判据：时长10–40min｜事件≥40｜失败率<5%｜含SAVE或test-OK｜最大同签名重复≤1') + '\n' +
+    looseBlock('顺风带 smooth（放宽层，船长指示）', smoothLoose,
+      '放宽：活跃5–60min｜事件≥30｜失败率<8%｜重复≤2。"缺项"= 未过的严格判据，供带信息圈选。') + '\n' +
     nomBlock('地狱带 hell（3 提名）', hell,
       '判据：FAIL≥8 或 失败率≥25%｜独立签名≥3｜含SAVE或RESOLVE（张力弧完整）') + '\n' +
     nomBlock('死循环带 loop（3 提名）', loop,

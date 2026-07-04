@@ -1,0 +1,51 @@
+{
+  "_source": "TAPE0_SPEC_v0.1 §6 起手值。参数唯一事实源。调参即回放。引擎输出携带 paramsHash。",
+  "stress": {
+    "S0": 1.0,
+    "verbWeights": { "READ": 0.2, "WRITE": 0.5, "RUN": 0.6, "SAVE": 0.3, "ASK": 0.3, "SPAWN": 0.4, "OTHER": 0.3 },
+    "repWindowMs": 600000,
+    "repBase": 1.5,
+    "repCap": 4,
+    "stuckLoopK": 2
+  },
+  "amplitude": {
+    "writeDiffCap": 500,
+    "runSecCap": 120,
+    "readKbCap": 100,
+    "default": 0.3
+  },
+  "release": {
+    "testResolveMinS": 0.3,
+    "testResolveFactor": 0.6,
+    "saveFactor": 0.5
+  },
+  "decay": {
+    "tauActiveSec": 60,
+    "tauIdleSec": 180,
+    "idleThresholdSec": 60,
+    "pendingRunDripAfterSec": 30,
+    "pendingRunDripPerMin": 0.02
+  },
+  "weather": {
+    "up": { "OVERCAST": 0.25, "RAIN": 0.5, "STORM": 0.75 },
+    "hysteresis": 0.1,
+    "stormExit": 0.6
+  },
+  "companions": {
+    "activityRateScale": 6,
+    "wowWindow": 12,
+    "wowSmoothingSec": 30,
+    "idlePhaseSec": 120
+  },
+  "spring": {
+    "up": { "zeta": 0.6, "omegaN": 33 },
+    "down": { "zeta": 1.0, "omegaN": 8 }
+  },
+  "adapter": {
+    "askTimeoutSec": 15,
+    "doneSilenceSec": 600,
+    "tagTestRegex": "test|jest|vitest|pytest|cargo test|go test",
+    "tagBuildRegex": "build|tsc|webpack|vite build",
+    "saveRegex": "git\\s+commit"
+  }
+}

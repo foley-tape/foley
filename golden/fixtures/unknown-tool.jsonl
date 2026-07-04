@@ -1,0 +1,11 @@
+{"type":"assistant","timestamp":"2026-07-04T10:00:00.000Z","message":{"role":"assistant","content":[{"type":"tool_use","id":"toolu_read1","name":"Read","input":{"file_path":"/tmp/a.txt"}}]}}
+{"type":"user","timestamp":"2026-07-04T10:00:01.000Z","toolUseResult":{"type":"text","file":{"filePath":"/tmp/a.txt","bytes":2048}},"message":{"role":"user","content":[{"type":"tool_result","tool_use_id":"toolu_read1","is_error":false,"content":"hello"}]}}
+{"type":"assistant","timestamp":"2026-07-04T10:00:02.000Z","message":{"role":"assistant","content":[{"type":"tool_use","id":"toolu_frob1","name":"FrobnicateWidget","input":{"widget":"x"}}]}}
+{"type":"user","timestamp":"2026-07-04T10:00:03.000Z","toolUseResult":{},"message":{"role":"user","content":[{"type":"tool_result","tool_use_id":"toolu_frob1","is_error":false,"content":"frobnicated"}]}}
+{"type":"assistant","timestamp":"2026-07-04T10:00:04.000Z","message":{"role":"assistant","content":[{"type":"tool_use","id":"toolu_bash1","name":"Bash","input":{"command":"git commit -m wip"}}]}}
+{"type":"user","timestamp":"2026-07-04T10:00:05.000Z","toolUseResult":{"stdout":"1 file changed","stderr":"","interrupted":false,"code":0,"durationMs":800},"message":{"role":"user","content":[{"type":"tool_result","tool_use_id":"toolu_bash1","is_error":false,"content":"1 file changed"}]}}
+{"type":"assistant","timestamp":"2026-07-04T10:00:06.000Z","message":{"role":"assistant","content":[{"type":"tool_use","id":"toolu_edit1","name":"Edit","input":{"file_path":"/tmp/a.txt","old_string":"foo","new_string":"bar"}}]}}
+{"type":"user","timestamp":"2026-07-04T10:00:07.000Z","toolUseResult":{"interrupted":false},"message":{"role":"user","content":[{"type":"tool_result","tool_use_id":"toolu_edit1","is_error":true,"content":"Error: String to replace not found in file."}]}}
+{ this line is deliberately not valid json to exercise bad-line counting }
+{"type":"system","timestamp":"2026-07-04T10:00:08.000Z","subtype":"info"}
+{"type":"assistant","timestamp":"2026-07-04T10:00:09.000Z","message":{"role":"assistant","stop_reason":"end_turn","content":[{"type":"text","text":"done"}]}}

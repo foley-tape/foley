@@ -1,0 +1,10 @@
+# 隐私：标准带与汇报产物永不入库（含密钥风险）
+tapes/
+runs/
+
+# 校准数据不入 git
+*.tape.jsonl
+
+node_modules/
+*.log
+.DS_Store

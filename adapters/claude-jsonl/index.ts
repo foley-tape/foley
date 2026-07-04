@@ -6,7 +6,7 @@ import type { MomentEvent } from '../../protocol/index.ts';
 import { parseTape, type ParseResult, type ParseStats } from './parse.ts';
 
 export { parseTape } from './parse.ts';
-export type { ParseResult, ParseStats } from './parse.ts';
+export type { ParseResult, ParseStats, TimedMoment } from './parse.ts';
 
 export function parseTapeFile(path: string): ParseResult {
   return parseTape(readFileSync(path, 'utf8'));

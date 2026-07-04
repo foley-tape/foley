@@ -60,8 +60,15 @@ export interface ParseStats {
   lastT: number | null;
 }
 
+/** 内部增强：带 tool_use / tool_result 时刻，供回放驱动做未决 RUN 滴灌。 */
+export interface TimedMoment extends MomentEvent {
+  useT: number;          // tool_use 发起时刻
+  resolveT: number | null; // tool_result 到达时刻（未配对为 null）
+}
+
 export interface ParseResult {
-  moments: MomentEvent[];
+  moments: MomentEvent[]; // 协议净版（供总线/CSV/测试）
+  timed: TimedMoment[];   // 内部增强版（供 driver）
   stats: ParseStats;
 }
 
@@ -239,7 +246,7 @@ export function parseTape(text: string): ParseResult {
   }
 
   // 第二遍：assistant tool_use → MomentEvent
-  const moments: MomentEvent[] = [];
+  const timed: TimedMoment[] = [];
   let seq = 0;
   let toolUseCount = 0;
   let pairedCount = 0;
@@ -247,9 +254,10 @@ export function parseTape(text: string): ParseResult {
 
   // SESSION_START 标点
   if (firstT !== null) {
-    moments.push({
+    timed.push({
       kind: 'moment', t: firstT, seq: seq++, agent: 'main',
       verb: 'OTHER', outcome: 'NA', m: 0, tags: [], special: 'SESSION_START',
+      useT: firstT, resolveT: firstT,
     });
   }
 
@@ -306,9 +314,14 @@ export function parseTape(text: string): ParseResult {
       const errLine = outcome === 'FAIL' ? normErr(res?.text ?? '') : '';
       const sig = fnv1a(`${verb}|${name}|${errLine}`);
 
-      const ev: MomentEvent = {
+      const useT = Number.isFinite(t) ? t : (firstT ?? 0);
+      const resolveT = res?.t ?? null;
+      // 效果落地时刻 = 结果到达时（outcome 可见时张力才响应）；未配对退回 useT
+      const effectT = resolveT ?? useT;
+
+      timed.push({
         kind: 'moment',
-        t: Number.isFinite(t) ? t : (firstT ?? 0),
+        t: effectT,
         seq: seq++,
         agent: 'main',
         verb,
@@ -316,8 +329,9 @@ export function parseTape(text: string): ParseResult {
         m,
         tags,
         sig,
-      };
-      moments.push(ev);
+        useT,
+        resolveT,
+      });
     }
   }
 
@@ -326,12 +340,21 @@ export function parseTape(text: string): ParseResult {
   if (lastAssistant && lastT !== null) {
     const hasStop = !!lastAssistant.message?.stop_reason;
     if (hasStop && unpairedToolUse === 0) {
-      moments.push({
+      timed.push({
         kind: 'moment', t: lastT, seq: seq++, agent: 'main',
         verb: 'OTHER', outcome: 'NA', m: 0, tags: [], special: 'DONE',
+        useT: lastT, resolveT: lastT,
       });
     }
   }
+
+  // 排序（效果时刻，seq 破平）→ 协议净版
+  timed.sort((a, b) => a.t - b.t || a.seq - b.seq);
+  const moments: MomentEvent[] = timed.map((tm) => {
+    const { useT, resolveT, ...clean } = tm;
+    void useT; void resolveT;
+    return clean;
+  });
 
   const stats: ParseStats = {
     totalLines,
@@ -350,5 +373,5 @@ export function parseTape(text: string): ParseResult {
     lastT,
   };
 
-  return { moments, stats };
+  return { moments, timed, stats };
 }

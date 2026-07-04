@@ -2,6 +2,7 @@
 // v0 范围梯：M0 仅 scan 可用；replay/live=M1，probe=M2。越级施工是缺陷，不是惊喜。
 
 import { runScan } from './scan.ts';
+import { runReplay } from './replay.ts';
 
 const cmd = process.argv[2];
 
@@ -10,8 +11,7 @@ switch (cmd) {
     runScan();
     break;
   case 'replay':
-    console.error('replay：M1 里程碑（引擎＋回放）。当前仅 M0 已开工。');
-    process.exit(2);
+    runReplay(process.argv.slice(3));
     break;
   case 'live':
     console.error('live：M1 里程碑（尾随＋广播）。当前仅 M0 已开工。');

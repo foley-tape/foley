@@ -150,6 +150,12 @@ function sparkline(vals: number[], cols = 60): string {
   return out.join('');
 }
 
+function weatherHint(T: number, params: Params): string {
+  const { up } = params.weather;
+  const label = T >= up.STORM ? '暴雨' : T >= up.RAIN ? '雨' : T >= up.OVERCAST ? '多云' : '晴';
+  return `峰值只到「${label}」`;
+}
+
 function buildReport(a: {
   parsed: ReturnType<typeof parseTape>;
   params: Params;
@@ -193,11 +199,7 @@ engine ${meta.engineSha} / params ${meta.paramsHash} / tape ${meta.tapeName}
 配对: ${parsed.stats.pairedCount}/${parsed.stats.toolUseCount}；未决(尾随局限): ${parsed.stats.unpairedToolUse}
 
 ## 现实修正
-- ASK 信号：现实有显式 AskUserQuestion（${parsed.stats.askToolCount} 次），M0 归 OTHER 计数上报，未擅改动词映射（详见 PARSE_REPORT）。
-- 一个 JSONL ≠ 一场会话：本带墙钟 ${h.durationMin.toFixed(0)}min / 活跃 ${h.activeMin.toFixed(0)}min；回放对 >2min 空档做解析跳跃（IDLE_CAP），衰减/弹簧稳定后续接，避免多日续跑爆炸。
-- 活跃度 EMA 窗：§6.3 未给数值，取 30s（ACT_WINDOW_SEC，引擎常量）。
-- RUN 时长：优先 toolUseResult.durationMs，缺则时间戳配对时差。
-- 效果时刻：moment.t 取 tool_result 到达时（outcome 可见时张力才响应）；未决 RUN 的等待张力由 [useT+30s, resolveT] 滴灌建模。
+逐条见交接件 **FEEDBACK.md**（规范说 X／现实是 Y／我做了 Z）。本带特有：墙钟 ${h.durationMin.toFixed(0)}min / 活跃 ${h.activeMin.toFixed(0)}min（多日续跑，回放对 >2min 空档做压缩）；AskUserQuestion ${parsed.stats.askToolCount} 次（归 OTHER 计数上报）。
 
 ## 曲线
 T 全程：\`${sparkline(Tvals)}\`  (峰值 T=${peakT.toFixed(3)})
@@ -207,12 +209,14 @@ curve.csv（t,S,T,A,wow,needle,phase,weather）｜moments.csv（含 emitT 直通
 ## 三大拐点抽检
 ${turnBlocks || '（事件过少）'}
 
-## 校准问卷（船长填写后随报告回传）
-Q1 地狱带峰值时刻，比你记忆中的绝望时刻偏早/偏晚/正好？
-Q2 RESOLVE 后的下坠，如释重负感成比例吗？
-Q3 顺风带全程 T 是否安分（<0.3）？活跃度像那天的手感吗？
-Q4 卡碟触发时刻，与你实际意识到"它卡了"差多少？
-Q5 列出任何"这笔账算错了"的时间点。
+## 校准问卷 v2（意图版·凭你想要它成为什么，不需记得那天）
+> 每份报告已把峰值/天气打在上面。你只需照直觉判断"该不该是这样"。
+
+Q1 这卷带的强度（本带峰值 T=${peakT.toFixed(2)}、${weatherHint(peakT, params)}），你觉得**该到哪一档**？晴/多云/雨/暴雨。
+Q2 失败之后，张力该"**来得快去得快**"还是"**攒着劲慢慢消**"？（决定衰减 τ）
+Q3 通过测试/提交那一刻的"如释重负"，要多明显的下坠？（决定泄能系数与 RESOLVE 门槛；本带 RESOLVE×${resolves}）
+Q4 卡碟（STUCK_LOOP，本带×${stuck}）触发的**密度**对吗——太吵/太哑/正好？
+Q5 一眼看去哪条"算错了"？（例：失败读几乎不涨张力——见 FEEDBACK.md【二】）
 `;
 }
 

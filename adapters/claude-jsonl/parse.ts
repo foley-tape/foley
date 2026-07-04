@@ -33,7 +33,8 @@ export interface DistilledMoment {
   mRaw: number;            // 原料量（行/秒/KB；default 为 0）
   durationMs: number | null;
   tags: string[];          // test/build 语义标签（派生分类，非内容）
-  sig: string | null;      // hash(verb|tool|errClass) —— 稳定聚类键
+  sig: string | null;      // hash(verb|tool|errClass) —— 充能/卡碟分组键（distill/2 规则不变）
+  targetHash: string;      // hash(命令头/主路径) —— 卡碟"同目标"清除键（distill/2 §3；余空''）
   errClass: string | null; // 唯一文本字段：错误首行归一化(抹路径/hex/token/数字)≤60；仅 FAIL
   episode: number;         // 会话分段序号（§4.1）
   sidechain: boolean;      // 子 agent 轨（v0 折叠 main，仅留标记）
@@ -72,7 +73,7 @@ export interface DistillResult {
   meta: DistillMeta;
 }
 
-export const DISTILLER_VERSION = 'distill/1';
+export const DISTILLER_VERSION = 'distill/2';
 
 // ---------- 工具函数 ----------
 
@@ -102,6 +103,30 @@ function normErr(text: string): string {
     .replace(/\s+/g, ' ')
     .trim()
     .slice(0, 60);
+}
+
+/** 净化单个 token：含路径 → PATH，长 token（密钥/哈希）→ TOKEN。不落盘原文，仅供 targetHash 前净化。 */
+function sanitizeToken(t: string): string {
+  if (t.includes('/') || t.startsWith('~') || t.startsWith('.')) return 'PATH';
+  if (/[A-Za-z0-9_-]{16,}/.test(t)) return 'TOKEN';
+  return t;
+}
+
+/**
+ * targetHash 键（distill/2 §3）：卡碟"同目标"清除用。RUN 取命令头前 2 token（净化路径/长token）；
+ * READ/WRITE 取主目标路径；其余动词空。返回 fnv1a hex 或 ''（键为空时不参与"同目标"约束）。
+ */
+function targetHashOf(verb: Verb, input: Record<string, unknown> | undefined, command: string | undefined): string {
+  let key = '';
+  if (verb === 'RUN' || verb === 'SAVE') {
+    if (command) key = command.trim().split(/\s+/).slice(0, 2).map(sanitizeToken).join(' ');
+  } else if (verb === 'READ' || verb === 'WRITE') {
+    // 主目标定位符：文件路径 / 目录 / 笔记本 / URL（WebFetch）/ 模式（Grep,Glob）。
+    const p = input?.['file_path'] ?? input?.['path'] ?? input?.['notebook_path']
+      ?? input?.['url'] ?? input?.['pattern'];
+    if (typeof p === 'string' && p) key = p;
+  }
+  return key ? fnv1a(key) : '';
 }
 
 /** 从 tool_result 的 content（string 或 block[]）提取文本。仅蒸馏内部用，不落盘。 */
@@ -211,6 +236,7 @@ interface PreMoment {
   durationMs: number | null;
   tags: string[];
   sig: string;
+  targetHash: string;
   errClass: string | null;
   sidechain: boolean;
 }
@@ -313,10 +339,11 @@ export function distillTape(text: string, params: Params): DistillResult {
       const tags = verb === 'RUN' || verb === 'SAVE' ? tagsForCommand(command) : [];
       const errClass = outcome === 'FAIL' ? normErr(res?.text ?? '') : null;
       const sig = fnv1a(`${verb}|${name}|${errClass ?? ''}`);
+      const targetHash = targetHashOf(verb, input, command);
 
       pre.push({
         useT, resolveT, t: effectT, verb, tool: name, outcome,
-        mKind, mRaw, durationMs, tags, sig, errClass, sidechain: o.isSidechain === true,
+        mKind, mRaw, durationMs, tags, sig, targetHash, errClass, sidechain: o.isSidechain === true,
       });
     }
   }
@@ -331,7 +358,7 @@ export function distillTape(text: string, params: Params): DistillResult {
   const pushSpecial = (special: Special, t: number, episode: number): void => {
     records.push({
       t, useT: t, resolveT: t, seq: seq++, verb: 'OTHER', tool: '', outcome: 'NA',
-      mKind: 'default', mRaw: 0, durationMs: null, tags: [], sig: null, errClass: null,
+      mKind: 'default', mRaw: 0, durationMs: null, tags: [], sig: null, targetHash: '', errClass: null,
       episode, sidechain: false, special,
     });
   };
@@ -353,7 +380,7 @@ export function distillTape(text: string, params: Params): DistillResult {
         records.push({
           t: p.t, useT: p.useT, resolveT: p.resolveT, seq: seq++,
           verb: p.verb, tool: p.tool, outcome: p.outcome, mKind: p.mKind, mRaw: p.mRaw,
-          durationMs: p.durationMs, tags: p.tags, sig: p.sig, errClass: p.errClass,
+          durationMs: p.durationMs, tags: p.tags, sig: p.sig, targetHash: p.targetHash, errClass: p.errClass,
           episode: e, sidechain: p.sidechain, special: null,
         });
       }

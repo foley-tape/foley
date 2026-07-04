@@ -8,9 +8,10 @@ import type { MomentEvent, Outcome } from '../../protocol/index.ts';
 import type { Params } from '../../engine/params.ts';
 import { fnv1a, type DistilledMoment, type MKind } from './parse.ts';
 
-/** verb|tool 身份哈希，供引擎"同 verb+tool 的 OK 清卡碟"匹配（driver 侧算）。 */
+/** verb|tool|targetHash 身份哈希，供引擎"同 verb+tool+目标 的 OK 清卡碟"匹配（driver 侧算）。
+ *  distill/2 §3：加 targetHash 收紧——bash-A 卡碟不被 bash-B 成功误清。 */
 export function clearSigOf(r: DistilledMoment): string {
-  return fnv1a(`${r.verb}|${r.tool}`);
+  return fnv1a(`${r.verb}|${r.tool}|${r.targetHash ?? ''}`);
 }
 
 /** 对数归一幅度：m = min(1, ln(1+x)/ln(1+cap))。 */

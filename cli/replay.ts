@@ -1,5 +1,6 @@
 // cli replay <tape.tape.jsonl> --out runs/<ts>/ —— 离线跑蒸馏带 → REPORT.md + curve.csv + moments.csv。
 // 只消费蒸馏带（§3）。时钟由本文件注入；引擎纯确定性。同带两跑逐字节一致。
+// 判定由 verdict.json 驱动（M1.6-A §3.4）；雨量 R、机会审计、clearedBy 分列、金时刻评分（REPORT v3.1）。
 
 import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 import { execSync } from 'node:child_process';
@@ -7,27 +8,36 @@ import { join, basename, relative } from 'node:path';
 import type { MomentEvent, StatePacket, Weather } from '../protocol/index.ts';
 import {
   parseDistilled, healthOf, momentOf, clearSigOf,
-  type DistilledMoment, type DistillResult, type HealthCard,
+  type DistillResult, type HealthCard,
 } from '../adapters/claude-jsonl/index.ts';
 import {
-  createEngine, advanceTo, ingest, addStress, snapshot, reap,
+  createEngine, advanceTo, ingest, addStress, snapshot, reap, type DerivedMoment,
 } from '../engine/index.ts';
-import { resolveParams, hashParams, type Params } from '../engine/params.ts';
+import { resolveParams, hashParams, hashJson, type Params } from '../engine/params.ts';
+import {
+  judgeBand, type Verdict, type MetricsView, type JudgeRow, type Landmark, type LandmarkResult,
+} from '../engine/verdict.ts';
 
 const SNAP_MS = 100;          // curve.csv 采样率 10Hz
 const IDLE_CAP_MS = 120_000;  // 单空档最多步进 2min，其余解析跳跃（防多日续跑爆炸）
-const ACTIVE_GAP_MS = 600_000; // 占空比分母：相邻采样间隔 <10min 且非 IDLE 相态才计活跃
+const ACTIVE_GAP_MS = 600_000; // 占空/雨量分母：相邻采样间隔 <10min 且非 IDLE 相态才计活跃
 
-export type TapeKind = 'smooth' | 'storm' | 'jam' | null;
+export type TapeKind = 'silence' | 'smooth' | 'busy' | 'jam' | 'storm' | null;
 
+interface Emit { ev: DerivedMoment; emitT: number }
 interface LedgerEntry { t: number; seq: number; label: string; dS: number }
+
+export interface ReplayMeta {
+  engineSha: string; paramsHash: string; tapeName: string; kind?: TapeKind;
+  verdict?: Verdict; verdictHash?: string;
+}
 
 export interface ReplayOutput {
   curveCsv: string;
   momentsCsv: string;
   report: string;
   snaps: StatePacket[];
-  emitted: { ev: MomentEvent; emitT: number }[];
+  emitted: Emit[];
   metrics: Metrics;
 }
 
@@ -36,23 +46,39 @@ export interface Metrics {
   dutyTlt30: number;                 // T<0.30 占活跃时长
   weatherDuty: Record<Weather, number>;
   dutyRainStorm: number;
+  rainR: number;                     // 全带雨量 ∫max(0,T−floor)dt，单位 T·min（M1.6-A §2）
   stuckEdges: number;
   resolves: number;
-  cleared: number;
+  cleared: number;                   // STUCK_CLEARED 总数
+  clearedOk: number;                 // ok 型（同目标 OK 破卡碟）
+  clearedExpiry: number;             // expiry 型（窗口过期消散）
+  opportunities: number;             // 机会数 = test-OK + SAVE-OK + 破卡碟（§5）
+  oppTestOk: number;
+  oppSaveOk: number;
+  oppJamBreak: number;
   jamMonotone: boolean;
 }
 
-/** 纯回放：蒸馏带文本 + params → 全部产物（无 fs，供金测试直接调用）。 */
-export function replayText(distilledText: string, params: Params, meta: {
-  engineSha: string; paramsHash: string; tapeName: string; kind?: TapeKind;
-}): ReplayOutput {
+/** Metrics → verdict 判定视图。 */
+export function toMetricsView(m: Metrics): MetricsView {
+  return {
+    peakT: m.peakT, dutyTlt30: m.dutyTlt30, dutyRainStorm: m.dutyRainStorm,
+    rainR: m.rainR, stuckEdges: m.stuckEdges, resolves: m.resolves,
+    opportunities: m.opportunities, jamMonotone: m.jamMonotone,
+  };
+}
+
+export interface ReplayCore { d: DistillResult; snaps: StatePacket[]; emitted: Emit[]; ledger: LedgerEntry[]; metrics: Metrics }
+
+/** 纯回放引擎核（无 fs、无字符串产物）：蒸馏带 + params + 雨量 floor → 采样/时刻/指标。sweep 走此轻路。 */
+export function replayCore(distilledText: string, params: Params, rainFloor: number): ReplayCore {
   const d = parseDistilled(distilledText);
   const records = d.records; // 已按 (t,seq) 排序，含标点
   const { firstT, lastT } = d.meta.stats;
 
   const st = createEngine(params);
   const snaps: StatePacket[] = [];
-  const emitted: { ev: MomentEvent; emitT: number }[] = [];
+  const emitted: Emit[] = [];
   const ledger: LedgerEntry[] = [];
 
   // 未决 RUN 滴灌区间：[useT+30s, resolveT]，速率 0.02×m /min（m 消费时按原料量算）
@@ -76,9 +102,10 @@ export function replayText(distilledText: string, params: Params, meta: {
   if (firstT === null || lastT === null || records.length === 0) {
     const empty: Metrics = {
       peakT: 0, dutyTlt30: 1, weatherDuty: { CLEAR: 1, OVERCAST: 0, RAIN: 0, STORM: 0 },
-      dutyRainStorm: 0, stuckEdges: 0, resolves: 0, cleared: 0, jamMonotone: true,
+      dutyRainStorm: 0, rainR: 0, stuckEdges: 0, resolves: 0, cleared: 0, clearedOk: 0, clearedExpiry: 0,
+      opportunities: 0, oppTestOk: 0, oppSaveOk: 0, oppJamBreak: 0, jamMonotone: true,
     };
-    return { curveCsv: 'no-events\n', momentsCsv: '', report: '# RUN REPORT\n(空磁带)\n', snaps, emitted, metrics: empty };
+    return { d, snaps, emitted, ledger, metrics: empty };
   }
 
   const reapInto = (): void => {
@@ -129,19 +156,39 @@ export function replayText(distilledText: string, params: Params, meta: {
     if (cursor >= lastT && ei >= records.length) break;
   }
 
-  const metrics = computeMetrics(snaps, emitted);
-  const curveCsv = buildCurveCsv(snaps);
-  const momentsCsv = buildMomentsCsv(emitted);
-  const report = buildReport({ d, params, snaps, emitted, ledger, metrics, meta });
-  return { curveCsv, momentsCsv, report, snaps, emitted, metrics };
+  const metrics = computeMetrics(snaps, emitted, rainFloor);
+  return { d, snaps, emitted, ledger, metrics };
+}
+
+/** 纯回放：蒸馏带文本 + params → 全部产物（CSV/REPORT）。金测试/CLI 用。 */
+export function replayText(distilledText: string, params: Params, meta: ReplayMeta): ReplayOutput {
+  const rainFloor = meta.verdict?.rain.floor ?? 0.5;
+  const core = replayCore(distilledText, params, rainFloor);
+  if (core.snaps.length === 0) {
+    return { curveCsv: 'no-events\n', momentsCsv: '', report: '# RUN REPORT\n(空磁带)\n', snaps: core.snaps, emitted: core.emitted, metrics: core.metrics };
+  }
+  const curveCsv = buildCurveCsv(core.snaps);
+  const momentsCsv = buildMomentsCsv(core.emitted);
+  const report = buildReport({ d: core.d, snaps: core.snaps, emitted: core.emitted, ledger: core.ledger, metrics: core.metrics, meta });
+  return { curveCsv, momentsCsv, report, snaps: core.snaps, emitted: core.emitted, metrics: core.metrics };
 }
 
 // ---------- 指标 ----------
 
-function computeMetrics(
-  snaps: StatePacket[],
-  emitted: { ev: MomentEvent; emitT: number }[],
-): Metrics {
+/** 雨量积分 ∫max(0,T−floor)dt（T·min），限 [loT,hiT] 且仅活跃采样。 */
+function rainROver(snaps: StatePacket[], loT: number, hiT: number, floor: number): number {
+  let r = 0;
+  for (let i = 1; i < snaps.length; i++) {
+    const left = snaps[i - 1]!;
+    const gap = snaps[i]!.t - left.t;
+    if (gap <= 0 || gap >= ACTIVE_GAP_MS || left.phase === 'IDLE') continue;
+    if (left.t < loT || left.t > hiT) continue;
+    if (left.T > floor) r += (left.T - floor) * (gap / 60000);
+  }
+  return r;
+}
+
+function computeMetrics(snaps: StatePacket[], emitted: Emit[], rainFloor: number): Metrics {
   const peakT = snaps.reduce((mx, s) => Math.max(mx, s.T), 0);
   const weatherDuty: Record<Weather, number> = { CLEAR: 0, OVERCAST: 0, RAIN: 0, STORM: 0 };
   let activeTotal = 0, Tlt30 = 0, rainStorm = 0;
@@ -155,6 +202,12 @@ function computeMetrics(
     if (left.weather === 'RAIN' || left.weather === 'STORM') rainStorm += gap;
   }
   const norm = activeTotal > 0 ? activeTotal : 1;
+  const src = emitted.filter((e) => !e.ev.special);
+  const oppTestOk = src.filter((e) => e.ev.verb === 'RUN' && e.ev.outcome === 'OK' && e.ev.tags.includes('test')).length;
+  const oppSaveOk = src.filter((e) => e.ev.verb === 'SAVE' && e.ev.outcome === 'OK').length;
+  const clearedOk = emitted.filter((e) => e.ev.special === 'STUCK_CLEARED' && e.ev.clearedBy === 'ok').length;
+  const clearedExpiry = emitted.filter((e) => e.ev.special === 'STUCK_CLEARED' && e.ev.clearedBy === 'expiry').length;
+  const opportunities = oppTestOk + oppSaveOk + clearedOk;
   return {
     peakT,
     dutyTlt30: activeTotal > 0 ? Tlt30 / norm : 1,
@@ -163,20 +216,19 @@ function computeMetrics(
       RAIN: weatherDuty.RAIN / norm, STORM: weatherDuty.STORM / norm,
     },
     dutyRainStorm: rainStorm / norm,
+    rainR: rainROver(snaps, -Infinity, Infinity, rainFloor),
     stuckEdges: emitted.filter((e) => e.ev.special === 'STUCK_LOOP').length,
     resolves: emitted.filter((e) => e.ev.special === 'RESOLVE').length,
-    cleared: emitted.filter((e) => e.ev.special === 'STUCK_CLEARED').length,
+    cleared: clearedOk + clearedExpiry,
+    clearedOk, clearedExpiry,
+    opportunities, oppTestOk, oppSaveOk, oppJamBreak: clearedOk,
     jamMonotone: checkJamMonotone(snaps, emitted),
   };
 }
 
 /** 卡碟段内 T 走势单调不减（在同签名 FAIL 命中点抽样，直至 CLEARED 或段末）。 */
-function checkJamMonotone(
-  snaps: StatePacket[],
-  emitted: { ev: MomentEvent; emitT: number }[],
-): boolean {
+function checkJamMonotone(snaps: StatePacket[], emitted: Emit[]): boolean {
   const Tat = (t: number): number => {
-    // 最近的不晚于 t 的采样
     let best = 0;
     for (const s of snaps) { if (s.t <= t) best = s.T; else break; }
     return best;
@@ -197,6 +249,35 @@ function checkJamMonotone(
   return true;
 }
 
+// ---------- 金时刻评分（M1.6-A §4，本轮记分不拦路） ----------
+
+function evalLandmarks(landmarks: Landmark[], kind: TapeKind, snaps: StatePacket[], episodes: DistillResult['meta']['episodes']): LandmarkResult[] {
+  const out: LandmarkResult[] = [];
+  const forKind = landmarks.filter((l) => l.tape === kind);
+  for (const l of forKind) {
+    if (l.kind === 'peakInWindow') {
+      const lo = Date.parse(l.fromUtc!), hi = Date.parse(l.toUtc!);
+      const win = snaps.filter((s) => s.t >= lo && s.t <= hi);
+      const peak = win.reduce((mx, s) => Math.max(mx, s.T), 0);
+      out.push({ id: l.id, desc: l.desc, ok: peak >= (l.minPeakT ?? 0), detail: `窗内峰值 T=${peak.toFixed(3)}（阈 ≥${l.minPeakT}）` });
+    } else if (l.kind === 'decayDrop') {
+      const lo = Date.parse(l.fromUtc!), hi = lo + (l.windowSec ?? 0) * 1000;
+      const win = snaps.filter((s) => s.t >= lo && s.t <= hi);
+      if (win.length < 2) { out.push({ id: l.id, desc: l.desc, ok: false, detail: '窗内采样不足' }); continue; }
+      const t0 = win[0]!.T, tEnd = win[win.length - 1]!.T;
+      let nonInc = true;
+      for (let i = 1; i < win.length; i++) if (win[i]!.T > win[i - 1]!.T + 1e-6) { nonInc = false; break; }
+      const relDrop = t0 > 1e-9 ? (t0 - tEnd) / t0 : 0;
+      out.push({ id: l.id, desc: l.desc, ok: nonInc && relDrop >= (l.minRelDrop ?? 0), detail: `非增=${nonInc}，相对下降=${(relDrop * 100).toFixed(1)}%（阈 ≥${((l.minRelDrop ?? 0) * 100).toFixed(0)}%）` });
+    } else if (l.kind === 'peakEpisode') {
+      const gp = snaps.reduce((a, s) => (s.T > a.T ? s : a), snaps[0]!);
+      const ep = episodes.find((e) => gp.t >= e.startT && gp.t <= e.endT);
+      out.push({ id: l.id, desc: l.desc, ok: ep?.i === l.episode, detail: `全局峰值 T=${gp.T.toFixed(3)} 落在 episode ${ep?.i ?? '?'}（要求 ${l.episode}）` });
+    }
+  }
+  return out;
+}
+
 // ---------- CSV ----------
 
 const f6 = (n: number): string => n.toFixed(6);
@@ -208,10 +289,10 @@ function buildCurveCsv(snaps: StatePacket[]): string {
   return head + '\n' + rows.join('\n') + '\n';
 }
 
-function buildMomentsCsv(emitted: { ev: MomentEvent; emitT: number }[]): string {
-  const head = 't,emitT,seq,verb,outcome,m,tags,special,sig,k';
+function buildMomentsCsv(emitted: Emit[]): string {
+  const head = 't,emitT,seq,verb,outcome,m,tags,special,sig,k,clearedBy';
   const rows = emitted.map(({ ev, emitT }) =>
-    `${ev.t},${emitT},${ev.seq},${ev.verb},${ev.outcome},${f6(ev.m)},${ev.tags.join('|')},${ev.special ?? ''},${ev.sig ?? ''},${ev.k ?? ''}`);
+    `${ev.t},${emitT},${ev.seq},${ev.verb},${ev.outcome},${f6(ev.m)},${ev.tags.join('|')},${ev.special ?? ''},${ev.sig ?? ''},${ev.k ?? ''},${ev.clearedBy ?? ''}`);
   return head + '\n' + rows.join('\n') + '\n';
 }
 
@@ -220,7 +301,7 @@ function labelOf(ev: MomentEvent): string {
   return `${ev.verb}-${ev.outcome}`;
 }
 
-// ---------- REPORT v3（施工令 §7） ----------
+// ---------- REPORT v3.1 ----------
 
 const SPARK = '▁▂▃▄▅▆▇█';
 function sparkline(vals: number[], cols = 60): string {
@@ -233,71 +314,52 @@ function sparkline(vals: number[], cols = 60): string {
   return out.join('');
 }
 
-interface JudgeRow { label: string; value: string; ok: boolean }
-
-function kindOf(meta: { tapeName: string; kind?: TapeKind }): TapeKind {
+function kindOf(meta: ReplayMeta): TapeKind {
   if (meta.kind) return meta.kind;
   const n = meta.tapeName.toLowerCase();
-  if (n.includes('storm')) return 'storm';
-  if (n.includes('jam')) return 'jam';
-  if (n.includes('smooth')) return 'smooth';
+  for (const k of ['silence', 'smooth', 'busy', 'jam', 'storm'] as const) if (n.includes(k)) return k;
   return null;
 }
 
 function pct(x: number): string { return `${(x * 100).toFixed(1)}%`; }
 
-function judge(kind: TapeKind, m: Metrics): JudgeRow[] {
-  const inRange = (v: number, lo: number, hi: number) => v >= lo && v <= hi;
-  if (kind === 'smooth') return [
-    { label: 'T<0.30 占空 ≥99%', value: pct(m.dutyTlt30), ok: m.dutyTlt30 >= 0.99 },
-    { label: 'STUCK_LOOP 边沿数 =0', value: `${m.stuckEdges}`, ok: m.stuckEdges === 0 },
-  ];
-  if (kind === 'storm') return [
-    { label: '峰值 T ∈ [0.65,0.92]', value: m.peakT.toFixed(3), ok: inRange(m.peakT, 0.65, 0.92) },
-    { label: 'RAIN+STORM 占空 ∈ [15%,45%]', value: pct(m.dutyRainStorm), ok: inRange(m.dutyRainStorm, 0.15, 0.45) },
-    { label: 'RESOLVE 次数 ≥1', value: `${m.resolves}`, ok: m.resolves >= 1 },
-    { label: 'STUCK_LOOP 边沿数 ∈ [3,12]', value: `${m.stuckEdges}`, ok: inRange(m.stuckEdges, 3, 12) },
-  ];
-  if (kind === 'jam') return [
-    { label: '峰值 T ∈ [0.50,0.90]', value: m.peakT.toFixed(3), ok: inRange(m.peakT, 0.50, 0.90) },
-    { label: 'STUCK_LOOP 边沿数 ∈ [1,3]', value: `${m.stuckEdges}`, ok: inRange(m.stuckEdges, 1, 3) },
-    { label: '卡碟段内 T 单调不减', value: m.jamMonotone ? '是' : '否', ok: m.jamMonotone },
-  ];
-  return [];
-}
-
-export function judgementFor(kind: TapeKind, m: Metrics): { rows: JudgeRow[]; allGreen: boolean } {
-  const rows = judge(kind, m);
-  return { rows, allGreen: rows.length > 0 && rows.every((r) => r.ok) };
+/** 供 sweep/报告共用：verdict + kind + metrics → 判定。 */
+export function judgeFor(verdict: Verdict | undefined, kind: TapeKind, m: Metrics): { rows: JudgeRow[]; allGreen: boolean } {
+  if (!verdict || !kind || !verdict.bands[kind]) return { rows: [], allGreen: false };
+  return judgeBand(verdict.bands[kind], toMetricsView(m));
 }
 
 function buildReport(a: {
   d: DistillResult;
-  params: Params;
   snaps: StatePacket[];
-  emitted: { ev: MomentEvent; emitT: number }[];
+  emitted: Emit[];
   ledger: LedgerEntry[];
   metrics: Metrics;
-  meta: { engineSha: string; paramsHash: string; tapeName: string; kind?: TapeKind };
+  meta: ReplayMeta;
 }): string {
   const { d, snaps, emitted, ledger, metrics, meta } = a;
   const h: HealthCard = healthOf(d);
   const kind = kindOf(meta);
   const Tvals = snaps.map((s) => s.T);
+  const floor = meta.verdict?.rain.floor ?? 0.5;
 
-  // 判定表
-  const { rows, allGreen } = judgementFor(kind, metrics);
+  // 判定表（verdict 驱动）
+  const { rows, allGreen } = judgeFor(meta.verdict, kind, metrics);
   const judgeTable = rows.length === 0
-    ? '_（未指定标准带类型，跳过判定）_'
+    ? '_（未指定标准带类型或缺 verdict，跳过判定）_'
     : `| 指标 | 实测 | 判定 |\n|---|---|---|\n` +
       rows.map((r) => `| ${r.label} | ${r.value} | ${r.ok ? '✅ PASS' : '❌ FAIL'} |`).join('\n') +
       `\n\n**本带判定：${allGreen ? '✅ 全绿' : '❌ 有越界'}**`;
 
-  // 天气占空比表
-  const wd = metrics.weatherDuty;
-  const weatherTable = `| CLEAR | OVERCAST | RAIN | STORM |\n|---|---|---|---|\n| ${pct(wd.CLEAR)} | ${pct(wd.OVERCAST)} | ${pct(wd.RAIN)} | ${pct(wd.STORM)} |`;
+  // 机会审计（§5）
+  const oppTable = `| test-OK | SAVE-OK | 破卡碟(ok型) | 机会合计 | RESOLVE 实发 |\n|---|---|---|---|---|\n` +
+    `| ${metrics.oppTestOk} | ${metrics.oppSaveOk} | ${metrics.oppJamBreak} | ${metrics.opportunities} | ${metrics.resolves} |`;
 
-  // episode 分表
+  // 天气占空 + 雨量
+  const wd = metrics.weatherDuty;
+  const weatherTable = `| CLEAR | OVERCAST | RAIN | STORM | 雨量R(全带) |\n|---|---|---|---|---|\n| ${pct(wd.CLEAR)} | ${pct(wd.OVERCAST)} | ${pct(wd.RAIN)} | ${pct(wd.STORM)} | ${metrics.rainR.toFixed(2)} T·min |`;
+
+  // episode 分表（含每段雨量）
   const epRows = d.meta.episodes.map((ep) => {
     const evs = d.records.filter((r) => r.episode === ep.i && !r.special);
     const fails = evs.filter((r) => r.outcome === 'FAIL').length;
@@ -306,10 +368,18 @@ function buildReport(a: {
     for (let i = 1; i < ts.length; i++) { const g = ts[i]! - ts[i - 1]!; if (g > 0 && g < ACTIVE_GAP_MS) active += g; }
     const inEp = snaps.filter((s) => s.t >= ep.startT && s.t <= ep.endT);
     const peak = inEp.reduce((mx, s) => Math.max(mx, s.T), 0);
-    return `| ${ep.i} | ${(active / 60000).toFixed(1)} | ${ep.events} | ${fails} | ${peak.toFixed(3)} |`;
+    const rE = rainROver(snaps, ep.startT, ep.endT, floor);
+    return `| ${ep.i} | ${(active / 60000).toFixed(1)} | ${ep.events} | ${fails} | ${peak.toFixed(3)} | ${rE.toFixed(2)} |`;
   }).join('\n');
 
-  // 三大拐点：|ΔT| 最大，两两间隔 ≥120s（同簇取最大者）
+  // 金时刻评分（记分不拦路）
+  const lms = meta.verdict ? evalLandmarks(meta.verdict.landmarks, kind, snaps, d.meta.episodes) : [];
+  const lmTable = lms.length === 0 ? '_（本带无金时刻）_'
+    : `| 金时刻 | 断言 | 结果 | 明细 |\n|---|---|---|---|\n` +
+      lms.map((l) => `| ${l.id} | ${l.desc} | ${l.ok ? '✅' : '❌'} | ${l.detail} |`).join('\n') +
+      `\n\n_金时刻本轮记分不拦路（M1.6-A §4）。_`;
+
+  // 三大拐点：|ΔT| 最大，两两间隔 ≥120s
   const deltas = snaps.slice(1).map((s, i) => ({ t: s.t, dT: s.T - snaps[i]!.T, T: s.T }));
   const sortedByMag = [...deltas].sort((x, y) => Math.abs(y.dT) - Math.abs(x.dT));
   const picked: typeof sortedByMag = [];
@@ -332,30 +402,39 @@ function buildReport(a: {
 
   const healthLine = `活跃${h.activeMin.toFixed(1)}min/墙钟${h.durationMin.toFixed(1)}min｜事件${h.eventCount}｜FAIL${h.failCount}（${(h.failRate * 100).toFixed(1)}%）｜独立签名${h.distinctSigs}｜最大同签名重复${h.maxSameSigRepeat}｜episode ${h.episodeCount}`;
 
-  return `# RUN REPORT
-engine ${meta.engineSha} / params ${meta.paramsHash} / tape ${meta.tapeName}${kind ? `（${kind}）` : ''}
+  return `# RUN REPORT v3.1
+engine ${meta.engineSha} / params ${meta.paramsHash} / verdict ${meta.verdictHash ?? '—'} / tape ${meta.tapeName}${kind ? `（${kind}）` : ''}
 蒸馏带 ${d.meta.distiller} / src ${d.meta.sourceHash}
 体检表：${healthLine}
 
-## 判定表（施工令 §6）
+## 判定表（verdict.json 驱动）
 ${judgeTable}
 
-## 天气占空比（占活跃时长）
+## 机会审计（§5：机会数=test-OK+SAVE-OK+破卡碟）
+${oppTable}
+
+## 天气占空比（占活跃时长）+ 雨量 R（换尺 M1.6-A §2）
 ${weatherTable}
 
-## episode 分表
-| # | 活跃min | 事件 | FAIL | 峰值T |
-|---|---|---|---|---|
-${epRows || '| 0 | — | — | — | — |'}
+## episode 分表（含每段雨量 R）
+| # | 活跃min | 事件 | FAIL | 峰值T | 雨量R |
+|---|---|---|---|---|---|
+${epRows || '| 0 | — | — | — | — | — |'}
+
+## 金时刻评分（M1.6-A §4）
+${lmTable}
+
+## 卡碟解除分列（clearedBy）
+STUCK_LOOP×${metrics.stuckEdges} ｜ STUCK_CLEARED×${metrics.cleared}（ok型 ${metrics.clearedOk} / expiry型 ${metrics.clearedExpiry}）｜ RESOLVE×${metrics.resolves}
+_纪律：expiry 型消散不泄能、不 RESOLVE（§2.1）。_
 
 ## 解析
 覆盖率 ${(d.meta.stats.parseCoverage * 100).toFixed(1)}%；未知工具: [${Object.keys(d.meta.stats.unknownTools).join(', ') || '无'}]；异常行: ${d.meta.stats.badLines}
-配对: ${d.meta.stats.pairedCount}/${d.meta.stats.toolUseCount}；未决(尾随局限): ${d.meta.stats.unpairedToolUse}；sidechain 行 ${d.meta.stats.sidechainLines}（折叠 main）；AskUserQuestion ${d.meta.stats.askToolCount} 次（现映射 ASK）
+配对: ${d.meta.stats.pairedCount}/${d.meta.stats.toolUseCount}；未决(尾随局限): ${d.meta.stats.unpairedToolUse}；sidechain 行 ${d.meta.stats.sidechainLines}（折叠 main）
 
 ## 曲线
 T 全程：\`${sparkline(Tvals)}\`  (峰值 T=${metrics.peakT.toFixed(3)})
-STUCK_LOOP×${metrics.stuckEdges} ｜ STUCK_CLEARED×${metrics.cleared} ｜ RESOLVE×${metrics.resolves}
-curve.csv（t,S,T,A,wow,needle,phase,weather）｜moments.csv（含 emitT 直通道延迟）
+curve.csv（t,S,T,A,wow,needle,phase,weather）｜moments.csv（+clearedBy 列）
 
 ## 三大拐点抽检（两两间隔 ≥120s）
 ${turnBlocks || '（事件过少）'}
@@ -369,9 +448,14 @@ function iso(t: number): string { return new Date(t).toISOString().slice(11, 19)
 
 // ---------- CLI 入口 ----------
 
+export function loadVerdict(): { verdict: Verdict; hash: string } {
+  const raw = JSON.parse(readFileSync(new URL('../verdict.json', import.meta.url), 'utf8'));
+  return { verdict: raw as Verdict, hash: hashJson(raw) };
+}
+
 export function runReplay(argv: string[]): void {
   const tapePath = argv[0];
-  if (!tapePath) { console.error('用法: node cli/index.ts replay <tape.tape.jsonl> [--out runs/<ts>/] [--kind smooth|storm|jam]'); process.exit(2); return; }
+  if (!tapePath) { console.error('用法: node cli/index.ts replay <tape.tape.jsonl> [--out runs/<ts>/] [--kind silence|smooth|busy|jam|storm]'); process.exit(2); return; }
   const outIdx = argv.indexOf('--out');
   const kindIdx = argv.indexOf('--kind');
   const kind = (kindIdx >= 0 ? argv[kindIdx + 1] : undefined) as TapeKind | undefined;
@@ -379,9 +463,10 @@ export function runReplay(argv: string[]): void {
   const paramsRaw = JSON.parse(readFileSync(new URL('../params.json', import.meta.url), 'utf8'));
   const params = resolveParams(paramsRaw);
   const paramsHash = hashParams(paramsRaw);
+  const { verdict, hash: verdictHash } = loadVerdict();
 
   const tapeText = readFileSync(tapePath, 'utf8');
-  const out = replayText(tapeText, params, { engineSha, paramsHash, tapeName: basename(tapePath), kind: kind ?? null });
+  const out = replayText(tapeText, params, { engineSha, paramsHash, tapeName: basename(tapePath), kind: kind ?? null, verdict, verdictHash });
 
   const now = new Date();
   const ts = now.toISOString().replace(/[:.]/g, '-');

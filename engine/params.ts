@@ -13,7 +13,10 @@ export interface Params {
     stuckLoopK: number;
   };
   amplitude: { writeDiffCap: number; runSecCap: number; readKbCap: number; default: number; failDefault: number };
-  release: { testResolveMinS: number; testResolveFactor: number; saveFactor: number };
+  release: {
+    testResolveMinS: number; testResolveFactor: number; saveFactor: number;
+    jamBreakFactor: number; jamBreakMinS: number;
+  };
   decay: {
     tauActiveSec: number;
     tauIdleSec: number;
@@ -72,8 +75,8 @@ function stableStringify(v: unknown): string {
   return '{' + keys.map((k) => JSON.stringify(k) + ':' + stableStringify((v as Record<string, unknown>)[k])).join(',') + '}';
 }
 
-/** FNV-1a 32-bit → 8位hex。引擎输出携带此 paramsHash。 */
-export function hashParams(raw: unknown): string {
+/** 任意 JSON 对象 → 确定性 8位hex（键排序、排除 _ 注释键）。供 params/verdict 等一切事实源。 */
+export function hashJson(raw: unknown): string {
   const s = stableStringify(raw);
   let h = 0x811c9dc5;
   for (let i = 0; i < s.length; i++) {
@@ -82,3 +85,6 @@ export function hashParams(raw: unknown): string {
   }
   return h.toString(16).padStart(8, '0');
 }
+
+/** FNV-1a 32-bit → 8位hex。引擎输出携带此 paramsHash。 */
+export const hashParams = hashJson;

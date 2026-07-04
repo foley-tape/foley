@@ -4,8 +4,18 @@
 import { readFileSync, writeFileSync } from 'node:fs';
 import type { Params } from '../../engine/params.ts';
 import {
-  distillTape, type DistillResult, type DistilledMoment, type DistillMeta,
+  distillTape, fnv1a, type DistillResult, type DistilledMoment, type DistillMeta,
 } from './parse.ts';
+
+/**
+ * 全脱敏（M1.6-A §1.二.4）：把唯一文本字段 errClass 换成其聚类哈希，产可分享形态。
+ * 蒸馏带其余字段本就无明文（tool 名、tags、hash）。sig 不变（聚类键稳定）。默认不脱敏——本地抽检需人读错误模板。
+ */
+export function redactResult(d: DistillResult): DistillResult {
+  const records: DistilledMoment[] = d.records.map((r) =>
+    r.errClass ? { ...r, errClass: 'e' + fnv1a(r.errClass) } : r);
+  return { records, meta: { ...d.meta, distiller: d.meta.distiller + '+redact' } };
+}
 
 /** 蒸馏带文本：meta 首行（kind:'meta'）+ 每记录一行。确定性。 */
 export function serializeTape(d: DistillResult): string {
@@ -45,9 +55,10 @@ export function loadDistilled(path: string): DistillResult {
   return parseDistilled(readFileSync(path, 'utf8'));
 }
 
-/** 蒸馏并写盘 .tape.jsonl。 */
-export function writeDistilled(rawPath: string, outPath: string, params: Params): DistillResult {
-  const d = distillFile(rawPath, params);
+/** 蒸馏并写盘 .tape.jsonl。redact=true 产全脱敏分享带。 */
+export function writeDistilled(rawPath: string, outPath: string, params: Params, redact = false): DistillResult {
+  const d0 = distillFile(rawPath, params);
+  const d = redact ? redactResult(d0) : d0;
   writeFileSync(outPath, serializeTape(d), 'utf8');
   return d;
 }

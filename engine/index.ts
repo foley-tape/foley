@@ -31,6 +31,12 @@ export interface IngestMoment extends MomentEvent {
   clearSig?: string;
 }
 
+/** 引擎派生时刻：协议 MomentEvent + 内部注记 clearedBy（ok/expiry）。
+ *  clearedBy 非协议字段（schema 冻结）——仅供报告分列 STUCK_CLEARED 与"消散≠解决"纪律。 */
+export interface DerivedMoment extends MomentEvent {
+  clearedBy?: 'ok' | 'expiry';
+}
+
 export interface EngineState {
   now: number;              // 当前仿真时刻(ms)
   S: number;                // 内部应力 ≥0，无上界
@@ -40,7 +46,8 @@ export interface EngineState {
   lastEventT: number | null;
   sigStates: Map<string, SigState>; // sig → 卡碟/rep 态
   actRate: number;          // 事件/分钟（泄漏积分）
-  wowEvent: number;         // 最近~12事件 FAIL 指示 EMA
+  outcomes: number[];       // wow v2：最近 wowWindow 个有结果事件（1=FAIL,0=OK），窗内成败交替率
+  wowEvent: number;         // 原始 wow = 近因加权交替率（§2.2）
   wowSmoothed: number;      // 再过 wowSmoothingSec 常数平滑
   pendingAsk: boolean;
   done: boolean;
@@ -51,7 +58,7 @@ export function createEngine(_params: Params): EngineState {
   return {
     now: 0, S: 0, needlePos: 0, needleVel: 0,
     startedT: null, lastEventT: null,
-    sigStates: new Map(), actRate: 0, wowEvent: 0, wowSmoothed: 0,
+    sigStates: new Map(), actRate: 0, outcomes: [], wowEvent: 0, wowSmoothed: 0,
     pendingAsk: false, done: false, weather: 'CLEAR',
   };
 }
@@ -133,32 +140,58 @@ function updateWeather(st: EngineState, params: Params): void {
 
 // ---------- 连续：卡碟窗口过期 → STUCK_CLEARED ----------
 
-/** 卡碟态在 repWindow 内无新击中 → 解除，发 STUCK_CLEARED（不改 S）。driver 在推进时钟后调用。 */
-export function reap(st: EngineState, params: Params): MomentEvent[] {
-  const out: MomentEvent[] = [];
+/** 卡碟态在 repWindow 内无新击中 → 解除，发 expiry 型 STUCK_CLEARED（§2.1 纪律：消散≠解决，不改 S、不 RESOLVE）。
+ *  过期时刻取理论过期点 lastHit+win（M1.6-A §1.二.6 正典：回放与直播一致）。driver 在推进时钟后调用。 */
+export function reap(st: EngineState, params: Params): DerivedMoment[] {
+  const out: DerivedMoment[] = [];
   const win = params.stress.repWindowMs;
   for (const [sig, s] of st.sigStates) {
     if (s.stuck && st.now - s.lastHit > win) {
       s.stuck = false;
-      out.push(clearedEvent(sig, s.lastHit + win));
+      out.push(clearedEvent(sig, s.lastHit + win, 'expiry'));
     }
   }
   return out;
 }
 
-function clearedEvent(sig: string, t: number): MomentEvent {
+function clearedEvent(sig: string, t: number, clearedBy: 'ok' | 'expiry'): DerivedMoment {
   return {
     kind: 'moment', t, seq: -1, agent: 'main',
-    verb: 'OTHER', outcome: 'NA', m: 0, tags: [], special: 'STUCK_CLEARED', sig,
+    verb: 'OTHER', outcome: 'NA', m: 0, tags: [], special: 'STUCK_CLEARED', sig, clearedBy,
   };
+}
+
+/** RESOLVE 时刻（§2.1）：测试转绿 / 提交 / 破卡碟三形态共用。 */
+function resolveEvent(m: IngestMoment): DerivedMoment {
+  return {
+    kind: 'moment', t: m.t, seq: -1, agent: m.agent,
+    verb: m.verb, outcome: 'OK', m: m.m, tags: m.tags, special: 'RESOLVE',
+  };
+}
+
+/**
+ * wow v2（§2.2，Nagios 借骨）：窗内成败交替率。相邻跳变(OK↔FAIL)按近因线性加权
+ * （最旧对 0.5 → 最新对 1.5），加权跳变和 / 最大可能加权和 ∈ [0,1]。稳定地烂→低，反复横跳→高。
+ */
+function alternationRate(outcomes: number[]): number {
+  const n = outcomes.length;
+  if (n < 2) return 0;
+  const pairs = n - 1; // 相邻对数
+  let flipW = 0, totW = 0;
+  for (let j = 1; j < n; j++) {
+    const w = pairs === 1 ? 1.0 : 0.5 + (1.0 * (j - 1)) / (pairs - 1); // 0.5→1.5 线性
+    totW += w;
+    if (outcomes[j] !== outcomes[j - 1]) flipW += w;
+  }
+  return totW > 0 ? flipW / totW : 0;
 }
 
 // ---------- 离散事件 ----------
 
 /** 摄入一个 MomentEvent（离散效果）。返回引擎派生时刻（STUCK_LOOP/RESOLVE/STUCK_CLEARED）。 */
-export function ingest(st: EngineState, m: IngestMoment, params: Params): MomentEvent[] {
+export function ingest(st: EngineState, m: IngestMoment, params: Params): DerivedMoment[] {
   st.now = m.t;
-  const derived: MomentEvent[] = [];
+  const derived: DerivedMoment[] = [];
 
   // 标点
   switch (m.special) {
@@ -167,7 +200,7 @@ export function ingest(st: EngineState, m: IngestMoment, params: Params): Moment
       st.startedT = m.t; st.lastEventT = m.t; st.done = false;
       st.S = 0; st.needlePos = 0; st.needleVel = 0;
       st.sigStates.clear();
-      st.actRate = 0; st.wowEvent = 0; st.wowSmoothed = 0;
+      st.actRate = 0; st.outcomes = []; st.wowEvent = 0; st.wowSmoothed = 0;
       st.pendingAsk = false; st.weather = 'CLEAR';
       return derived;
     case 'DONE':
@@ -186,8 +219,9 @@ export function ingest(st: EngineState, m: IngestMoment, params: Params): Moment
   st.lastEventT = m.t;
   st.actRate += 60 / params.companions.activityEmaSec; // 冲量，稳态 ≈ 事件/分钟
   if (m.outcome === 'OK' || m.outcome === 'FAIL') {
-    const alpha = 2 / (params.companions.wowWindow + 1);
-    st.wowEvent += alpha * ((m.outcome === 'FAIL' ? 1 : 0) - st.wowEvent);
+    st.outcomes.push(m.outcome === 'FAIL' ? 1 : 0);
+    if (st.outcomes.length > params.companions.wowWindow) st.outcomes.shift();
+    st.wowEvent = alternationRate(st.outcomes); // wow v2：成败交替率，非失败率
   }
 
   if (m.outcome === 'FAIL') {
@@ -212,25 +246,27 @@ export function ingest(st: EngineState, m: IngestMoment, params: Params): Moment
       });
     }
   } else if (m.outcome === 'OK') {
-    let didResolve = false;
+    // RESOLVE 多态化（§2.1）。形态 1/2：测试转绿 / 提交——各自泄能并发 RESOLVE。
+    let resolved = false;
     if (m.verb === 'RUN' && m.tags.includes('test') && st.S > params.release.testResolveMinS) {
       st.S *= params.release.testResolveFactor;
-      derived.push({
-        kind: 'moment', t: m.t, seq: -1, agent: m.agent,
-        verb: m.verb, outcome: 'OK', m: m.m, tags: m.tags, special: 'RESOLVE',
-      });
-      didResolve = true;
+      derived.push(resolveEvent(m));
+      resolved = true;
     } else if (m.verb === 'SAVE') {
       st.S *= params.release.saveFactor;
+      derived.push(resolveEvent(m)); // §2.1.2：提交现在也发 RESOLVE 时刻（原先只泄能）
+      resolved = true;
     }
-    // 卡碟退出：RESOLVE 清全部；否则同 verb+tool 的 OK 清对应
-    if (didResolve) {
+    // 形态 3（卡碟打破）：仅同 verb+tool+target 的 OK 清对应卡碟（distill/2 §3 收紧；ok 型）。
+    // test/save 不再强清无关卡碟——清除权收敛到"同目标 OK"与"窗口过期"两条，合 §3 本旨。
+    if (m.clearSig) {
+      let broke = false;
       for (const [sig, s] of st.sigStates) {
-        if (s.stuck) { s.stuck = false; derived.push(clearedEvent(sig, m.t)); }
+        if (s.stuck && s.clearSig === m.clearSig) { s.stuck = false; derived.push(clearedEvent(sig, m.t, 'ok')); broke = true; }
       }
-    } else if (m.clearSig) {
-      for (const [sig, s] of st.sigStates) {
-        if (s.stuck && s.clearSig === m.clearSig) { s.stuck = false; derived.push(clearedEvent(sig, m.t)); }
+      if (broke && !resolved && st.S > params.release.jamBreakMinS) {
+        st.S *= params.release.jamBreakFactor; // §2.1.3：破卡碟泄能
+        derived.push(resolveEvent(m));
       }
     }
   }

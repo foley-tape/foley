@@ -5,6 +5,7 @@ import { runScan } from './scan.ts';
 import { runReplay } from './replay.ts';
 import { runDistill } from './distill.ts';
 import { runProbe } from './probe.ts';
+import { runSweep } from './sweep.ts';
 
 const cmd = process.argv[2];
 
@@ -17,6 +18,9 @@ switch (cmd) {
     break;
   case 'replay':
     runReplay(process.argv.slice(3));
+    break;
+  case 'sweep':
+    runSweep(process.argv.slice(3));
     break;
   case 'probe':
     runProbe(process.argv.slice(3));

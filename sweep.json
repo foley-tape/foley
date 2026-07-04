@@ -1,0 +1,17 @@
+{
+  "_source": "TAPE0 M1.6 §4.1 扫参网格 4×3×3×2×2 = 144 组。其余参数固定为 params.json 现值（含 §2 新参数）。current 供冠军『最少改动』归一化距离基准。",
+  "dims": [
+    { "path": "stress.verbWeights.READ", "values": [0.15, 0.18, 0.21, 0.24] },
+    { "path": "amplitude.failDefault", "values": [0.3, 0.4, 0.5] },
+    { "path": "decay.tauActiveSec", "values": [120, 150, 180] },
+    { "path": "stress.repCap", "values": [4, 6] },
+    { "path": "release.testResolveMinS", "values": [0.2, 0.3] }
+  ],
+  "current": {
+    "stress.verbWeights.READ": 0.12,
+    "amplitude.failDefault": 0.3,
+    "decay.tauActiveSec": 120,
+    "stress.repCap": 4,
+    "release.testResolveMinS": 0.3
+  }
+}

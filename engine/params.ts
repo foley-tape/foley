@@ -12,7 +12,7 @@ export interface Params {
     repCap: number;
     stuckLoopK: number;
   };
-  amplitude: { writeDiffCap: number; runSecCap: number; readKbCap: number; default: number };
+  amplitude: { writeDiffCap: number; runSecCap: number; readKbCap: number; default: number; failDefault: number };
   release: { testResolveMinS: number; testResolveFactor: number; saveFactor: number };
   decay: {
     tauActiveSec: number;
@@ -26,8 +26,20 @@ export interface Params {
     hysteresis: number;
     stormExit: number;
   };
-  companions: { activityRateScale: number; wowWindow: number; wowSmoothingSec: number; idlePhaseSec: number };
+  companions: {
+    activityRateScale: number; wowWindow: number; wowSmoothingSec: number;
+    idlePhaseSec: number; activityEmaSec: number;
+  };
   spring: { up: SpringLaw; down: SpringLaw };
+  adapter: {
+    askTimeoutSec: number;
+    doneSilenceSec: number;
+    episodeGapMin: number;
+    tagTestRegex: string;
+    tagBuildRegex: string;
+    saveRegex: string;
+    verbMapExtra: Record<string, string>;
+  };
 }
 export interface SpringLaw { zeta: number; omegaN: number }
 
@@ -44,8 +56,9 @@ export function resolveParams(raw: unknown): Params {
     weather: p['weather'],
     companions: p['companions'],
     spring: p['spring'],
+    adapter: p['adapter'],
   } as unknown as Params;
-  for (const k of ['stress', 'amplitude', 'release', 'decay', 'weather', 'companions', 'spring'] as const) {
+  for (const k of ['stress', 'amplitude', 'release', 'decay', 'weather', 'companions', 'spring', 'adapter'] as const) {
     if (!out[k]) throw new Error(`params 缺少 ${k} 段`);
   }
   return out;

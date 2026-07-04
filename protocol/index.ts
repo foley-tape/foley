@@ -10,6 +10,7 @@ export type Special =
   | 'SESSION_START'
   | 'DONE'
   | 'STUCK_LOOP'
+  | 'STUCK_CLEARED' // 增项：卡碟解除（TAPE0 施工令 M1.5 §4.3，架构师签核，只增不改）
   | 'RESOLVE'
   | 'ASK_CLEARED';
 

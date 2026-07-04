@@ -1,32 +1,27 @@
 // cli scan —— §9 标准带甄选规程。
-// 扫描 ~/.claude/projects 全部 JSONL，各提名 3 卷候选，出体检表 + PARSE_REPORT。
-// 只读、零配置、零网络。tapes/ 不复制（交船长手工圈选）。
+// 扫描 ~/.claude/projects 全部 JSONL，蒸馏后体检，各提名候选，出体检表 + PARSE_REPORT。
+// 只读、零网络。原始经蒸馏器读一次即化为骨架记录（下游只见蒸馏记录）。
 
-import { readdirSync, mkdirSync, writeFileSync } from 'node:fs';
+import { readdirSync, mkdirSync, writeFileSync, readFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { join, relative } from 'node:path';
 import {
-  parseTapeFile,
-  healthOf,
-  type HealthCard,
-  type ParseResult,
+  distillFile, healthOf, type HealthCard, type DistillResult,
 } from '../adapters/claude-jsonl/index.ts';
+import { resolveParams, type Params } from '../engine/params.ts';
 
 interface FileCard {
   path: string;
   short: string;
   health: HealthCard;
-  res: ParseResult;
+  d: DistillResult;
 }
 
 function findJsonl(root: string): string[] {
   const out: string[] = [];
   let entries: string[];
-  try {
-    entries = readdirSync(root, { recursive: true }) as string[];
-  } catch {
-    return out;
-  }
+  try { entries = readdirSync(root, { recursive: true }) as string[]; }
+  catch { return out; }
   for (const e of entries) {
     if (typeof e === 'string' && e.endsWith('.jsonl')) out.push(join(root, e));
   }
@@ -35,7 +30,6 @@ function findJsonl(root: string): string[] {
 
 // ---- §9 候选判据 ----
 function isSmooth(h: HealthCard): boolean {
-  // §9 时长判据落在"活跃时长"上（墙钟跨度会被多日续跑虚高，见 PARSE_REPORT 现实修正）
   return (
     h.activeMin >= 10 && h.activeMin <= 40 &&
     h.eventCount >= 40 &&
@@ -44,19 +38,18 @@ function isSmooth(h: HealthCard): boolean {
     h.maxSameSigRepeat <= 1
   );
 }
-function isHell(h: HealthCard): boolean {
+function isStorm(h: HealthCard): boolean {
   return (
     (h.failCount >= 8 || h.failRate >= 0.25) &&
     h.distinctSigs >= 3 &&
     (h.hasSave || h.hasResolveProxy)
   );
 }
-function isLoop(h: HealthCard): boolean {
-  return h.maxSameSigRepeat >= 4;
+// jam：施工令 §5 追加"活跃≥5min 且事件≥30"（现役样本仅 36 秒，太薄，仅够验探测器）
+function isJam(h: HealthCard): boolean {
+  return h.maxSameSigRepeat >= 4 && h.activeMin >= 5 && h.eventCount >= 30;
 }
 
-// smooth 放宽（船长指示）：保留"平静=低失败率"的内核，松开时长/事件/repeat/收束点。
-// 每卷标注它未过的严格判据（缺项），排序=缺项少→失败率低，供船长带信息圈选。
 const SMOOTH_LOOSE = { activeMin: [5, 60] as const, eventCount: 30, failRate: 0.08 };
 function smoothMisses(h: HealthCard): string[] {
   const miss: string[] = [];
@@ -76,71 +69,62 @@ function isSmoothLoose(h: HealthCard): boolean {
   );
 }
 
-function fmt(n: number, d = 1): string {
-  return n.toFixed(d);
-}
+function fmt(n: number, d = 1): string { return n.toFixed(d); }
 
 function healthRow(c: FileCard): string {
   const h = c.health;
-  return `| \`${c.short}\` | ${fmt(h.activeMin)} | ${fmt(h.durationMin)} | ${h.eventCount} | ${h.failCount} | ${fmt(h.failRate * 100)}% | ${h.distinctSigs} | ${h.maxSameSigRepeat} | ${h.hasSave ? '✅' : '—'} | ${h.hasResolveProxy ? '✅*' : '—'} |`;
+  return `| \`${c.short}\` | ${fmt(h.activeMin)} | ${fmt(h.durationMin)} | ${h.eventCount} | ${h.failCount} | ${fmt(h.failRate * 100)}% | ${h.distinctSigs} | ${h.maxSameSigRepeat} | ${h.episodeCount} | ${h.hasSave ? '✅' : '—'} | ${h.hasResolveProxy ? '✅*' : '—'} |`;
 }
 
 const TABLE_HEAD =
-  '| 磁带 | 活跃min | 墙钟min | 事件 | FAIL | 失败率 | 独立签名 | 最大同签名重复 | SAVE | RESOLVE* |\n' +
-  '|---|---|---|---|---|---|---|---|---|---|';
+  '| 磁带 | 活跃min | 墙钟min | 事件 | FAIL | 失败率 | 独立签名 | 最大同签名重复 | episode | SAVE | RESOLVE* |\n' +
+  '|---|---|---|---|---|---|---|---|---|---|---|';
 
 export function runScan(): void {
+  const paramsRaw = JSON.parse(readFileSync(new URL('../params.json', import.meta.url), 'utf8'));
+  const params: Params = resolveParams(paramsRaw);
+
   const projects = join(homedir(), '.claude', 'projects');
   const files = findJsonl(projects);
   process.stderr.write(`扫描 ${projects}\n找到 ${files.length} 卷 JSONL\n`);
 
   const cards: FileCard[] = [];
-  // 聚合解析统计（PARSE_REPORT 用）
   let totalLines = 0, parsedLines = 0, badLines = 0;
   const lineTypes: Record<string, number> = {};
   const unknownTools: Record<string, number> = {};
   let totalToolUse = 0, totalPaired = 0, totalUnpaired = 0, totalAsk = 0, totalSidechain = 0;
 
   for (const path of files) {
-    let res: ParseResult;
-    try {
-      res = parseTapeFile(path);
-    } catch (err) {
-      process.stderr.write(`跳过（读取/解析异常，禁 crash）: ${path} — ${(err as Error).message}\n`);
-      continue;
-    }
-    const s = res.stats;
+    let d: DistillResult;
+    try { d = distillFile(path, params); }
+    catch (err) { process.stderr.write(`跳过（读取/蒸馏异常，禁 crash）: ${path} — ${(err as Error).message}\n`); continue; }
+    const s = d.meta.stats;
     totalLines += s.totalLines; parsedLines += s.parsedLines; badLines += s.badLines;
     totalToolUse += s.toolUseCount; totalPaired += s.pairedCount; totalUnpaired += s.unpairedToolUse;
     totalAsk += s.askToolCount; totalSidechain += s.sidechainLines;
     for (const [k, v] of Object.entries(s.lineTypeCounts)) lineTypes[k] = (lineTypes[k] ?? 0) + v;
     for (const [k, v] of Object.entries(s.unknownTools)) unknownTools[k] = (unknownTools[k] ?? 0) + v;
-
-    cards.push({ path, short: relative(projects, path), health: healthOf(res), res });
+    cards.push({ path, short: relative(projects, path), health: healthOf(d), d });
   }
 
-  // 提名各 3 卷
   const smooth = cards.filter((c) => isSmooth(c.health))
     .sort((a, b) => b.health.eventCount - a.health.eventCount || a.health.failRate - b.health.failRate)
     .slice(0, 3);
-  // smooth 放宽层：近失候选，标注缺项（严格候选自动纳入且缺项为空）
   const strictShorts = new Set(smooth.map((c) => c.short));
   const smoothLoose = cards.filter((c) => isSmoothLoose(c.health) && !strictShorts.has(c.short))
     .sort((a, b) => smoothMisses(a.health).length - smoothMisses(b.health).length || a.health.failRate - b.health.failRate)
     .slice(0, 5);
-  const hell = cards.filter((c) => isHell(c.health))
+  const storm = cards.filter((c) => isStorm(c.health))
     .sort((a, b) => b.health.failCount - a.health.failCount || b.health.distinctSigs - a.health.distinctSigs)
-    .slice(0, 3);
-  const loop = cards.filter((c) => isLoop(c.health))
-    .sort((a, b) => b.health.maxSameSigRepeat - a.health.maxSameSigRepeat)
-    .slice(0, 3);
+    .slice(0, 5);
+  const jam = cards.filter((c) => isJam(c.health))
+    .sort((a, b) => b.health.maxSameSigRepeat - a.health.maxSameSigRepeat || b.health.activeMin - a.health.activeMin)
+    .slice(0, 5);
 
-  // ---- 输出：体检表到 stdout ----
   const nomBlock = (title: string, cs: FileCard[], note: string): string => {
     if (cs.length === 0) return `### ${title}\n\n_（无候选满足判据）_ ${note}\n`;
     return `### ${title}\n\n${TABLE_HEAD}\n${cs.map(healthRow).join('\n')}\n\n${note}\n`;
   };
-  // 放宽层带"缺项"列
   const looseBlock = (title: string, cs: FileCard[], note: string): string => {
     if (cs.length === 0) return `### ${title}\n\n_（无近失候选）_ ${note}\n`;
     const head = TABLE_HEAD.replace(' |\n', ' | 缺项 |\n').replace(/\|---\|$/, '|---|---|');
@@ -162,16 +146,16 @@ export function runScan(): void {
 
   const candidatesMd =
     `# 标准带候选体检表\n\n` +
-    `> 扫描 ${cards.length} 卷。船长各圈选 1 卷，复制入 \`tapes/\` 重命名 smooth/hell/loop.jsonl。\n` +
-    `> \`RESOLVE*\` 为 M0 代理（test-tagged RUN-OK 存在）；精确 RESOLVE 属 M1 引擎。\n\n` +
+    `> 扫描 ${cards.length} 卷（蒸馏后体检）。\`RESOLVE*\`=test-tagged RUN-OK 存在（体检代理）。\n` +
+    `> 圈选后 \`node cli/index.ts distill <原始> tapes/<名>.tape.jsonl\` 蒸馏入册。\n\n` +
     nomBlock('顺风带 smooth（严格判据）', smooth,
-      '判据：时长10–40min｜事件≥40｜失败率<5%｜含SAVE或test-OK｜最大同签名重复≤1') + '\n' +
-    looseBlock('顺风带 smooth（放宽层，船长指示）', smoothLoose,
-      '放宽：活跃5–60min｜事件≥30｜失败率<8%｜重复≤2。"缺项"= 未过的严格判据，供带信息圈选。') + '\n' +
-    nomBlock('地狱带 hell（3 提名）', hell,
+      '判据：活跃10–40min｜事件≥40｜失败率<5%｜含SAVE或test-OK｜最大同签名重复≤1') + '\n' +
+    looseBlock('顺风带 smooth（放宽层）', smoothLoose,
+      '放宽：活跃5–60min｜事件≥30｜失败率<8%｜重复≤2。"缺项"=未过的严格判据。') + '\n' +
+    nomBlock('风暴带 storm（提名）', storm,
       '判据：FAIL≥8 或 失败率≥25%｜独立签名≥3｜含SAVE或RESOLVE（张力弧完整）') + '\n' +
-    nomBlock('死循环带 loop（3 提名）', loop,
-      '判据：同签名10分钟窗内≥4次');
+    nomBlock('卡碟带 jam（提名）', jam,
+      '判据：同签名10min窗内≥4次｜活跃≥5min｜事件≥30（施工令 §5 加厚）');
   writeFileSync(join(outDir, 'CANDIDATES.md'), candidatesMd, 'utf8');
 
   process.stdout.write(candidatesMd);
@@ -191,53 +175,27 @@ function buildParseReport(i: ReportInput): string {
   const cov = fmt((i.parsedLines / Math.max(1, i.totalLines)) * 100);
   const unknownList = Object.entries(i.unknownTools).sort((a, b) => b[1] - a[1]);
   const lineTypeList = Object.entries(i.lineTypes).sort((a, b) => b[1] - a[1]);
-  return `# PARSE_REPORT — M0 格式考古
+  return `# PARSE_REPORT — 格式考古（蒸馏口径）
 
-> 由 \`cli scan\` 自动生成。规范：TAPE0_SPEC_v0.1 §5 / §10。
+> 由 \`cli scan\` 自动生成。原始经蒸馏器读一次化为骨架。逐条现实修正见 FEEDBACK.md。
 
 ## 解析覆盖
-
 - 扫描目录：\`${i.projects}\`
 - JSONL 文件：${i.fileCount}（成功体检 ${i.scannedCount}）
-- 总行数：${i.totalLines}｜成功 JSON 解析：${i.parsedLines}｜**异常行：${i.badLines}**
+- 总行数：${i.totalLines}｜成功解析：${i.parsedLines}｜**异常行：${i.badLines}**
 - **解析覆盖率：${cov}%**
-- tool_use 总数：${i.totalToolUse}｜已配对结果：${i.totalPaired}｜未配对（未决/尾随局限）：${i.totalUnpaired}
-- sidechain（子 agent）行：${i.totalSidechain}（v0 全折叠为 agent="main"，字段留位待 M?多轨）
+- tool_use 总数：${i.totalToolUse}｜已配对：${i.totalPaired}｜未配对：${i.totalUnpaired}
+- AskUserQuestion：${i.totalAsk} 次（现映射 **ASK**，施工令裁决④已签核）
+- sidechain（子 agent）行：${i.totalSidechain}（v0 折叠 main，仅计数）
 
-## as-built 字段对照表（假设 → 现实 → 采用）
-
-| 语义 | §4/§5 假设 | 真实 JSONL 位置 | M0 采用 |
-|---|---|---|---|
-| 工具调用 | \`type:assistant\` 的 \`tool_use\` | \`assistant.message.content[]\`，block \`type:"tool_use"\`（id/name/input） | ✅ 按此 |
-| 工具结果 | 对应 \`tool_result\` | \`user.message.content[]\`，block \`type:"tool_result"\`（tool_use_id/content） | ✅ 按此 |
-| 配对键 | 以 id 配对 | \`tool_use.id\` === \`tool_result.tool_use_id\` | ✅ 按此 |
-| 错误标记 outcome | \`is_error\` 或等价物 | \`tool_result.is_error\`（布尔，存在于结果 block） | ✅ is_error→FAIL |
-| RUN 时长 | tool_use↔result 时差 | 顶层 \`toolUseResult.durationMs\`（Bash 才有）；缺则回退时间戳配对时差 | ✅ 优先 durationMs |
-| 退出码 | — | 顶层 \`toolUseResult.code\`（Bash）；≠0→FAIL | ✅ 采用 |
-| 中断 | — | 顶层 \`toolUseResult.interrupted:true\` | ✅ interrupted→NA |
-| WRITE 幅度 | diff 行数 cap500 | \`toolUseResult.structuredPatch[].lines\`（+/-）；缺则 old/new/content 行数 | ✅ structuredPatch 优先 |
-| READ 幅度 | 内容 KB cap100 | \`toolUseResult.file.bytes\`/\`bytes\`；缺则 result 文本 UTF-8 字节 | ✅ 按此 |
-| 时间戳 | 数字注入 | ISO 字符串（如 \`2026-06-28T03:55:38.102Z\`）→ \`Date.parse\`→ms | ✅ 转换 |
-| 丢弃行 | "其余一切故意丢弃" | \`mode\`/\`permission-mode\`/\`file-history-snapshot\`/\`ai-title\`/\`last-prompt\`/\`system\`/\`attachment\`/\`queue-operation\` | ✅ 计数不解析 |
-
-## 行类型分布（全量）
-
+## 行类型分布
 ${lineTypeList.map(([k, v]) => `- \`${k}\`: ${v}`).join('\n')}
 
 ## 未知工具清单（→ OTHER，禁 crash，计数上报）
-
 ${unknownList.length === 0 ? '（无）' : unknownList.map(([k, v]) => `- \`${k}\`: ${v}`).join('\n')}
 
-## 现实修正（规范说 X／现实是 Y／我做了 Z）
-
-1. **ASK 信号**：§4 说 ASK 无显式源工具、靠 §5 的 >15s 启发式；现实是存在显式 **\`AskUserQuestion\`** 工具（本次扫描出现 ${i.totalAsk} 次），是比启发式精确得多的 ASK 信号。M0 我按冻结的 §4 表把它归入 **OTHER 并计数上报**，未擅自改动动词映射。**建议**：架构师签核后在适配器把 \`AskUserQuestion → ASK\`（精确信号优于启发式，且不改协议 schema）。
-2. **RUN 时长来源**：§5 说用 tool_use↔result 时差；现实是 Bash 结果直接带 \`durationMs\`（更准，且不受尾随乱序影响）。我做了：优先 \`durationMs\`，缺失才回退时差。
-3. **子 agent**：现实日志有 \`isSidechain\` / \`sourceToolAssistantUUID\` 可精确识别子 agent 轨道（本次 ${i.totalSidechain} 行）；v0 单轨，我全折叠为 \`agent="main"\`，仅计数，为未来多轨留地基（未越级建多轨 UI）。
-4. **SESSION_START / DONE**：无显式"会话终结"记录类型；DONE 用"末条 assistant 有 stop_reason 且无未决工具"近似（§5 的静默>10min 判据属 live 尾随，replay 全文视角用此代理）。
-5. **一个 JSONL 文件 ≠ 一场会话**：§9 隐含"磁带≈会话"，现实是同一文件被 resume/continue 跨日追加——扫描见到墙钟跨度高达 ~11 天（15969 min）的文件。墙钟时长因此严重虚高。我做了：新增 **"活跃时长 activeMin"**（只累加 <10min 的相邻事件间隔），smooth 的 10–40min 判据落在活跃时长上；体检表两列并列（活跃/墙钟）供船长判断。未擅自把文件切成多会话（那是 selection 粒度的重构，超 M0 范围）——若架构师要求，可在 §9 增补"按 >N min 空档分段"细则。
-
 ## 金测试
-
-- 未知工具 → OTHER 不 crash：见 \`golden/unknown-tool.test.ts\`（\`npm test\`）。
+- 未知工具 → OTHER 不 crash：\`golden/unknown-tool.test.ts\`
+- 引擎与蒸馏/回放确定性：\`golden/engine.test.ts\`（\`npm test\`）
 `;
 }

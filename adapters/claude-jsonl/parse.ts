@@ -1,5 +1,10 @@
-// claude-jsonl 适配器核心：纯函数 text → 事件流 + 解析统计。
-// 无 fs、无网络（fs 封装在 index.ts）。同构可测。
+// claude-jsonl 蒸馏核（§3 蒸馏工序）：纯函数 原始JSONL文本 → 蒸馏记录 + meta。
+// 无 fs、无网络（fs 封装在 distill.ts / index.ts）。同构可测。
+//
+// 【隐私膜】这是全系统唯一读取原始 JSONL 的地方。产出蒸馏带只含事件骨架：
+//   t / useT / resolveT / verb / tool / outcome / m原料量(mKind+mRaw) / durationMs
+//   / sig / episode / sidechain / seq，外加唯一文本字段 errClass（错误首行归一化，≤60）。
+//   工具输入、输出正文、对话内容一律不落盘。
 //
 // as-built（对照真实 ~/.claude/projects/**/*.jsonl，M0 格式考古）：
 //  - tool_use 在 assistant.message.content[]（block.type==='tool_use'：id/name/input）
@@ -7,17 +12,114 @@
 //  - 配对键：tool_use.id === tool_result.tool_use_id
 //  - 富结果在顶层 toolUseResult（durationMs/code/structuredPatch/interrupted/file...）
 //  - timestamp 为 ISO 字符串 → Date.parse → ms
-//  - 其余 line type（mode/system/file-history-snapshot/ai-title/...）故意丢弃（§4）
 
-import type { MomentEvent, Verb, Outcome } from '../../protocol/index.ts';
-import {
-  verbOf,
-  classifyBash,
-  tagsForCommand,
-  isKnownTool,
-} from './verbs.ts';
+import type { Verb, Outcome, Special } from '../../protocol/index.ts';
+import type { Params } from '../../engine/params.ts';
+import { verbOf, classifyBash, tagsForCommand, isKnownTool } from './verbs.ts';
 
-// ---- 松散的日志行类型（真实日志字段多，只narrow我们要的）----
+// ---- m 原料量的种类：决定消费时用哪个 cap 归一 ----
+export type MKind = 'lines' | 'sec' | 'kb' | 'default';
+
+/** 蒸馏记录：一行事件骨架。序列化即蒸馏带一行。 */
+export interface DistilledMoment {
+  t: number;               // 效果落地时刻 = resolveT ?? useT
+  useT: number;            // tool_use 发起时刻（未决 RUN 滴灌窗起点基准）
+  resolveT: number | null; // tool_result 到达时刻（未配对=null；标点=t）
+  seq: number;
+  verb: Verb;
+  tool: string;            // 源工具名（骨架，非内容）
+  outcome: Outcome;
+  mKind: MKind;            // m 原料量种类
+  mRaw: number;            // 原料量（行/秒/KB；default 为 0）
+  durationMs: number | null;
+  tags: string[];          // test/build 语义标签（派生分类，非内容）
+  sig: string | null;      // hash(verb|tool|errClass) —— 稳定聚类键
+  errClass: string | null; // 唯一文本字段：错误首行归一化(抹路径/hex/token/数字)≤60；仅 FAIL
+  episode: number;         // 会话分段序号（§4.1）
+  sidechain: boolean;      // 子 agent 轨（v0 折叠 main，仅留标记）
+  special: Special | null; // SESSION_START / DONE 等标点
+}
+
+export interface EpisodeInfo { i: number; startT: number; endT: number; events: number }
+
+export interface DistillStats {
+  totalLines: number;
+  parsedLines: number;
+  badLines: number;
+  parseCoverage: number;
+  lineTypeCounts: Record<string, number>;
+  toolUseCount: number;
+  toolResultCount: number;
+  pairedCount: number;
+  unpairedToolUse: number;
+  sidechainLines: number;
+  unknownTools: Record<string, number>;
+  askToolCount: number;
+  firstT: number | null;
+  lastT: number | null;
+}
+
+export interface DistillMeta {
+  distiller: string;      // 蒸馏器版本
+  sourceHash: string;     // 原始文件字节 FNV-1a
+  episodes: EpisodeInfo[];
+  eventCount: number;     // 非标点记录数
+  stats: DistillStats;
+}
+
+export interface DistillResult {
+  records: DistilledMoment[]; // 已按 (t,seq) 排序，含标点
+  meta: DistillMeta;
+}
+
+export const DISTILLER_VERSION = 'distill/1';
+
+// ---------- 工具函数 ----------
+
+const enc = new TextEncoder();
+function utf8Bytes(s: string): number {
+  return enc.encode(s).length;
+}
+
+/** FNV-1a 32-bit → 8位hex。确定性、零依赖。 */
+export function fnv1a(s: string): string {
+  let h = 0x811c9dc5;
+  for (let i = 0; i < s.length; i++) {
+    h ^= s.charCodeAt(i);
+    h = (h + ((h << 1) + (h << 4) + (h << 7) + (h << 8) + (h << 24))) >>> 0;
+  }
+  return h.toString(16).padStart(8, '0');
+}
+
+/** 归一化错误首行：抹路径/hex/长token/数字，供 sig 稳定聚类。截断 60（§3.2）。 */
+function normErr(text: string): string {
+  const first = (text.split('\n')[0] ?? '').toLowerCase();
+  return first
+    .replace(/[\/~][\w./@-]+/g, 'PATH')
+    .replace(/0x[0-9a-f]+/g, 'HEX')
+    .replace(/[a-z0-9_-]{16,}/g, 'TOKEN') // 隐私加固：抹长 token（密钥/哈希）
+    .replace(/\d+/g, '0')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .slice(0, 60);
+}
+
+/** 从 tool_result 的 content（string 或 block[]）提取文本。仅蒸馏内部用，不落盘。 */
+function resultText(content: unknown): string {
+  if (typeof content === 'string') return content;
+  if (Array.isArray(content)) {
+    return content
+      .map((b) => (b && typeof b === 'object' && 'text' in b ? String((b as ContentBlock).text ?? '') : ''))
+      .join('\n');
+  }
+  return '';
+}
+
+function num(v: unknown): number | undefined {
+  return typeof v === 'number' && Number.isFinite(v) ? v : undefined;
+}
+
+// ---- 松散日志行类型 ----
 interface ContentBlock {
   type?: string;
   id?: string;
@@ -43,89 +145,9 @@ interface RawLine {
   sourceToolAssistantUUID?: string;
 }
 
-export interface ParseStats {
-  totalLines: number;
-  parsedLines: number;
-  badLines: number;
-  parseCoverage: number; // parsedLines / totalLines
-  lineTypeCounts: Record<string, number>;
-  toolUseCount: number;
-  toolResultCount: number;
-  pairedCount: number;
-  unpairedToolUse: number; // 无配对结果（尾随局限 / 未决）
-  sidechainLines: number;
-  unknownTools: Record<string, number>; // name → count（→ OTHER）
-  askToolCount: number; // AskUserQuestion 出现次数（现实修正观测量）
-  firstT: number | null;
-  lastT: number | null;
-}
-
-/** 内部增强：带 tool_use / tool_result 时刻，供回放驱动做未决 RUN 滴灌。 */
-export interface TimedMoment extends MomentEvent {
-  useT: number;          // tool_use 发起时刻
-  resolveT: number | null; // tool_result 到达时刻（未配对为 null）
-}
-
-export interface ParseResult {
-  moments: MomentEvent[]; // 协议净版（供总线/CSV/测试）
-  timed: TimedMoment[];   // 内部增强版（供 driver）
-  stats: ParseStats;
-}
-
-// ---------- 工具函数 ----------
-
-const enc = new TextEncoder();
-function utf8Bytes(s: string): number {
-  return enc.encode(s).length;
-}
-
-/** 对数归一幅度：m = min(1, ln(1+x)/ln(1+cap))。 */
-function amp(x: number, cap: number): number {
-  if (x <= 0) return 0;
-  return Math.min(1, Math.log(1 + x) / Math.log(1 + cap));
-}
-
-/** FNV-1a 32-bit → 8位hex。确定性、零依赖。 */
-function fnv1a(s: string): string {
-  let h = 0x811c9dc5;
-  for (let i = 0; i < s.length; i++) {
-    h ^= s.charCodeAt(i);
-    h = (h + ((h << 1) + (h << 4) + (h << 7) + (h << 8) + (h << 24))) >>> 0;
-  }
-  return h.toString(16).padStart(8, '0');
-}
-
-/** 归一化错误首行：抹掉数字/路径/hex，供 sig 稳定聚类。 */
-function normErr(text: string): string {
-  const first = (text.split('\n')[0] ?? '').toLowerCase();
-  return first
-    .replace(/[\/~][\w./@-]+/g, 'PATH')
-    .replace(/0x[0-9a-f]+/g, 'HEX')
-    .replace(/\d+/g, '0')
-    .replace(/\s+/g, ' ')
-    .trim()
-    .slice(0, 120);
-}
-
-/** 从 tool_result 的 content（string 或 block[]）提取文本。 */
-function resultText(content: unknown): string {
-  if (typeof content === 'string') return content;
-  if (Array.isArray(content)) {
-    return content
-      .map((b) => (b && typeof b === 'object' && 'text' in b ? String((b as ContentBlock).text ?? '') : ''))
-      .join('\n');
-  }
-  return '';
-}
-
-function num(v: unknown): number | undefined {
-  return typeof v === 'number' && Number.isFinite(v) ? v : undefined;
-}
-
-// ---------- 幅度计算 ----------
+// ---------- 原料量提取（原始 → mRaw；m 归一在消费侧 consume.ts） ----------
 
 function writeDiffLines(input: Record<string, unknown> | undefined, tur: Record<string, unknown> | undefined): number {
-  // 优先 structuredPatch：统计 +/- 变更行
   const patch = tur?.['structuredPatch'];
   if (Array.isArray(patch)) {
     let changed = 0;
@@ -140,7 +162,6 @@ function writeDiffLines(input: Record<string, unknown> | undefined, tur: Record<
     }
     if (changed > 0) return changed;
   }
-  // 退路：Write 用 content 行数；Edit 用 old/new 行数差
   const content = input?.['content'];
   if (typeof content === 'string') return content.split('\n').length;
   const oldS = typeof input?.['old_string'] === 'string' ? (input['old_string'] as string) : '';
@@ -148,11 +169,7 @@ function writeDiffLines(input: Record<string, unknown> | undefined, tur: Record<
   return Math.max(oldS.split('\n').length, newS.split('\n').length);
 }
 
-function runSeconds(
-  tur: Record<string, unknown> | undefined,
-  useT: number,
-  resT: number | null,
-): number {
+function runSeconds(tur: Record<string, unknown> | undefined, useT: number, resT: number | null): number {
   const d = num(tur?.['durationMs']);
   if (d !== undefined) return d / 1000;
   if (resT !== null && resT > useT) return (resT - useT) / 1000;
@@ -181,37 +198,45 @@ interface ResultRec {
   t: number | null;
 }
 
-// ---------- 主解析 ----------
+// 尚未分段/未定 seq 的原料记录
+interface PreMoment {
+  useT: number;
+  resolveT: number | null;
+  t: number;
+  verb: Verb;
+  tool: string;
+  outcome: Outcome;
+  mKind: MKind;
+  mRaw: number;
+  durationMs: number | null;
+  tags: string[];
+  sig: string;
+  errClass: string | null;
+  sidechain: boolean;
+}
 
-const AMP = { writeDiffCap: 500, runSecCap: 120, readKbCap: 100, default: 0.3 } as const;
+// ---------- 主蒸馏 ----------
 
-export function parseTape(text: string): ParseResult {
+/** 原始 JSONL 文本 → 蒸馏记录 + meta。唯一读原始的入口。 */
+export function distillTape(text: string, params: Params): DistillResult {
+  const extra = params.adapter.verbMapExtra;
+  const episodeGapMs = params.adapter.episodeGapMin * 60_000;
+
   const rawLines = text.split('\n');
   const lineTypeCounts: Record<string, number> = {};
   const unknownTools: Record<string, number> = {};
   const resultsById = new Map<string, ResultRec>();
 
-  let totalLines = 0;
-  let parsedLines = 0;
-  let badLines = 0;
-  let toolResultCount = 0;
-  let sidechainLines = 0;
-  let askToolCount = 0;
-  let firstT: number | null = null;
-  let lastT: number | null = null;
-
+  let totalLines = 0, parsedLines = 0, badLines = 0, toolResultCount = 0, sidechainLines = 0, askToolCount = 0;
+  let firstT: number | null = null, lastT: number | null = null;
   const parsed: RawLine[] = [];
 
   for (const raw of rawLines) {
     if (raw.trim() === '') continue;
     totalLines++;
     let o: RawLine;
-    try {
-      o = JSON.parse(raw) as RawLine;
-    } catch {
-      badLines++; // 解析失败：跳过、计数、上报，禁 crash
-      continue;
-    }
+    try { o = JSON.parse(raw) as RawLine; }
+    catch { badLines++; continue; } // 解析失败：跳过、计数、禁 crash
     parsedLines++;
     parsed.push(o);
     const ty = o.type ?? '(no-type)';
@@ -224,14 +249,12 @@ export function parseTape(text: string): ParseResult {
       if (lastT === null || ts > lastT) lastT = ts;
     }
 
-    // 索引 tool_result（在 user 消息里）
     if (o.type === 'user' && o.message && Array.isArray(o.message.content)) {
       for (const b of o.message.content) {
         if (b.type === 'tool_result' && typeof b.tool_use_id === 'string') {
           toolResultCount++;
           const tur = typeof o.toolUseResult === 'object' && o.toolUseResult !== null
-            ? (o.toolUseResult as Record<string, unknown>)
-            : undefined;
+            ? (o.toolUseResult as Record<string, unknown>) : undefined;
           resultsById.set(b.tool_use_id, {
             isError: b.is_error === true,
             interrupted: tur?.['interrupted'] === true,
@@ -245,21 +268,9 @@ export function parseTape(text: string): ParseResult {
     }
   }
 
-  // 第二遍：assistant tool_use → MomentEvent
-  const timed: TimedMoment[] = [];
-  let seq = 0;
-  let toolUseCount = 0;
-  let pairedCount = 0;
-  let unpairedToolUse = 0;
-
-  // SESSION_START 标点
-  if (firstT !== null) {
-    timed.push({
-      kind: 'moment', t: firstT, seq: seq++, agent: 'main',
-      verb: 'OTHER', outcome: 'NA', m: 0, tags: [], special: 'SESSION_START',
-      useT: firstT, resolveT: firstT,
-    });
-  }
+  // 第二遍：assistant tool_use → PreMoment（原料量，未分段）
+  const pre: PreMoment[] = [];
+  let toolUseCount = 0, pairedCount = 0, unpairedToolUse = 0;
 
   for (const o of parsed) {
     if (o.type !== 'assistant' || !o.message || !Array.isArray(o.message.content)) continue;
@@ -269,18 +280,15 @@ export function parseTape(text: string): ParseResult {
       toolUseCount++;
       const name = b.name;
       if (name === 'AskUserQuestion') askToolCount++;
-      if (!isKnownTool(name)) unknownTools[name] = (unknownTools[name] ?? 0) + 1;
+      if (!isKnownTool(name, extra)) unknownTools[name] = (unknownTools[name] ?? 0) + 1;
 
       const input = (b.input && typeof b.input === 'object') ? b.input : undefined;
       const command = typeof input?.['command'] === 'string' ? (input['command'] as string) : undefined;
-
-      let verb: Verb = name === 'Bash' ? classifyBash(command) : verbOf(name);
+      const verb: Verb = name === 'Bash' ? classifyBash(command) : verbOf(name, extra);
 
       const res = typeof b.id === 'string' ? resultsById.get(b.id) : undefined;
-      if (res) pairedCount++;
-      else unpairedToolUse++;
+      if (res) pairedCount++; else unpairedToolUse++;
 
-      // outcome
       let outcome: Outcome;
       if (!res) outcome = 'NA';
       else if (res.interrupted) outcome = 'NA';
@@ -288,90 +296,78 @@ export function parseTape(text: string): ParseResult {
       else if (res.code !== undefined && res.code !== 0) outcome = 'FAIL';
       else outcome = 'OK';
 
-      // 幅度 m
-      let m: number;
-      switch (verb) {
-        case 'WRITE':
-          m = amp(writeDiffLines(input, res?.tur), AMP.writeDiffCap);
-          break;
-        case 'RUN':
-        case 'SAVE': {
-          const secs = runSeconds(res?.tur, Number.isFinite(t) ? t : 0, res?.t ?? null);
-          m = verb === 'RUN' ? amp(secs, AMP.runSecCap) : AMP.default;
-          break;
-        }
-        case 'READ':
-          m = amp(readKb(res?.tur, res?.text ?? ''), AMP.readKbCap);
-          break;
-        default:
-          m = AMP.default;
-      }
-
-      // tags
-      const tags = verb === 'RUN' || verb === 'SAVE' ? tagsForCommand(command) : [];
-
-      // sig：hash(verb + tool + normalize(错误首行))
-      const errLine = outcome === 'FAIL' ? normErr(res?.text ?? '') : '';
-      const sig = fnv1a(`${verb}|${name}|${errLine}`);
-
       const useT = Number.isFinite(t) ? t : (firstT ?? 0);
       const resolveT = res?.t ?? null;
-      // 效果落地时刻 = 结果到达时（outcome 可见时张力才响应）；未配对退回 useT
       const effectT = resolveT ?? useT;
+      const durationMs = num(res?.tur?.['durationMs']) ?? null;
 
-      timed.push({
-        kind: 'moment',
-        t: effectT,
-        seq: seq++,
-        agent: 'main',
-        verb,
-        outcome,
-        m,
-        tags,
-        sig,
-        useT,
-        resolveT,
+      // 原料量（不归一）
+      let mKind: MKind, mRaw: number;
+      switch (verb) {
+        case 'WRITE': mKind = 'lines'; mRaw = writeDiffLines(input, res?.tur); break;
+        case 'RUN': mKind = 'sec'; mRaw = runSeconds(res?.tur, useT, resolveT); break;
+        case 'READ': mKind = 'kb'; mRaw = readKb(res?.tur, res?.text ?? ''); break;
+        default: mKind = 'default'; mRaw = 0; // SAVE/ASK/SPAWN/OTHER 用默认幅度
+      }
+
+      const tags = verb === 'RUN' || verb === 'SAVE' ? tagsForCommand(command) : [];
+      const errClass = outcome === 'FAIL' ? normErr(res?.text ?? '') : null;
+      const sig = fnv1a(`${verb}|${name}|${errClass ?? ''}`);
+
+      pre.push({
+        useT, resolveT, t: effectT, verb, tool: name, outcome,
+        mKind, mRaw, durationMs, tags, sig, errClass, sidechain: o.isSidechain === true,
       });
     }
   }
 
-  // DONE 启发式（replay 全文视角）：末条 assistant 有 stop_reason 且无未决工具 → 收尾
-  const lastAssistant = [...parsed].reverse().find((o) => o.type === 'assistant');
-  if (lastAssistant && lastT !== null) {
-    const hasStop = !!lastAssistant.message?.stop_reason;
-    if (hasStop && unpairedToolUse === 0) {
-      timed.push({
-        kind: 'moment', t: lastT, seq: seq++, agent: 'main',
-        verb: 'OTHER', outcome: 'NA', m: 0, tags: [], special: 'DONE',
-        useT: lastT, resolveT: lastT,
-      });
-    }
-  }
+  // 排序（效果时刻，稳定）
+  pre.sort((a, b) => a.t - b.t);
 
-  // 排序（效果时刻，seq 破平）→ 协议净版
-  timed.sort((a, b) => a.t - b.t || a.seq - b.seq);
-  const moments: MomentEvent[] = timed.map((tm) => {
-    const { useT, resolveT, ...clean } = tm;
-    void useT; void resolveT;
-    return clean;
-  });
-
-  const stats: ParseStats = {
-    totalLines,
-    parsedLines,
-    badLines,
-    parseCoverage: totalLines === 0 ? 1 : parsedLines / totalLines,
-    lineTypeCounts,
-    toolUseCount,
-    toolResultCount,
-    pairedCount,
-    unpairedToolUse,
-    sidechainLines,
-    unknownTools,
-    askToolCount,
-    firstT,
-    lastT,
+  // 会话分段（§4.1）：相邻效果时刻空档 > episodeGapMs 切段
+  const episodes: EpisodeInfo[] = [];
+  const records: DistilledMoment[] = [];
+  let seq = 0;
+  const pushSpecial = (special: Special, t: number, episode: number): void => {
+    records.push({
+      t, useT: t, resolveT: t, seq: seq++, verb: 'OTHER', tool: '', outcome: 'NA',
+      mKind: 'default', mRaw: 0, durationMs: null, tags: [], sig: null, errClass: null,
+      episode, sidechain: false, special,
+    });
   };
 
-  return { moments, timed, stats };
+  if (pre.length > 0) {
+    // 分段边界
+    const bounds: number[] = [0];
+    for (let i = 1; i < pre.length; i++) {
+      if (pre[i]!.t - pre[i - 1]!.t > episodeGapMs) bounds.push(i);
+    }
+    bounds.push(pre.length);
+    for (let e = 0; e < bounds.length - 1; e++) {
+      const lo = bounds[e]!, hi = bounds[e + 1]!;
+      const startT = pre[lo]!.t, endT = pre[hi - 1]!.t;
+      episodes.push({ i: e, startT, endT, events: hi - lo });
+      pushSpecial('SESSION_START', startT, e);
+      for (let i = lo; i < hi; i++) {
+        const p = pre[i]!;
+        records.push({
+          t: p.t, useT: p.useT, resolveT: p.resolveT, seq: seq++,
+          verb: p.verb, tool: p.tool, outcome: p.outcome, mKind: p.mKind, mRaw: p.mRaw,
+          durationMs: p.durationMs, tags: p.tags, sig: p.sig, errClass: p.errClass,
+          episode: e, sidechain: p.sidechain, special: null,
+        });
+      }
+      pushSpecial('DONE', endT, e);
+    }
+  }
+
+  const stats: DistillStats = {
+    totalLines, parsedLines, badLines,
+    parseCoverage: totalLines === 0 ? 1 : parsedLines / totalLines,
+    lineTypeCounts, toolUseCount, toolResultCount, pairedCount, unpairedToolUse,
+    sidechainLines, unknownTools, askToolCount, firstT, lastT,
+  };
+  const sourceHash = fnv1a(text);
+  const meta: DistillMeta = { distiller: DISTILLER_VERSION, sourceHash, episodes, eventCount: pre.length, stats };
+  return { records, meta };
 }

@@ -19,16 +19,19 @@ for (const [verb, tools] of Object.entries(VERB_TABLE)) {
 // RUN 单独：Bash（git commit 时升格 SAVE，见 classifyBash）
 TOOL_TO_VERB.set('Bash', 'RUN');
 
-/** 已知工具集合（用于区分"已知丢弃"与"未知兜底"）。 */
-export function isKnownTool(name: string): boolean {
-  return TOOL_TO_VERB.has(name);
+/** 已知工具集合（用于区分"已知丢弃"与"未知兜底"）。extra=params.adapter.verbMapExtra。 */
+export function isKnownTool(name: string, extra?: Record<string, string>): boolean {
+  return TOOL_TO_VERB.has(name) || (!!extra && Object.prototype.hasOwnProperty.call(extra, name));
 }
 
 /**
  * 工具名 → 动词。未知工具 → OTHER（兜底，禁 crash）。
+ * extra（params.adapter.verbMapExtra，已签核）优先：AskUserQuestion→ASK、ToolSearch→READ。
  * Bash 的 SAVE 升格在 classifyBash 里做（需命令文本）。
  */
-export function verbOf(name: string): Verb {
+export function verbOf(name: string, extra?: Record<string, string>): Verb {
+  const e = extra?.[name];
+  if (e) return e as Verb;
   return TOOL_TO_VERB.get(name) ?? 'OTHER';
 }
 

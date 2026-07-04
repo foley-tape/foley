@@ -34,6 +34,8 @@ export function runProbe(argv: string[]): void {
   const kindIdx = argv.indexOf('--kind');
   const kind = (kindIdx >= 0 ? argv[kindIdx + 1] : undefined) as TapeKind | undefined;
   const outIdx = argv.indexOf('--out');
+  const anonIdx = argv.indexOf('--anon');
+  const anonLabel = anonIdx >= 0 ? argv[anonIdx + 1] : undefined; // 盲听匿名：清带名/卷号/日期/统计
 
   const paramsRaw = JSON.parse(readFileSync(new URL('../params.json', import.meta.url), 'utf8'));
   const params = resolveParams(paramsRaw);
@@ -87,13 +89,18 @@ export function runProbe(argv: string[]): void {
   sounds.sort((a, b) => a[0] - b[0]);
 
   const durationMs = track.length ? track[track.length - 1]![0] : 0;
-  const data = {
-    tape: basename(tapePath), kind: kind ?? '',
-    engineSha: gitSha(), paramsHash: hashParams(paramsRaw), verdictHash,
-    provisional: true, durationMs, peakT: core.metrics.peakT,
-    stuck: core.metrics.stuckEdges, resolves: core.metrics.resolves,
-    track, sounds,
-  };
+  const anon = !!anonLabel;
+  const data = anon
+    ? { // 匿名：只留 label，抹带名/卷号/日期/engine/params/verdict/统计（防推断）
+        tape: anonLabel, kind: '', engineSha: '—', paramsHash: '—', verdictHash: '—',
+        provisional: false, anon: true, durationMs, peakT: 0, stuck: 0, resolves: 0, track, sounds,
+      }
+    : {
+        tape: basename(tapePath), kind: kind ?? '',
+        engineSha: gitSha(), paramsHash: hashParams(paramsRaw), verdictHash,
+        provisional: false, anon: false, durationMs, peakT: core.metrics.peakT,
+        stuck: core.metrics.stuckEdges, resolves: core.metrics.resolves, track, sounds,
+      };
 
   const html = buildProbeHtml(data);
   const ts = new Date().toISOString().replace(/[:.]/g, '-');
@@ -229,7 +236,7 @@ function drawCurve(pm){ const w=cc.width,h=cc.height; ccx.clearRect(0,0,w,h);
   ccx.strokeStyle='#59c'; ccx.lineWidth=1.5; ccx.stroke();
   const px=pm/span*w; ccx.strokeStyle='#e0b050'; ccx.lineWidth=1; ccx.beginPath(); ccx.moveTo(px,0); ccx.lineTo(px,h); ccx.stroke();
   ccx.fillStyle='#6b6b70'; ccx.font='11px ui-monospace,monospace'; ccx.textAlign='left';
-  ccx.fillText('T 曲线 · 峰值 '+D.peakT.toFixed(3)+' · 跳针×'+D.stuck+' · 和弦×'+D.resolves,6,14); }
+  ccx.fillText(D.anon?'T 曲线':('T 曲线 · 峰值 '+D.peakT.toFixed(3)+' · 跳针×'+D.stuck+' · 和弦×'+D.resolves),6,14); }
 function frame(){ const pm=Math.min(playMs(),dur); const s=sampleAt(pm);
   drawNeedle(s[1],s[4]); drawCurve(pm);
   document.getElementById('prog').textContent=(pm/1000).toFixed(0)+'s / '+(dur/1000).toFixed(0)+'s';

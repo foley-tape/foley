@@ -24,7 +24,7 @@ const ACTIVE_GAP_MS = 600_000; // 占空/雨量分母：相邻采样间隔 <10mi
 
 export type TapeKind = 'silence' | 'smooth' | 'busy' | 'jam' | 'storm' | null;
 
-interface Emit { ev: DerivedMoment; emitT: number }
+export interface Emit { ev: DerivedMoment; emitT: number }
 interface LedgerEntry { t: number; seq: number; label: string; dS: number }
 
 export interface ReplayMeta {
@@ -251,28 +251,40 @@ function checkJamMonotone(snaps: StatePacket[], emitted: Emit[]): boolean {
 
 // ---------- 金时刻评分（M1.6-A §4，本轮记分不拦路） ----------
 
-function evalLandmarks(landmarks: Landmark[], kind: TapeKind, snaps: StatePacket[], episodes: DistillResult['meta']['episodes']): LandmarkResult[] {
+export function evalLandmarks(landmarks: Landmark[], kind: TapeKind, snaps: StatePacket[], episodes: DistillResult['meta']['episodes'], emitted: Emit[]): LandmarkResult[] {
   const out: LandmarkResult[] = [];
-  const forKind = landmarks.filter((l) => l.tape === kind);
-  for (const l of forKind) {
+  const R = (id: string, desc: string, ok: boolean, na: boolean, detail: string): LandmarkResult => ({ id, desc, ok, na, detail });
+  for (const l of landmarks.filter((x) => x.tape === kind)) {
     if (l.kind === 'peakInWindow') {
       const lo = Date.parse(l.fromUtc!), hi = Date.parse(l.toUtc!);
       const win = snaps.filter((s) => s.t >= lo && s.t <= hi);
       const peak = win.reduce((mx, s) => Math.max(mx, s.T), 0);
-      out.push({ id: l.id, desc: l.desc, ok: peak >= (l.minPeakT ?? 0), detail: `窗内峰值 T=${peak.toFixed(3)}（阈 ≥${l.minPeakT}）` });
-    } else if (l.kind === 'decayDrop') {
-      const lo = Date.parse(l.fromUtc!), hi = lo + (l.windowSec ?? 0) * 1000;
-      const win = snaps.filter((s) => s.t >= lo && s.t <= hi);
-      if (win.length < 2) { out.push({ id: l.id, desc: l.desc, ok: false, detail: '窗内采样不足' }); continue; }
+      out.push(R(l.id, l.desc, peak >= (l.minPeakT ?? 0), false, `窗内峰值 T=${peak.toFixed(3)}（阈 ≥${l.minPeakT}）`));
+    } else if (l.kind === 'decayAfterClear') {
+      // 自定位（M1.7 §1.2）：末次 STUCK_CLEARED 后，首个 ≥windowSec 无充能(无FAIL)区间；前置不满足→N/A
+      const clears = emitted.filter((e) => e.ev.special === 'STUCK_CLEARED').map((e) => e.ev.t);
+      const winMs = (l.windowSec ?? 120) * 1000;
+      const lastSnapT = snaps.length ? snaps[snaps.length - 1]!.t : 0;
+      if (clears.length === 0) { out.push(R(l.id, l.desc, false, true, '前置不满足：全带无 STUCK_CLEARED → N/A')); continue; }
+      const lastClear = Math.max(...clears);
+      const fails = emitted.filter((e) => !e.ev.special && e.ev.outcome === 'FAIL' && e.ev.t >= lastClear).map((e) => e.ev.t);
+      let a: number | null = null;
+      for (const s of snaps) {
+        if (s.t < lastClear) continue;
+        if (s.t + winMs > lastSnapT) break; // 窗超出磁带
+        if (!fails.some((ft) => ft >= s.t && ft <= s.t + winMs)) { a = s.t; break; }
+      }
+      if (a === null) { out.push(R(l.id, l.desc, false, true, '末次破卡碟后无 ≥120s 无充能区间 → N/A')); continue; }
+      const win = snaps.filter((s) => s.t >= a! && s.t <= a! + winMs);
       const t0 = win[0]!.T, tEnd = win[win.length - 1]!.T;
       let nonInc = true;
       for (let i = 1; i < win.length; i++) if (win[i]!.T > win[i - 1]!.T + 1e-6) { nonInc = false; break; }
       const relDrop = t0 > 1e-9 ? (t0 - tEnd) / t0 : 0;
-      out.push({ id: l.id, desc: l.desc, ok: nonInc && relDrop >= (l.minRelDrop ?? 0), detail: `非增=${nonInc}，相对下降=${(relDrop * 100).toFixed(1)}%（阈 ≥${((l.minRelDrop ?? 0) * 100).toFixed(0)}%）` });
+      out.push(R(l.id, l.desc, nonInc && relDrop >= (l.minRelDrop ?? 0), false, `自定位窗 @${iso(a)}：非增=${nonInc}，降=${(relDrop * 100).toFixed(1)}%（阈 ≥${((l.minRelDrop ?? 0) * 100).toFixed(0)}%）`));
     } else if (l.kind === 'peakEpisode') {
-      const gp = snaps.reduce((a, s) => (s.T > a.T ? s : a), snaps[0]!);
+      const gp = snaps.reduce((acc, s) => (s.T > acc.T ? s : acc), snaps[0]!);
       const ep = episodes.find((e) => gp.t >= e.startT && gp.t <= e.endT);
-      out.push({ id: l.id, desc: l.desc, ok: ep?.i === l.episode, detail: `全局峰值 T=${gp.T.toFixed(3)} 落在 episode ${ep?.i ?? '?'}（要求 ${l.episode}）` });
+      out.push(R(l.id, l.desc, ep?.i === l.episode, false, `全局峰值 T=${gp.T.toFixed(3)} 落在 episode ${ep?.i ?? '?'}（要求 ${l.episode}）`));
     }
   }
   return out;
@@ -343,13 +355,17 @@ function buildReport(a: {
   const Tvals = snaps.map((s) => s.T);
   const floor = meta.verdict?.rain.floor ?? 0.5;
 
-  // 判定表（verdict 驱动）
+  // 判定表（verdict 驱动，status 三态）
   const { rows, allGreen } = judgeFor(meta.verdict, kind, metrics);
+  const mark = (r: JudgeRow): string =>
+    r.status === 'retired' ? '⊘ 退役·不计分'
+      : r.status === 'informational' ? (r.ok ? 'ℹ 记分·达' : 'ℹ 记分·未达')
+        : (r.ok ? '✅ PASS' : '❌ FAIL');
   const judgeTable = rows.length === 0
     ? '_（未指定标准带类型或缺 verdict，跳过判定）_'
-    : `| 指标 | 实测 | 判定 |\n|---|---|---|\n` +
-      rows.map((r) => `| ${r.label} | ${r.value} | ${r.ok ? '✅ PASS' : '❌ FAIL'} |`).join('\n') +
-      `\n\n**本带判定：${allGreen ? '✅ 全绿' : '❌ 有越界'}**`;
+    : `| 指标 | 实测 | 判定(status) |\n|---|---|---|\n` +
+      rows.map((r) => `| ${r.label} | ${r.value} | ${mark(r)} |`).join('\n') +
+      `\n\n**本带判定：${allGreen ? '✅ 全绿（active 全过）' : '❌ 有 active 越界'}**`;
 
   // 机会审计（§5）
   const oppTable = `| test-OK | SAVE-OK | 破卡碟(ok型) | 机会合计 | RESOLVE 实发 |\n|---|---|---|---|---|\n` +
@@ -372,12 +388,12 @@ function buildReport(a: {
     return `| ${ep.i} | ${(active / 60000).toFixed(1)} | ${ep.events} | ${fails} | ${peak.toFixed(3)} | ${rE.toFixed(2)} |`;
   }).join('\n');
 
-  // 金时刻评分（记分不拦路）
-  const lms = meta.verdict ? evalLandmarks(meta.verdict.landmarks, kind, snaps, d.meta.episodes) : [];
+  // 金时刻评分（informational，记分不拦路；N/A≠FAIL）
+  const lms = meta.verdict ? evalLandmarks(meta.verdict.landmarks, kind, snaps, d.meta.episodes, emitted) : [];
   const lmTable = lms.length === 0 ? '_（本带无金时刻）_'
     : `| 金时刻 | 断言 | 结果 | 明细 |\n|---|---|---|---|\n` +
-      lms.map((l) => `| ${l.id} | ${l.desc} | ${l.ok ? '✅' : '❌'} | ${l.detail} |`).join('\n') +
-      `\n\n_金时刻本轮记分不拦路（M1.6-A §4）。_`;
+      lms.map((l) => `| ${l.id} | ${l.desc} | ${l.na ? 'N/A' : l.ok ? '✅' : '❌'} | ${l.detail} |`).join('\n') +
+      `\n\n_金时刻本轮 informational（记分不拦路）；N/A=前置不满足，不算 FAIL（M1.7 §1.2）。_`;
 
   // 三大拐点：|ΔT| 最大，两两间隔 ≥120s
   const deltas = snaps.slice(1).map((s, i) => ({ t: s.t, dT: s.T - snaps[i]!.T, T: s.T }));

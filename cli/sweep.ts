@@ -40,7 +40,7 @@ export function runSweep(_argv: string[]): void {
   const baseRaw = JSON.parse(readFileSync(new URL('../params.json', import.meta.url), 'utf8'));
   const sweep = JSON.parse(readFileSync(new URL('../sweep.json', import.meta.url), 'utf8'));
   const dims: Dim[] = sweep.dims;
-  const current: Record<string, number> = sweep.current;
+  const current: Record<string, number> = sweep.baseline; // §5：距离锚＝上一个正式参数
   const { verdict, hash: verdictHash } = loadVerdict();
   const rainFloor = verdict.rain.floor;
 
@@ -211,7 +211,15 @@ function buildSweepReport(a: {
 
   const gridLine = dims.map((d) => `${d.path.split('.').pop()}[${d.values.join(',')}]`).join(' × ');
 
-  return `# SWEEP_REPORT — M1.6 扫参（${results.length} 组 × 五带）
+  // 架构师预测验证（M1.7 §2）：886928d1 = READ0.21/fD0.4/tau120/repCap4/tR0.3
+  const PRED = [0.21, 0.4, 120, 4, 0.3];
+  const pred = results.find((r) => r.vals.every((v, i) => v === PRED[i]));
+  const champIsPred = champion.vals.every((v, i) => v === PRED[i]);
+  const predBlock = pred
+    ? `## 架构师预测验证（M1.7 §2，可证伪）\n预测：\`886928d1\`(READ0.21/fD0.4) 在 verdict/2 下全绿并夺冠转正。\n- 886928d1 全绿：**${pred.allGreen ? '✅ 成立' : '❌ 不成立'}**（active 判定）\n- 886928d1 即冠军：**${champIsPred ? '✅ 成立' : `❌ 不成立——冠军是更靠近 baseline 的 \\\`${paramLine(dims, champion.vals)}\\\`（归一距离 ${champion.distance.toFixed(3)} < 886928d1 的 ${pred.distance.toFixed(3)}）`}**\n- 综合：${pred.allGreen && champIsPred ? '预测完全成立。' : pred.allGreen ? '预测半成立（全绿✅，但非最少改动冠军——机械规则选了更近 baseline 者，这是重要信息）。' : '预测不成立，照常出报告。'}\n`
+    : '';
+
+  return `# SWEEP_REPORT v2 — verdict/2 重扫（${results.length} 组 × 五带）
 engine ${engineSha} / verdict ${verdictHash} / 组合 ${results.length}
 网格：${gridLine}
 
@@ -224,6 +232,7 @@ engine ${engineSha} / verdict ${verdictHash} / 组合 ${results.length}
     ? `全组中归一化总违规最小（${champion.totalViol.toFixed(3)}）；并列取最少改动→storm峰值最低→τ最小。`
     : `全绿组中最少改动（归一距离 ${champion.distance.toFixed(3)}）→ storm 峰值最低 → τ 最小。`}
 
+${predBlock}
 ## 冠军参数
 \`${paramLine(dims, champion.vals)}\`
 params hash \`${champHash}\` ｜ 距现参归一距离 ${champion.distance.toFixed(3)} ｜ 总违规 ${champion.totalViol.toFixed(3)}

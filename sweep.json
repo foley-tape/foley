@@ -8,8 +8,8 @@
     { "path": "release.testResolveMinS", "values": [0.2, 0.3] }
   ],
   "baseline": {
-    "stress.verbWeights.READ": 0.12,
-    "amplitude.failDefault": 0.3,
+    "stress.verbWeights.READ": 0.21,
+    "amplitude.failDefault": 0.4,
     "decay.tauActiveSec": 120,
     "stress.repCap": 4,
     "release.testResolveMinS": 0.3

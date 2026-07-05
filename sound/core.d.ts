@@ -27,11 +27,33 @@ export interface SoundParams {
   call: { gain: number; askBandHzLo: number; askBandHzHi: number; askRepeatSec: number };
   loudness: { bedLufs: number; bedSwingDb: number; fgPeakLufs: number; callPeakLufs: number; truePeakDbTp: number };
   scale: { pentatonic: number[]; rootMidiBase: number; rootMidiSpan: number };
+  record: {
+    // SOUND-R3 唱片总线：恒电平（F5 v2）；T 的表达=处置（磨损/滤波/抖）
+    targetLufs: number;                        // 唱片在位总线积分响度目标（G3/G7 v3 口径）
+    duckDb: number; duckSlewMs: number;        // ASK：唱片让位半格
+    stuckLoopSecLo: number; stuckLoopSecHi: number; // 跳针短循环窗（种子化取值）
+    stuckTickGain: number;                     // 跳针针嗒电平（每循环回绕一声——哑跳可辨的物理来源）
+    tapeStopSec: number;                       // DONE：降速滑停历时
+    filterHzLo: number; filterHzHi: number;    // T 低通下压（S4 参数域平移）
+    wowCentsLo: number; wowCentsHi: number; wowTBoost: number; // 音高微醺；T 加深
+    wowRateHz: number;                         // 走带不稳频率（≈33⅓rpm 偏心）
+    fadeInSec: number; fadeOutSec: number;     // IDLE 淡出／回场淡入
+  };
 }
 
 export interface BedState {
   T: number; A: number; wow: number;
   phase: Phase; weather: Weather; pendingAsk: boolean;
+  recordOn?: boolean; // SOUND-R3：唱片在位——作曲四层（L1/L2/S2/S3）退场；磨损照旧
+}
+
+export interface RecordTargets {
+  gain: number;      // trim×duck×关断（响度定标乘数在 graph 侧：targetLufs−catalog.lufs）
+  lpHz: number;      // T 低通下压
+  wowCents: number;  // 音高微醺深度（wow 驱动，T 加深）
+  fadeSec: number;   // 当前朝向的 slew 时常（淡入/淡出）
+  silence: boolean;  // DONE（tape-stop 事件由 graph 调度）
+  idle: boolean;     // IDLE：唱片淡出，房间层接管
 }
 
 export interface BedTargets {
@@ -58,6 +80,7 @@ export const clamp01: (x: number) => number;
 export const dbToLin: (db: number) => number;
 export const linToDb: (lin: number) => number;
 export function bedTargets(s: BedState, sp: SoundParams): BedTargets;
+export function recordTargets(s: BedState, sp: SoundParams): RecordTargets;
 export function bedEnergyDb(bt: BedTargets): number;
 export const S2_REF_DENSITY: number;
 export const S2_CREST: number;

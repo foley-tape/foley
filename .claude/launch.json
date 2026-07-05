@@ -2,16 +2,16 @@
   "version": "0.0.1",
   "configurations": [
     {
-      "name": "probe",
+      "name": "sound-probe",
       "runtimeExecutable": "python3",
       "runtimeArgs": [
         "-m",
         "http.server",
-        "4198",
+        "8931",
         "--directory",
-        "/Users/shadow/tape0/runs/probe-m19-storm"
+        "/Users/shadow/tape0/runs/probe-latest"
       ],
-      "port": 4198
+      "port": 8931
     },
     {
       "name": "stage-dub",

@@ -131,7 +131,9 @@ export abstract class OfflineNode {
   constructor(ctx: OfflineCtx) { this.ctx = ctx; ctx.allNodes.push(this); }
 
   connect(dst: OfflineNode | OfflineParam): OfflineNode | OfflineParam {
-    dst.inputs.push(this);
+    // 规范语义：同一对 (src,dst) 重复 connect 只算一条（R3 修——唱片源逐个 modulate 同一 LFO→深度对，
+    // 浏览器幂等而旧实现累加会成三倍深度：双端一致性之漂，金测试盯防）
+    if (!dst.inputs.includes(this)) dst.inputs.push(this);
     return dst;
   }
 
@@ -281,29 +283,43 @@ class OfflineBuffer {
 class BufferSourceNode extends OfflineNode {
   buffer: OfflineBuffer | null = null;
   loop = false;
+  // SOUND-R3：loopStart/loopEnd（秒，规范语义；0/0=全曲）——STUCK 跳针短循环的结构基础；live 可改
+  loopStart = 0;
+  loopEnd = 0;
   // SOUND-R2：资产缓冲带自有采样率（32k vendor）+ playbackRate（repo-key 变奏）——分数步进+线性插值重放
   readonly playbackRate: OfflineParam;
   private startAt = Infinity;
   private stopAt = Infinity;
   private pos = 0; // 缓冲内分数读头
+  private offsetSec = 0;
   constructor(ctx: OfflineCtx) { super(ctx); this.playbackRate = new OfflineParam(ctx, 1, 0, 64); }
-  start(t?: number): void { this.startAt = t ?? this.ctx.currentTime; }
+  start(t?: number, offsetSec?: number): void {
+    this.startAt = t ?? this.ctx.currentTime;
+    this.offsetSec = offsetSec ?? 0;
+    if (this.buffer && this.offsetSec > 0) this.pos = this.offsetSec * this.buffer.sampleRate;
+  }
   stop(t?: number): void { this.stopAt = t ?? this.ctx.currentTime; }
   protected render(bi: number, sf: number, n: number): void {
     const sr = this.ctx.sampleRate;
     const d = this.buffer ? this.buffer.data : null;
     const bufSr = this.buffer ? this.buffer.sampleRate : sr;
     const rate = this.playbackRate.computeBlock(bi, sf, n);
+    // 循环区间（帧，buffer 采样率域）：loopEnd>0 → [loopStart,loopEnd)，否则全曲（规范语义；live 读取=动态生效）
+    const len = d ? d.length : 0;
+    const ls = Math.max(0, Math.min(this.loopStart * bufSr, len));
+    const le = this.loopEnd > 0 ? Math.max(ls + 1, Math.min(this.loopEnd * bufSr, len)) : len;
     for (let i = 0; i < n; i++) {
       const t = (sf + i) / sr;
-      if (!d || d.length === 0 || t < this.startAt || t >= this.stopAt) { this.out[i] = 0; continue; }
+      if (!d || len === 0 || t < this.startAt || t >= this.stopAt) { this.out[i] = 0; continue; }
       const step = (bufSr / sr) * rate[i]!;
       let p = this.pos;
-      if (this.loop) p %= d.length;
-      else if (p >= d.length) { this.out[i] = 0; continue; }
+      if (this.loop) { if (p >= le) p = ls + ((p - le) % (le - ls)); }
+      else if (p >= len) { this.out[i] = 0; continue; }
       const k0 = Math.floor(p), fr = p - k0;
-      const a = d[k0 % d.length]!;
-      const b = this.loop ? d[(k0 + 1) % d.length]! : (k0 + 1 < d.length ? d[k0 + 1]! : 0);
+      const a = d[k0 % len]!;
+      const k1 = k0 + 1;
+      // 循环回绕的邻样本=loop 起点首样本（索引必取整——float 索引读数组是 NaN 之源）
+      const b = this.loop ? d[(k1 >= le ? Math.floor(ls) : k1) % len]! : (k1 < len ? d[k1]! : 0);
       this.out[i] = a + (b - a) * fr;
       this.pos = p + step;
     }

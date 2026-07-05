@@ -6,8 +6,8 @@
 
 export {
   resolveSoundParams, clamp01, dbToLin, linToDb,
-  bedTargets, bedEnergyDb, bedRmsDb, S2_REF_DENSITY, S2_CREST,
+  bedTargets, recordTargets, bedEnergyDb, bedRmsDb, S2_REF_DENSITY, S2_CREST,
   habituationGain, quantizeUpSec, degreeOf, rootMidiOf, midiToHz, degreeHz, askMotifHz,
   WEATHER_IDX, PHASE_IDX, buildTrack, sampleAt, pearson,
 } from './core.js';
-export type { SoundParams, BedState, BedTargets, TrackRow } from './core.js';
+export type { SoundParams, BedState, BedTargets, RecordTargets, TrackRow } from './core.js';

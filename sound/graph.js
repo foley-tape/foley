@@ -20,6 +20,17 @@
 //               hiss(噪声环) → hissHP(2.2k) → hissLP(7.5k) → hissNorm → hissLevel ──────┴→ wearBus(duck) ─┘
 //               （SOUND-R2 §2 L3：hiss/crackle=介质噪声，出 S4 低通直达输出——"磁带变闷"不再滤走"磁带变糙"）
 //
+//  [唱片层 R3]  recSrc(BufferSource：唱片 PCM，loop 顺播；STUCK/复走=换源排程，见下)
+//                 .playbackRate ←(调制口) recWowLfo(≈0.55Hz) × recWowD    ——走带不稳=音高微醺（rt.wowCents）
+//                 .playbackRate ←(自动化) DONE tape-stop：1→0 linearRamp（tapeStopSec，pitch 随速降）
+//               → recLP(lowpass ← T：8k→1.8k，S4 参数域平移=磁带变旧变闷) → recG(level：定标×duck×关断) → master
+//               定标：recG 基准 = dbToLin(record.targetLufs − catalog.lufs)（数据驱动归一，L1 rmsDb 同形制）
+//               STUCK 跳针（唯一全排程解法——离线渲染器无事件循环，禁 live 改属性）：
+//                 主源 stop(at)；stuckSrc 同 buffer 短循环 [pos−L,pos]（L=stuckLoopSec 窗种子化）start(at,pos−L) stop(at+dur)；
+//                 resumeSrc 全曲 start(at+dur, pos)——CLEARED 即复走，双端逐字同源。
+//               唱片在位 → bedTargets(recordOn) 收作曲四层（L1/L2/S2/S3 归零=音乐由唱片供给）；
+//               磨损（crackle/hiss）与前景照旧（信息由机器供给）；隔离板勾掉唱片=房间层回场（G6 无唱片态口径）。
+//
 //  电平参数（规矩② stop/trim 遍历域）：l1/crackle/l2/s2/s3/hiss 六电平（+bedBus/wearBus duck）
 //    - trim 在 core.bedTargets 内乘进每一个电平目标，applyBed 是电平唯一写者——绕闸支路无处出生。
 //  调制口（规矩③ 唯一可接外接信号的参数）：l1Breath.gain（bias1）、wowDelay.delayTime（bias30ms）、
@@ -32,7 +43,10 @@
 //    fallback 合成织体（粉噪+脉冲串 crackle，repo-key 种子变奏）同构顶上——结构不因资产缺席而变。
 // ─────────────────────────────────────────────────────────────────────────────
 
-import { bedTargets, dbToLin, midiToHz, sampleAt, habituationGain, degreeHz as coreDegreeHz, askMotifHz, rootMidiOf } from './core.js';
+// import 禁用 as 别名（NIGHT-2 审计 probe-coreDegreeHz 案）：页壳内嵌=剥 import 行的逐字拼接，
+// 别名在页内无定义——播放中 pluck 首触发即 ReferenceError，schedule setTimeout 链断（针走声死）。
+// 契约测试（R3 §4.1）静态盯防 sound/*.js 的 import 别名。
+import { bedTargets, recordTargets, dbToLin, midiToHz, sampleAt, habituationGain, degreeHz, askMotifHz, rootMidiOf } from './core.js';
 
 // ---------- 确定性随机（渲染必须确定性：噪声一律种子化，禁 Math.random） ----------
 export function seedOf(str) {
@@ -77,6 +91,12 @@ export function createRegistry(ctx) {
     modStage(name, node, param, bias) {
       reg(name, node); param.value = bias; modPorts.add(param);
       return node;
+    },
+    /** 匿名调制口（SOUND-R3 规矩③增补）：唱片源短命换代，其 playbackRate 逐个获准；不占名字表。 */
+    modPort(param, bias) {
+      if (bias !== undefined) param.value = bias;
+      modPorts.add(param);
+      return param;
     },
     depth(name, max) {
       const g = reg(name, ctx.createGain()); g.gain.value = 0;
@@ -393,15 +413,123 @@ export function buildEngine(ctx, SP, opts) {
   R.connect(s2Level, bedBus);
   R.auto(lp.frequency); R.auto(shelf.gain);
 
+  // ---- 唱片层（SOUND-R3）：recSrc → recLP → recG → master ----
+  const records = opts.records || []; // [{name,title,x:Float32Array,sr,lufs,bpmMeasured}]（PCM 已解码：页 decodeAudioData／ear afconvert）
+  const recLP = R.filter('recLP', 'lowpass', SP.record.filterHzHi, 0.4);
+  const recG = R.level('recG'); // levels 遍历域：stopAll/trim/hardMute 自动覆盖（G1/G2 含唱片路径的结构保证）
+  R.connect(recLP, recG); R.connect(recG, master);
+  const recWowLfo = R.osc('recWowLfo', 'sine', SP.record.wowRateHz);
+  const recWowD = R.depth('recWowD', 0.03); // max≈50 音分的 rate 摆幅（2^(50/1200)−1）
+  const stuckRng = mulberry32(seedOf('rec-stuck:' + (opts.seed || '') + ':' + opts.repoKey));
+
   // ---- 引擎状态 ----
   const E = {
     ctx, SP, R, ROOT,
-    nodes: { master, shelf, lp, wowDelay: wowDelayNode, bedBus, wearBus, fgBus, l1Level, crackleLevel, l2Level, s2Level, s3Level, hissLevel, l1Breath },
+    nodes: { master, shelf, lp, wowDelay: wowDelayNode, bedBus, wearBus, fgBus, l1Level, crackleLevel, l2Level, s2Level, s3Level, hissLevel, l1Breath, recLP, recG },
     transport: null,
     lastGridAt: 0, lastBarAt: 0, lastAskRepeat: -1e9, doneSilentUntil: -1, wxLatch: 0,
     habLog: new Map(),
-    mutes: new Set(), // 隔离板：'l1'|'crackle'|'l2'|'s2'|'s3'|'hiss'|'fg'
+    mutes: new Set(), // 隔离板：'l1'|'crackle'|'l2'|'s2'|'s3'|'hiss'|'fg'|'record'
+    rec: { idx: -1, meta: null, buf: null, srcs: [], calibLin: 0, posBase: 0, posBaseAt: 0, tapeStopped: false },
   };
+
+  // ---- 唱片机芯（全排程纪律：离线渲染器无事件循环，一切源的起停在调度刻排定） ----
+  /** 唱片在位（作曲四层退场的口径）：有唱片、未被 tape-stop 停死、隔离板未勾掉。 */
+  function recOn() { return !!E.rec.meta && !E.rec.tapeStopped && !E.mutes.has('record'); }
+  /** 读头位置账本（秒，恒速 1 域；wow 微抖均值 1 忽略；卡碟期打转不前进——复走点=卡点）。 */
+  function recPosAt(t) { return E.rec.meta ? (E.rec.posBase + Math.max(0, t - E.rec.posBaseAt)) % E.rec.meta.seconds : 0; }
+  /** 建一个唱片源（接 wow 调制口+recLP）；一切 start/stop 由调用方排程。buffer 装盘时建一次，多源复用。 */
+  function recMakeSrc() {
+    const s = ctx.createBufferSource(); s.buffer = E.rec.buf; s.loop = true;
+    R.modPort(s.playbackRate, 1); // 调制口修法（规矩③增补）：唱片 playbackRate 为获准口——wow 之真身
+    R.modulate(recWowLfo, recWowD, s.playbackRate);
+    R.connect(s, recLP);
+    E.rec.srcs.push(s);
+    return s;
+  }
+  /** 装盘（不起播）：idx 入账、buffer 建一次、定标增益（targetLufs−lufs 数据驱动归一）。 */
+  function loadRecord(idx) {
+    if (!records.length) return;
+    const i = ((idx % records.length) + records.length) % records.length;
+    const m = records[i];
+    E.rec.idx = i; E.rec.meta = m;
+    E.rec.buf = ctx.createBuffer(1, m.x.length, m.sr);
+    E.rec.buf.copyToChannel(m.x, 0);
+    E.rec.calibLin = dbToLin(SP.record.targetLufs - m.lufs);
+  }
+  /** 起播唱片（at 起、唱片内相位 offsetSec）——startTransport/换曲共用。 */
+  function recStart(at, offsetSec) {
+    if (!E.rec.meta) return;
+    const s = recMakeSrc();
+    const off = ((offsetSec % E.rec.meta.seconds) + E.rec.meta.seconds) % E.rec.meta.seconds;
+    s.start(at, off);
+    E.rec.posBase = off; E.rec.posBaseAt = at; E.rec.tapeStopped = false;
+  }
+  function recStopAll(at) {
+    for (const s of E.rec.srcs) { try { s.stop(at); } catch (_e) { /* 已停/未起 */ } }
+    E.rec.srcs.length = 0;
+  }
+  /** 跳针针嗒（每循环回绕一声）：哑跳可辨的物理来源——素材恰逢休止时（实测 2-am-debug-loop
+   *  12s 处 −52dBFS 乐句间隙），乐句重复本身听不见，"嗒…嗒…"才是世界上最可识别的那半。
+   *  过唱片链（recLP→recG）：duck/tape-stop/停止连带，物理上针嗒出自唱片系统。 */
+  const tickRng = mulberry32(seedOf('rec-tick:' + (opts.seed || '') + ':' + opts.repoKey));
+  function recTick(at) {
+    const n = Math.ceil(ctx.sampleRate * 0.008);
+    const b = ctx.createBuffer(1, n, ctx.sampleRate);
+    const d = b.getChannelData(0);
+    for (let i = 0; i < n; i++) d[i] = (tickRng() * 2 - 1) * (1 - i / n);
+    const s = ctx.createBufferSource(); s.buffer = b;
+    const hp = ctx.createBiquadFilter(); hp.type = 'highpass'; hp.frequency.value = 1800; hp.Q.value = 0.5;
+    const g = ctx.createGain(); g.gain.value = SP.record.stuckTickGain;
+    R.connect(s, hp); R.connect(hp, g); R.connect(g, recLP);
+    s.start(at); R.ephemeral(s, at + 0.05);
+  }
+  /** STUCK 跳针啃唱片：短循环 [pos−L,pos] 重复 durSec＋每回绕一声针嗒（CLEARED 即复走）——全排程。 */
+  function recordStuck(at, durSec) {
+    if (!recOn() || !E.rec.srcs.length) return;
+    const L = SP.record.stuckLoopSecLo + stuckRng() * (SP.record.stuckLoopSecHi - SP.record.stuckLoopSecLo);
+    const pos = recPosAt(at);
+    const ls = Math.max(0, pos - L);
+    if (pos - ls < 0.05) return; // 曲头无肉可啃（<50ms）：跳过，主源照走
+    // durSec 是播放轴（压缩轴）秒；唱片恒 1× 走（speed 是带子快进，不是唱片快放）→ 音频钟域换算
+    const dur = Math.max(0.3, (durSec || 3) / (E.transport ? E.transport.speed : 1));
+    const main = E.rec.srcs[E.rec.srcs.length - 1];
+    try { main.stop(at); } catch (_e) { /* 已停 */ }
+    const stuck = recMakeSrc();
+    stuck.loopStart = ls; stuck.loopEnd = pos;
+    stuck.start(at, ls); stuck.stop(at + dur);
+    const loopLen = pos - ls;
+    for (let k = 1; k <= 64; k++) { // 每回绕一嗒（护栏 64）
+      const tickAt = at + k * loopLen;
+      if (tickAt > at + dur - 0.02) break;
+      recTick(tickAt);
+    }
+    const resume = recMakeSrc();
+    resume.start(at + dur, pos);
+    // 复走账本：卡碟期读头打转不前进——复走点=卡点
+    E.rec.posBase = pos; E.rec.posBaseAt = at + dur;
+  }
+  /** DONE tape-stop：降速滑停（pitch 随速降）→ 真静默。playbackRate 自动化=全排程。 */
+  function recordTapeStop(at) {
+    if (!recOn() || !E.rec.srcs.length) return;
+    const sec = SP.record.tapeStopSec;
+    for (const s of E.rec.srcs) {
+      s.playbackRate.cancelScheduledValues(at);
+      s.playbackRate.setValueAtTime(1, at);
+      s.playbackRate.linearRampToValueAtTime(0, at + sec);
+      try { s.stop(at + sec + 0.1); } catch (_e) { /* 已停 */ }
+    }
+    R.setDepth(recWowD, 0, at, 0.3, false); // 停转的唱片不再走带不稳（免 rate≈0 时微爬行）
+    E.rec.tapeStopped = true;
+  }
+  /** 换曲（HUD/URL）：停当前、装下一张、即刻起播（唱片从头）；电平由下一网格（≤半拍）纠正。 */
+  function setRecord(idx, at) {
+    const t = at !== undefined ? at : ctx.currentTime;
+    recStopAll(t);
+    loadRecord(idx);
+    if (E.transport) recStart(t, 0);
+  }
+  if (records.length) loadRecord(opts.recordIndex || 0);
 
   const beat = () => 60 / SP.bpm, grid = () => beat() / 2, bar = () => beat() * 4;
 
@@ -432,6 +560,22 @@ export function buildEngine(ctx, SP, opts) {
     set(v1.frequency, f1, fast); set(v2.frequency, f2, fast);
   }
 
+  // ---- 唱片参数施加（SOUND-R3；与 applyBed 同拍调度） ----
+  function applyRecord(rt, at, imm) {
+    if (!E.rec.meta) return;
+    const slow = SP.bed.slewMsSlow / 1000;
+    const set = (param, v, tc) => {
+      if (imm) { param.cancelScheduledValues(at); param.setValueAtTime(v, at); }
+      else param.setTargetAtTime(v, at, tc);
+    };
+    // 电平：定标（targetLufs−lufs）×映射目标（trim×duck×关断）；淡入淡出用 rt.fadeSec
+    const g = E.mutes.has('record') || E.rec.tapeStopped ? 0 : rt.gain * E.rec.calibLin;
+    set(recG.gain, g, Math.max(rt.fadeSec / 3, 0.05));
+    set(recLP.frequency, rt.lpHz, slow);
+    // wow：wowCents → playbackRate 摆幅（2^(c/1200)−1）；tape-stop 后不再抖（recordTapeStop 已排零）
+    if (!E.rec.tapeStopped) R.setDepth(recWowD, Math.pow(2, rt.wowCents / 1200) - 1, at, slow, imm);
+  }
+
   // ---- 前景合成（SOUND-R1 沿革，未动） ----
   function envG(at, peak, att, dec) {
     const g = ctx.createGain(); g.connect(fgBus);
@@ -450,7 +594,7 @@ export function buildEngine(ctx, SP, opts) {
     const s = ctx.createBufferSource(); s.buffer = b; s.start(at); R.ephemeral(s, at + len + 0.05); return s;
   }
   function pluck(at, deg, vel, fail, hab) {
-    const o = oneOsc('triangle', coreDegreeHz(ROOT, deg, fail ? 0 : 2, SP), at, at + 0.4);
+    const o = oneOsc('triangle', degreeHz(ROOT, deg, fail ? 0 : 2, SP), at, at + 0.4);
     const f = ctx.createBiquadFilter(); f.type = 'lowpass'; f.frequency.value = fail ? 700 : (900 + 3600 * vel);
     const peak = (fail ? SP.foreground.failGain : SP.foreground.peakGain * (0.55 + 0.45 * vel)) * hab;
     o.connect(f); f.connect(envG(at, peak, 0.006, fail ? 0.22 : 0.16));
@@ -470,7 +614,7 @@ export function buildEngine(ctx, SP, opts) {
     oneOsc('sine', midiToHz(ROOT - 12), at, at + 0.35).connect(envG(at, SP.foreground.saveGain * 0.8 * hab, 0.01, 0.3));
   }
   function spawnVoice(at, deg, hab) {
-    const o = oneOsc('sine', coreDegreeHz(ROOT, deg, 1, SP), at, at + bar() * 2 + 0.1);
+    const o = oneOsc('sine', degreeHz(ROOT, deg, 1, SP), at, at + bar() * 2 + 0.1);
     const g = ctx.createGain(); g.connect(fgBus); g.gain.setValueAtTime(0.0001, at);
     g.gain.linearRampToValueAtTime(SP.foreground.spawnGain * hab, at + bar());
     g.gain.linearRampToValueAtTime(0.0001, at + bar() * 2);
@@ -526,10 +670,18 @@ export function buildEngine(ctx, SP, opts) {
       bus.gain.cancelScheduledValues(ctx.currentTime);
       bus.gain.setValueAtTime(1, ctx.currentTime);
     }
+    // 唱片起播（R3）：重建源（stop 后源不可复用）；唱片内相位=带位置映射（确定性＋跳转对应感）
+    if (E.rec.meta || records.length) {
+      recStopAll(ctx.currentTime);
+      if (!E.rec.meta) loadRecord(opts.recordIndex || 0);
+      E.rec.tapeStopped = false;
+      recStart(audio0, (startPm / 1000) * speed % 1e9);
+    }
     const s0 = track.length ? sampleAt(track, Math.min(startPm, durMs)) : [0, 0, 0, 0, 0, 0, 0, 0];
     applyBed(bedTargets(stateOf(s0), SP), ctx.currentTime, true);
+    applyRecord(recordTargets(stateOf(s0), SP), ctx.currentTime, true);
   }
-  const stateOf = (s) => ({ T: s[2], A: s[3], wow: s[6], phase: ['IDLE', 'WORKING', 'WAITING', 'DONE'][s[5]] || 'WORKING', weather: 'CLEAR', pendingAsk: s[7] === 1 });
+  const stateOf = (s) => ({ T: s[2], A: s[3], wow: s[6], phase: ['IDLE', 'WORKING', 'WAITING', 'DONE'][s[5]] || 'WORKING', weather: 'CLEAR', pendingAsk: s[7] === 1, recordOn: recOn() });
 
   function scheduleGridUntil(untilSec) {
     const { audio0, speed, track, durMs, startPm } = E.transport;
@@ -537,7 +689,7 @@ export function buildEngine(ctx, SP, opts) {
       const at = E.lastGridAt, gpm = (at - audio0) * 1000 * speed + (startPm || 0);
       const s = sampleAt(track, Math.min(gpm, durMs));
       const bt = bedTargets(stateOf(s), SP);
-      if (at > E.doneSilentUntil) applyBed(bt, at, false);
+      if (at > E.doneSilentUntil) { applyBed(bt, at, false); applyRecord(recordTargets(stateOf(s), SP), at, false); }
       if (at >= E.lastBarAt + bar() - 1e-6) {
         E.lastBarAt = at; E.wxLatch = s[4];
         if (!bt.hover) {
@@ -574,6 +726,9 @@ export function buildEngine(ctx, SP, opts) {
   }
 
   function trigger(cls, atE, deg, vel) {
+    // 唱片处置先于前景静音判定：跳针/滑停是机器对唱片的动作，不属前景层（隔离板 fg 勾掉时照常）
+    if (cls === 7) recordStuck(atE, vel); // vel 装卡碟期秒数（蒸馏侧 STUCK_LOOP→STUCK_CLEARED 实测）
+    else if (cls === 9) recordTapeStop(atE);
     if (E.mutes.has('fg')) return;
     const hab = habFor(cls, atE);
     if (cls === 6) chordResolve(atE);
@@ -596,6 +751,7 @@ export function buildEngine(ctx, SP, opts) {
   function applyBedNow(pm) {
     const s = sampleAt(E.transport.track, Math.min(pm, E.transport.durMs));
     applyBed(bedTargets(stateOf(s), SP), ctx.currentTime, true);
+    applyRecord(recordTargets(stateOf(s), SP), ctx.currentTime, true);
   }
 
   return {
@@ -606,10 +762,16 @@ export function buildEngine(ctx, SP, opts) {
     get transport() { return E.transport; },
     get lastGridAt() { return E.lastGridAt; },
     get doneSilentUntil() { return E.doneSilentUntil; },
+    // 唱片面（R3）：HUD/验证用。recordInfo=当前装盘；setRecord=换曲（HUD/URL 消费）
+    get recordInfo() { return E.rec.meta ? { idx: E.rec.idx, name: E.rec.meta.name, title: E.rec.meta.title || E.rec.meta.name, seconds: E.rec.meta.seconds, count: records.length, tapeStopped: E.rec.tapeStopped } : null; },
+    recordCount: records.length,
+    setRecord,
+    recordPosAt: recPosAt,
     applyBed, startTransport, scheduleGridUntil, trigger, applyBedNow,
     setMute(name, on) { if (on) E.mutes.add(name); else E.mutes.delete(name); },
     stop(at) {
       R.stopAll(at);
+      recStopAll(at); // G1 含唱片路径：levels 闸（recG）+源硬停，双重
       bedBus.gain.setTargetAtTime(1, at, 0.05);
       wearBus.gain.setTargetAtTime(1, at, 0.05);
     },

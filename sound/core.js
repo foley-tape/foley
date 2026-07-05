@@ -22,6 +22,15 @@ export function resolveSoundParams(raw) {
   }
   // 铁律执法（SOUND-R2 §2 L2）：和声垫电平永远低于织体体——参数层就把违例拦死
   if (out.bed.l2Gain >= out.bed.l1Gain) throw new Error(`铁律：l2Gain(${out.bed.l2Gain}) 必须 < l1Gain(${out.bed.l1Gain})——和声垫永远躺在织体下面`);
+  // SOUND-R3 唱机改造：record 节（唱片总线处置参数）
+  out.record = p['record'];
+  if (!out.record) throw new Error('sound-params 缺少 record（SOUND-R3 唱机改造）');
+  for (const k of ['targetLufs', 'duckDb', 'duckSlewMs', 'stuckLoopSecLo', 'stuckLoopSecHi',
+    'stuckTickGain', 'tapeStopSec', 'filterHzLo', 'filterHzHi', 'wowCentsLo', 'wowCentsHi', 'wowTBoost',
+    'wowRateHz', 'fadeInSec', 'fadeOutSec']) {
+    if (typeof out.record[k] !== 'number') throw new Error(`sound-params 缺少 record.${k}（SOUND-R3 唱片总线）`);
+  }
+  if (out.record.stuckLoopSecHi < out.record.stuckLoopSecLo) throw new Error('record：stuckLoopSecHi 必须 ≥ stuckLoopSecLo');
   return out;
 }
 
@@ -36,17 +45,21 @@ export function bedTargets(s, sp) {
   const T = clamp01(s.T), A = clamp01(s.A), wow = clamp01(s.wow);
   const idle = s.phase === 'IDLE';
   const silence = s.phase === 'DONE';
+  // SOUND-R3 总纲：音乐由唱片供给，信息由机器供给。唱片在位（recordOn）时作曲四层
+  // （L1/L2/S2/S3）退场——房间层只在无唱片态发声；磨损（crackle/hiss）是机器介质噪声，照旧。
+  // 未传 recordOn（旧调用方/金测试）＝false，全部 R2 断言原样成立（判据冻结纪律）。
+  const rec = s.recordOn === true;
   const trim = dbToLin(b.trimDb); // 床总闸进 targets：验收能量模型与渲染器同一数字
   // L1 织体体（真采样为体；IDLE 唯余此层最弱态——白皮书 v1.1 §2.1）
-  const l1 = trim * (silence ? 0 : idle ? b.l1IdleGain : b.l1Gain);
+  const l1 = trim * (silence || rec ? 0 : idle ? b.l1IdleGain : b.l1Gain);
   // crackle 磨损织体（T 驱动，与 hiss 同属介质噪声，直达输出）
   const crackle = trim * (silence ? 0 : dbToLin(b.crackleDbLo + (b.crackleDbHi - b.crackleDbLo) * T));
   // L2 和声垫（三关铁律成品；永低于 L1——resolve 已执法）
-  const l2 = trim * (silence || idle ? 0 : b.l2Gain);
+  const l2 = trim * (silence || idle || rec ? 0 : b.l2Gain);
   const s2gate = clamp01((A - b.s2GateA) / (1 - b.s2GateA));
-  const s2 = trim * (silence || idle ? 0 : b.s2Gain * s2gate);
+  const s2 = trim * (silence || idle || rec ? 0 : b.s2Gain * s2gate);
   const s3gate = clamp01((T - b.s3GateT) / (1 - b.s3GateT));
-  const s3 = trim * (silence ? 0 : b.s3Gain * s3gate);
+  const s3 = trim * (silence || rec ? 0 : b.s3Gain * s3gate);
   const hissLin = trim * (silence ? 0 : dbToLin(b.hissDbLo + (b.hissDbHi - b.hissDbLo) * T));
   return {
     l1, crackle, l2, s2, s3, hissLin,
@@ -82,6 +95,31 @@ export function bedRmsDb(bt) {
   const e = Math.sqrt(bt.l1 * bt.l1 + bt.crackle * bt.crackle + bt.l2 * bt.l2
     + s2eff * s2eff + bt.s3 * bt.s3 + bt.hissLin * bt.hissLin);
   return e <= 1e-9 ? -120 : 20 * Math.log10(e);
+}
+
+// ---------- 唱片总线映射律（SOUND-R3 §2：机器对唱片的处置——皇冠机制上真盘） ----------
+
+/**
+ * 唱片处置目标（纯函数，连续量；STUCK/tape-stop 为事件性处置，由 graph 调度，不在此表）。
+ * F5 v2 语义（§七.4 裁 a）：唱片以恒定电平播放，机器不泵音量——T 的表达=处置（磨损/滤波/抖）。
+ * gain 只含 trim（G2 总闸遍历域）×duck（ASK 让位）×关断（DONE/IDLE）；
+ * 响度定标（targetLufs − 唱片实测 lufs）是数据驱动归一，在 graph 侧乘（与 L1 rmsDb 定标锚同形制）。
+ */
+export function recordTargets(s, sp) {
+  const r = sp.record;
+  const T = clamp01(s.T), wow = clamp01(s.wow);
+  const idle = s.phase === 'IDLE';
+  const silence = s.phase === 'DONE';
+  const trim = dbToLin(sp.bed.trimDb);
+  const duck = s.pendingAsk ? dbToLin(r.duckDb) : 1; // ASK：唱片让位半格（−6~−9dB，250ms slew）
+  return {
+    gain: trim * duck * (silence || idle ? 0 : 1),
+    lpHz: r.filterHzHi + (r.filterHzLo - r.filterHzHi) * T, // T=磁带变旧变闷（S4 参数域平移）
+    // wow=走带不稳的音高微醺；T 加深之（磁带变旧走带更晃）——真旋律上第一次可闻
+    wowCents: r.wowCentsLo + (r.wowCentsHi - r.wowCentsLo) * clamp01(wow + T * r.wowTBoost),
+    fadeSec: idle || silence ? r.fadeOutSec : r.fadeInSec, // 淡出去（IDLE 房间层接管）／淡进来
+    silence, idle,
+  };
 }
 
 // ---------- 前景（离散层）律 §3 ----------

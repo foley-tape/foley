@@ -9,13 +9,14 @@
 // 禁令照旧：无网络、自包含、无导出分享；视觉保持素面（美学归 Track-STAGE 琥珀舞台）。
 // 现实修正（沿革）：repoKey=hash(repo) 在蒸馏带不可得（隐私膜抹 cwd）→ replay 侧以 sourceHash 代。
 
-import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
+import { readFileSync, writeFileSync, mkdirSync, readdirSync, existsSync } from 'node:fs';
 import { execSync } from 'node:child_process';
-import { join, basename, relative } from 'node:path';
+import { homedir } from 'node:os';
+import { join, basename, relative, extname } from 'node:path';
 import { resolveParams, hashParams, hashJson } from '../engine/params.ts';
 import { replayCore, loadVerdict, type TapeKind } from './replay.ts';
 import { resolveSoundParams, degreeOf, buildTrack } from '../sound/index.ts';
-import { assetsHash } from '../sound/assets.js';
+import { assetsHash, fnvBytes } from '../sound/assets.js';
 import { loadAssetsNode } from './assets-node.ts';
 import type { DerivedMoment } from '../engine/index.ts';
 
@@ -63,6 +64,50 @@ function embeddedAssets(): { json: string; hash: string } {
     b64: readFileSync(new URL(`../sound/assets/${m.file}`, import.meta.url)).toString('base64'),
   }));
   return { json: JSON.stringify(entries), hash: assetsHash(assets) };
+}
+
+interface RecordCatalogEntry {
+  name: string; file: string; title: string; seconds: number; fnv: string;
+  lufs: number; bpmMeasured?: number; category?: string;
+}
+
+/**
+ * 唱片层（SOUND-R3 §1）→ 页内嵌 base64 条目（mp3/ogg/wav 原件；页内 decodeAudioData 通吃）。
+ * 出厂唱片：sound/records/catalog.json（lufs=定标锚）。--records a,b 选子集（默认全上）。
+ * 用户唱片架：--user-records 显式旗标才扫 ~/.foley/records/（只读、不复制进仓、不上传；
+ * 嵌入本地预览页是播放的技术必然——file:// 下 fetch/MediaElementSource 均不可用；dub 默认不含）。
+ * 用户盘无定标锚（lufs:null→graph 侧不定标原电平），HUD 如实标注。
+ */
+function embeddedRecords(argv: string[]): { json: string; names: string[]; userCount: number } {
+  const sel = ((i) => (i >= 0 ? (argv[i + 1] || '').split(',').filter(Boolean) : null))(argv.indexOf('--records'));
+  const entries: Record<string, unknown>[] = [];
+  const catPath = new URL('../sound/records/catalog.json', import.meta.url);
+  if (existsSync(catPath)) {
+    const cat = JSON.parse(readFileSync(catPath, 'utf8')) as { records: RecordCatalogEntry[] };
+    for (const r of cat.records) {
+      if (sel && !sel.includes(r.name)) continue;
+      entries.push({
+        name: r.name, title: r.title, seconds: r.seconds, fnv: r.fnv, lufs: r.lufs,
+        bpmMeasured: r.bpmMeasured, user: false,
+        b64: readFileSync(new URL(`../sound/records/${r.file}`, import.meta.url)).toString('base64'),
+      });
+    }
+  }
+  let userCount = 0;
+  if (argv.includes('--user-records')) {
+    const dir = join(homedir(), '.foley', 'records');
+    if (existsSync(dir)) {
+      for (const f of readdirSync(dir).filter((f) => ['.mp3', '.ogg', '.wav'].includes(extname(f).toLowerCase())).sort()) {
+        const bytes = readFileSync(join(dir, f));
+        entries.push({
+          name: f.replace(/\.[^.]+$/, ''), title: f, seconds: 0, fnv: fnvBytes(bytes), lufs: null,
+          user: true, b64: bytes.toString('base64'),
+        });
+        userCount++;
+      }
+    }
+  }
+  return { json: JSON.stringify(entries), names: entries.map((e) => e['name'] as string), userCount };
 }
 
 export function runProbe(argv: string[]): void {
@@ -125,13 +170,22 @@ export function runProbe(argv: string[]): void {
     return snaps.length ? snaps[best]!.T : 0;
   };
 
-  // 声音事件：[comp, cls, degree, vel]。degree=slot 选音；vel=当刻 T（力度/亮度 ∝ T，F1）
+  // 声音事件：[comp, cls, degree, vel]。degree=slot 选音；vel=当刻 T（力度/亮度 ∝ T，F1）。
+  // 例外（SOUND-R3）：cls7 跳针的 vel=卡碟期秒数（STUCK_LOOP→STUCK_CLEARED 压缩轴实测）——
+  // graph.recordStuck 以它排定短循环时长与复走点（"CLEARED 即复走"）。
   const resolveTimes = new Set(core.emitted.filter((e) => e.ev.special === 'RESOLVE').map((e) => e.emitT));
+  const clearedTimes = core.emitted.filter((e) => e.ev.special === 'STUCK_CLEARED').map((e) => e.emitT).sort((a, b) => a - b);
+  const stuckDurSec = (emitT: number): number => {
+    const clear = clearedTimes.find((t) => t > emitT);
+    const durMsC = clear !== undefined ? interp(clear - t0) - interp(emitT - t0) : 3000; // 无 CLEARED（带尾截断）→ 3s 兜底
+    return Math.round(Math.min(Math.max(durMsC / 1000, 0.5), 20) * 100) / 100; // [0.5,20]s 夹紧（压缩轴天然有界）
+  };
   const sounds: number[][] = [];
   for (const e of core.emitted) {
     const cls = soundClass(e.ev, resolveTimes, e.emitT);
     if (cls === null) continue;
-    sounds.push([Math.round(interp(e.emitT - t0)), cls, degreeOf(e.ev.slot, sp), r3(Tat(e.emitT))]);
+    sounds.push([Math.round(interp(e.emitT - t0)), cls, degreeOf(e.ev.slot, sp),
+      cls === 7 ? stuckDurSec(e.emitT) : r3(Tat(e.emitT))]);
   }
   sounds.sort((a, b) => a[0]! - b[0]!);
 
@@ -148,7 +202,8 @@ export function runProbe(argv: string[]): void {
         stuck: core.metrics.stuckEdges, resolves: core.metrics.resolves, repoKey, track, sounds };
 
   const emb = embeddedAssets();
-  const html = buildProbeHtml(data, soundRaw, emb);
+  const recs = embeddedRecords(argv);
+  const html = buildProbeHtml(data, soundRaw, emb, recs.json);
   const ts = new Date().toISOString().replace(/[:.]/g, '-');
   const tapeBase = basename(tapePath).replace(/\.tape\.jsonl$/, '').replace(/\.jsonl$/, ''); // M2.0 §1.2 命名规约
   const outDir = outIdx >= 0 && argv[outIdx + 1] ? argv[outIdx + 1]! : join(process.cwd(), 'runs', `probe-${tapeBase}-${ts}`);
@@ -166,10 +221,11 @@ export function runProbe(argv: string[]): void {
   }
   const cnt = (c: number): number => sounds.filter((s) => s[1] === c).length;
   process.stderr.write(
-    `探针 声音相(SOUND-R2) ${basename(tapePath)}${kind ? `（${kind}）` : ''} → ${relative(process.cwd(), outFile)}\n` +
+    `探针 声音相(SOUND-R3) ${basename(tapePath)}${kind ? `（${kind}）` : ''} → ${relative(process.cwd(), outFile)}\n` +
     `  固定入口：runs/probe-latest/probe.html（旧标签页会被新页自动静音接管）\n` +
     `  sound-params ${soundHash}｜轨迹 ${track.length} 点｜前景 ${sounds.length}` +
     `（拨弦${cnt(0)}/闷弦${cnt(1)}/纸页${cnt(2)}/铃${cnt(3)}/卡座${cnt(4)}/声部${cnt(5)}｜和弦${cnt(6)}/跳针${cnt(7)}/ASK${cnt(8)}｜DONE${cnt(9)}）\n` +
+    `  唱片 ${recs.names.length} 张${recs.userCount ? `（含用户架 ${recs.userCount}）` : ''}：${recs.names.join('、') || '（无——房间层模式）'}｜?record=名字 选盘\n` +
     `  浏览器打开 probe.html 点『▶』（用户手势解锁音频）。?tuner=1 开调音抽屉。自包含、零网络。\n`,
   );
 }
@@ -179,7 +235,7 @@ function gitSha(): string { try { return execSync('git rev-parse --short HEAD', 
 
 // ---------- probe.html（自包含：内联 CSS/JS + 内嵌数据/声参 + 内嵌 sound/ 真源；无外部 URL） ----------
 
-function buildProbeHtml(data: unknown, soundRaw: unknown, emb: { json: string; hash: string }): string {
+function buildProbeHtml(data: unknown, soundRaw: unknown, emb: { json: string; hash: string }, recordsJson: string): string {
   const json = JSON.stringify(data);
   const spJson = JSON.stringify(soundRaw);
   return `<!doctype html>
@@ -223,6 +279,7 @@ function buildProbeHtml(data: unknown, soundRaw: unknown, emb: { json: string; h
   <span class="muted">速度</span><input id="speed" type="range" min="1" max="60" value="1"><span id="speedV">1×</span>
   <span class="muted">｜进度</span><span id="prog">0s</span>
   <span class="muted">｜天气</span><span id="wx">CLEAR</span>
+  <span class="muted">｜唱片</span><span id="rec">—</span><button id="recNext" title="换盘（顺播下一张；URL ?record=名字 直选）">⏭</button>
   <span class="muted">｜床</span><span id="bed">—</span>
   <span class="muted">｜词汇：拨弦=改动(槽选音) 闷弦=失败 纸页=读 铃=跑 卡座=存 ｜呼唤：和弦=解决 跳针=卡碟 动机=ASK ｜DONE=静默</span>
 </div>
@@ -234,6 +291,7 @@ function buildProbeHtml(data: unknown, soundRaw: unknown, emb: { json: string; h
 <script id="d" type="application/json">${json}</script>
 <script id="sp" type="application/json">${spJson}</script>
 <script id="assets" type="application/json">${emb.json}</script>
+<script id="records" type="application/json">${recordsJson}</script>
 <script>
 "use strict";
 ${inlineSoundSource()}
@@ -264,15 +322,37 @@ function hashJsonUi(o){ const s=stableStr(o); let h=0x811c9dc5;
   return h.toString(16).padStart(8,'0'); }
 
 // ===== 音频：引擎只建一次（EAR-3 单实例语义在页内同样成立），transport 每次起播复位 =====
-let ac=null, engine=null;
+let ac=null, engine=null, audioReady=null;
 let capInfo={load:0,peak:0,underruns:0,updates:0};
+// 唱片层（SOUND-R3）：内嵌 base64 → decodeAudioData（mp3/ogg/wav 通吃）→ 单声道混合。
+// fnv 校验=防腐（assets 同律）；lufs 定标锚随行（prep 实测；用户盘 null=不定标，HUD 如实标注）。
+const RECORDS_META=JSON.parse(document.getElementById('records').textContent);
+const recSel=new URLSearchParams(location.search).get('record'); // ?record=名字｜序号
+let recIndex0=0;
+if(recSel){ const i=RECORDS_META.findIndex(r=>r.name===recSel); recIndex0=i>=0?i:(parseInt(recSel)||0); }
+function b64Bytes(b64){ const s=atob(b64); const u=new Uint8Array(s.length); for(let i=0;i<s.length;i++)u[i]=s.charCodeAt(i); return u; }
+async function decodeRecords(){
+  const out=[];
+  for(const r of RECORDS_META){
+    const u=b64Bytes(r.b64);
+    if(fnvBytes(u)!==r.fnv) throw new Error('records：'+r.name+' 内容哈希不符（页内嵌损坏）');
+    const ab=await ac.decodeAudioData(u.buffer.slice(0)); // decodeAudioData 会重采样到 ctx 采样率
+    const n=ab.length, mono=new Float32Array(n);
+    for(let ch=0;ch<ab.numberOfChannels;ch++){ const d=ab.getChannelData(ch); for(let i=0;i<n;i++) mono[i]+=d[i]; }
+    if(ab.numberOfChannels>1) for(let i=0;i<n;i++) mono[i]/=ab.numberOfChannels;
+    out.push({ name:r.name, title:r.title||r.name, x:mono, sr:ab.sampleRate, lufs:r.lufs, seconds:ab.duration, bpmMeasured:r.bpmMeasured, user:!!r.user });
+  }
+  return out;
+}
 function ensureAudio(){
-  if(ac){ if(ac.state==='suspended') ac.resume(); return; }
+  if(audioReady) { if(ac&&ac.state==='suspended') ac.resume(); return audioReady; }
   // EAR-8：latencyHint 'playback'——这是收听仪器不是演奏乐器，大缓冲换实时线程欠载免疫
   // （欠载爆音"滋滋啦啦"骑在当刻最响的层上、且与磁带版本无关——正是历轮"噪声一模一样"的候选机理）
   ac=new (window.AudioContext||window.webkitAudioContext)({ latencyHint:'playback' });
+  audioReady=(async()=>{
   const assets=assetsFromEmbedded(JSON.parse(document.getElementById('assets').textContent)); // 内容哈希校验在内
-  engine=buildEngine(ac, SP, { repoKey: D.repoKey, seed: D.repoKey, assets });
+  const records=await decodeRecords();
+  engine=buildEngine(ac, SP, { repoKey: D.repoKey, seed: D.repoKey, assets, records, recordIndex: recIndex0 });
   for(const k of isoMutes) engine.setMute(k,true); // 起播前勾掉的层，建图即施加
   // 欠载记录仪（Chrome AudioRenderCapacity；不支持则显示 n/a）——船长页头可见，机器证据入 __probe
   try{
@@ -285,6 +365,8 @@ function ensureAudio(){
       }); }
     else document.getElementById('mHealth').textContent='载荷 n/a';
   }catch(_e){ document.getElementById('mHealth').textContent='载荷 n/a'; }
+  })();
+  return audioReady;
 }
 
 // ===== 双时钟播放（针走墙钟；声音走音频钟；调度与量化全在 graph.js）=====
@@ -331,13 +413,18 @@ function frame(){ const pm=Math.min(playMs(),dur); const s=sampleAt(track,pm);
   document.getElementById('wx').textContent=WX[s[4]];
   const bt=bedTargets({T:s[2],A:s[3],wow:s[6],phase:PHASE_IDX[s[5]]||'WORKING',weather:'CLEAR',pendingAsk:s[7]===1},SP);
   document.getElementById('bed').textContent=(bt.silence?'静默':bt.hover?'悬停':'L1 '+bt.l1.toFixed(3)+' L2 '+bt.l2.toFixed(3)+' S3 '+bt.s3.toFixed(3)+' 磨损 '+(bt.crackle+bt.hissLin).toFixed(4));
+  const ri=engine?engine.recordInfo:null, rm=!engine&&RECORDS_META.length?RECORDS_META[recIndex0]:null;
+  document.getElementById('rec').textContent = ri?(ri.title+' '+(ri.idx+1)+'/'+ri.count+(ri.tapeStopped?' ⏹滑停':'')):(rm?(rm.title||rm.name)+' '+(recIndex0+1)+'/'+RECORDS_META.length:'（无——房间层）');
   if(playing && pm<dur) raf=requestAnimationFrame(frame); else if(pm>=dur) stopPlay(); }
 
-function start(fromPm){ if(playing) return;
+async function start(fromPm){ if(playing) return;
   // EAR-6 修：接管语义从"后开的页永久独占"改为"谁按▶谁发声"——被接管页按播放即夺回
   if(takenOver){ takenOver=false; try{ CHAN&&CHAN.postMessage({type:'takeover',id:TABID}); }catch(_e){}
     if(engine) engine.unmuteMaster(ac.currentTime); }
-  ensureAudio(); playing=true; setState('▶ 播放中');
+  if(!engine) setState('… 解码唱片'); // 首次：内嵌 base64 → decodeAudioData（1-2s）
+  await ensureAudio();
+  if(playing) return; // await 间隙重入护栏
+  playing=true; setState('▶ 播放中');
   startPm=Math.max(0,Math.min(fromPm===undefined?startPm:fromPm,dur)); // 无参=从上次位置续播
   perf0=performance.now(); audio0=ac.currentTime+0.05;
   si=0; while(si<sounds.length&&sounds[si][0]<startPm) si++;  // 前景快进到起点
@@ -360,6 +447,12 @@ function stopPlay(){
 }
 document.getElementById('play').onclick=()=>start(); // 勿直挂 start：onclick 会把事件对象误作 fromPm
 document.getElementById('stop').onclick=stopPlay;
+// 换盘（SOUND-R3）：顺播下一张（唱片架循环）。引擎未建=只挪起始盘号；tape-stop 后换盘即复活。
+document.getElementById('recNext').onclick=()=>{
+  if(!RECORDS_META.length) return;
+  if(engine){ engine.setRecord((engine.recordInfo?engine.recordInfo.idx:0)+1, ac.currentTime); frame(); }
+  else { recIndex0=(recIndex0+1)%RECORDS_META.length; frame(); }
+};
 // 跳转手柄（EAR-11）：曲线画布按下/拖动/松开——松开即跳
 (function(){ cc.style.cursor='crosshair'; let scrubbing=false;
   const pmOf=(e)=>{ const r=cc.getBoundingClientRect(); return Math.max(0,Math.min((e.clientX-r.left)/r.width,1))*dur; };
@@ -372,7 +465,7 @@ document.getElementById('stop').onclick=stopPlay;
 // ===== 隔离板（EAR-7）：层禁声走引擎（engine.setMute），不动 SP/哈希；起播前的勾选先记账后施加 =====
 const isoMutes=new Set();
 (function(){ const board=document.getElementById('isoBoard');
-  const LAYERS=[['l1','L1 织体体'],['crackle','磨损crackle'],['l2','L2 和声垫'],['s2','S2 律动'],['s3','S3 张力弦'],['hiss','底噪hiss'],['fg','前景+呼唤']];
+  const LAYERS=[['record','唱片'],['l1','L1 织体体'],['crackle','磨损crackle'],['l2','L2 和声垫'],['s2','S2 律动'],['s3','S3 张力弦'],['hiss','底噪hiss'],['fg','前景+呼唤']];
   for(const [key,label] of LAYERS){
     const lab=document.createElement('label'); lab.style.cssText='display:flex;gap:4px;align-items:center';
     const cb=document.createElement('input'); cb.type='checkbox'; cb.checked=true;
@@ -401,6 +494,7 @@ try{ CHAN=new BroadcastChannel('foley-probe');
 window.__probe={ isPlaying:()=>playing, acState:()=>ac?ac.state:'none', acTime:()=>ac?ac.currentTime:-1,
   playMs:()=>playing?playMs():-1, scheduled:()=>si, gridAt:()=>engine?engine.lastGridAt:-1, takenOver:()=>takenOver,
   gains:()=>engine?engine.debugGains():null, master:()=>engine?engine.nodes.master.gain.value:-1,
+  record:()=>engine?engine.recordInfo:{pending:RECORDS_META.length,idx:recIndex0}, // R3：装盘状态（dev 诊断口）
   health:()=>({...capInfo, baseLatency:ac?ac.baseLatency:-1, sampleRate:ac?ac.sampleRate:-1}) };
 
 // ===== 调音抽屉（?tuner=1，仅 dev；拧 SP → 实时生效 + 哈希重算） =====

@@ -10,6 +10,8 @@ import { runLive } from './live.ts';
 import { runHunt } from './hunt.ts';
 import { runEar } from './ear.ts';
 import { runRuns } from './runs.ts';
+import { runCalibrate } from './calibrate.ts';
+import { runRenderCuts } from './rendercuts.ts';
 
 const cmd = process.argv[2];
 
@@ -41,6 +43,12 @@ switch (cmd) {
   case 'runs':
     runRuns(process.argv.slice(3));
     break;
+  case 'calibrate':
+    runCalibrate(process.argv.slice(3));
+    break;
+  case 'render-cuts':
+    runRenderCuts(process.argv.slice(3));
+    break;
   default:
     console.error('用法: node cli/index.ts <distill|scan|replay|live|hunt|probe>');
     console.error('  distill 原始 JSONL → 蒸馏带 .tape.jsonl（§3，唯一读原始处）');
@@ -48,7 +56,7 @@ switch (cmd) {
     console.error('  replay  离线跑蒸馏带 → REPORT.md（判定表/占空比/拐点）[--hz 10|20]');
     console.error('  live    尾随生长中的原始 JSONL，20Hz 广播（M1.9 §1.1，bounded）');
     console.error('  hunt    磁带狩猎 v2：真卡碟带 + 释放带（M1.9 §1.3 判据）');
-    console.error('  ear     机器耳朵（SOUND-R1）：离线渲染 G1–G5 门（停止静默/总闸/床响度 active）');
+    console.error('  ear     机器耳朵（SOUND-R3 v3）：离线渲染 G1–G8 门（含唱片路径；G7 唱片在位 −20 LUFS）\n  calibrate 定标轮（R3 §4.4）：CALIB 四常数实测 vs 冻结对照（只测不改）');
     console.error('  probe   探针页（v1 声音相：床＋前景＋调音抽屉）');
     process.exit(cmd ? 2 : 1);
 }

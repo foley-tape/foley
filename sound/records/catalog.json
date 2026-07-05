@@ -1,0 +1,62 @@
+{
+  "_source": "SOUND-R3 §1 出厂唱片清单（open-lofi vendor）。fnv 内容哈希与 sound/assets manifest 同法（ear 双哈希原料）；bpmMeasured 为 vendor 日谱通量自相关实测；lufs 为响度定标锚（measureLufs 同尺，48k afconvert 解码）；播放语义 v1=顺播＋无缝循环。来源属性：AI 生成（Suno v5，作者 btahir 以 premium 会员身份声明所有权后捐入公共领域）——见 LICENSES.md 风险判读。",
+  "_weatherCatalogOnRecord": "open-lofi seasonal-weather 类目 27 首（雨/风暴/四季）记录在案，天气选曲留 v1.x（R3 §1 裁定本轮不做）。",
+  "records": [
+    {
+      "name": "2-am-debug-loop",
+      "file": "2-am-debug-loop.mp3",
+      "title": "2 AM Debug Loop",
+      "category": "activities",
+      "bpmMeasured": 80,
+      "seconds": 117.8,
+      "bytes": 2333286,
+      "fnv": "070e3c82",
+      "lufs": -18.18,
+      "source": "https://github.com/btahir/open-lofi",
+      "author": "btahir",
+      "license": "CC0-1.0"
+    },
+    {
+      "name": "cursor-after-midnight",
+      "file": "cursor-after-midnight.mp3",
+      "title": "Cursor After Midnight",
+      "category": "activities",
+      "bpmMeasured": 83,
+      "seconds": 232.4,
+      "bytes": 4627158,
+      "fnv": "c6af5fdd",
+      "lufs": -17.35,
+      "source": "https://github.com/btahir/open-lofi",
+      "author": "btahir",
+      "license": "CC0-1.0"
+    },
+    {
+      "name": "dust-on-the-morning-keys",
+      "file": "dust-on-the-morning-keys.mp3",
+      "title": "Dust on the Morning Keys",
+      "category": "chillhop",
+      "bpmMeasured": 76,
+      "seconds": 152.8,
+      "bytes": 3244566,
+      "fnv": "0761ce27",
+      "lufs": -16.15,
+      "source": "https://github.com/btahir/open-lofi",
+      "author": "btahir",
+      "license": "CC0-1.0"
+    },
+    {
+      "name": "terminal-rain",
+      "file": "terminal-rain.mp3",
+      "title": "Terminal Rain",
+      "category": "activities",
+      "bpmMeasured": 80,
+      "seconds": 123.8,
+      "bytes": 2650566,
+      "fnv": "363568bf",
+      "lufs": -17.23,
+      "source": "https://github.com/btahir/open-lofi",
+      "author": "btahir",
+      "license": "CC0-1.0"
+    }
+  ]
+}

@@ -22,8 +22,8 @@ export interface SoundCtx {
   createOscillator(): SoundNodeLike & { type: string; frequency: SoundParamLike; start(t?: number): void; stop(t?: number): void };
   createBiquadFilter(): SoundNodeLike & { type: string; frequency: SoundParamLike; Q: SoundParamLike; gain: SoundParamLike };
   createDelay(maxSec: number): SoundNodeLike & { delayTime: SoundParamLike };
-  createBuffer(ch: number, len: number, sr: number): { getChannelData(ch: number): Float32Array };
-  createBufferSource(): SoundNodeLike & { buffer: unknown; loop: boolean; playbackRate: SoundParamLike; start(t?: number): void; stop(t?: number): void };
+  createBuffer(ch: number, len: number, sr: number): { getChannelData(ch: number): Float32Array; copyToChannel(src: Float32Array, ch: number): void };
+  createBufferSource(): SoundNodeLike & { buffer: unknown; loop: boolean; loopStart: number; loopEnd: number; playbackRate: SoundParamLike; start(t?: number, offsetSec?: number): void; stop(t?: number): void };
   createWaveShaper(): SoundNodeLike & { curve: Float32Array | null };
 }
 
@@ -61,9 +61,14 @@ export interface SoundEngine {
   scheduleGridUntil(untilSec: number): void;
   trigger(cls: number, atSec: number, deg: number, vel: number): void;
   applyBedNow(pm: number): void;
-  setMute(name: 'l1' | 'crackle' | 'l2' | 's2' | 's3' | 'hiss' | 'fg', on: boolean): void;
+  setMute(name: 'l1' | 'crackle' | 'l2' | 's2' | 's3' | 'hiss' | 'fg' | 'record', on: boolean): void;
   assetsUsed: { body: boolean; air: boolean; crackle: boolean };
   stackInfo: { l2: StackInfo; s3: StackInfo };
+  // 唱片面（SOUND-R3）
+  readonly recordInfo: { idx: number; name: string; title: string; seconds: number; count: number; tapeStopped: boolean } | null;
+  recordCount: number;
+  setRecord(idx: number, at?: number): void;
+  recordPosAt(t: number): number;
   stop(at: number): void;
   hardMute(): void;
   muteMaster(at: number): void;
@@ -71,4 +76,9 @@ export interface SoundEngine {
   debugGains(): Record<string, number>;
 }
 
-export function buildEngine(ctx: SoundCtx, SP: SoundParams, opts: { repoKey: string; seed?: string; assets?: AssetMap | null }): SoundEngine;
+/** 唱片条目（PCM 已解码：页 decodeAudioData／Node afconvert）；lufs=定标锚（catalog.json prep 实测）。 */
+export interface RecordClip {
+  name: string; title?: string; x: Float32Array; sr: number; lufs: number; seconds: number; bpmMeasured?: number;
+}
+
+export function buildEngine(ctx: SoundCtx, SP: SoundParams, opts: { repoKey: string; seed?: string; assets?: AssetMap | null; records?: RecordClip[] | null; recordIndex?: number }): SoundEngine;

@@ -52,12 +52,30 @@
     "askRepeatSec": 90
   },
   "loudness": {
-    "_": "G7 执法（SOUND-R2）：床积分响度 K 加权门控积分，中张力段 1× 原速测。",
+    "_": "G7 执法（SOUND-R2）：床积分响度 K 加权门控积分，中张力段 1× 原速测。R3 唱片在位改口径见 record.targetLufs。",
     "bedLufs": -26,
     "bedSwingDb": 4,
     "fgPeakLufs": -18,
     "callPeakLufs": -14,
     "truePeakDbTp": -1
+  },
+  "record": {
+    "_": "SOUND-R3 唱片总线（机器对唱片的处置）。恒电平（F5 v2：机器不泵音量）；T 的表达=处置。响度定标：targetLufs−唱片实测 lufs（catalog.json prep 实测，measureLufs 同尺）。filterHz 域=S4 参数域平移（磁带变旧变闷）。wow=playbackRate 调制口（走带不稳→音高微醺）；wowRateHz≈0.55 取 33⅓rpm 唱片偏心频率。风味默认（wowCents/fade）候美学轮 A/B，非定标常数。",
+    "targetLufs": -20,
+    "duckDb": -7.5,
+    "duckSlewMs": 250,
+    "stuckLoopSecLo": 0.3,
+    "stuckLoopSecHi": 0.8,
+    "stuckTickGain": 0.12,
+    "tapeStopSec": 1.6,
+    "filterHzLo": 1800,
+    "filterHzHi": 8000,
+    "wowCentsLo": 2,
+    "wowCentsHi": 14,
+    "wowTBoost": 0.6,
+    "wowRateHz": 0.55,
+    "fadeInSec": 1.2,
+    "fadeOutSec": 2.5
   },
   "scale": {
     "_": "每仓库一调：repoKey→主音；五声音阶。replay 侧以磁带 sourceHash 代 repoKey（现实修正沿革）。",

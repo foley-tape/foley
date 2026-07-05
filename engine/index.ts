@@ -105,9 +105,12 @@ function decayStress(st: EngineState, dtMs: number, params: Params): void {
   }
 }
 
-/** 弹簧-阻尼：needle 吃 T。上行欠阻尼(快攻)，下行过阻尼(慢放)。子步半隐式 Euler。 */
+/** 弹簧-阻尼：needle 吃 T。上行欠阻尼(快攻)，下行过阻尼(慢放)。子步半隐式 Euler。
+ *  DONE 断电落针（SOUND-R1 §5）：马达断电、表头失励磁——弹簧目标置 0 走既有慢放翼，
+ *  **S 账本照常衰减不动**（归零是仪器的诚实物理，不是数据造假）；"洗碗机时刻"由此干净。
+ *  任何真实活动清 done（ingest）→ 表头复励磁，针回 T。 */
 function integrateSpring(st: EngineState, dtMs: number, params: Params): void {
-  const target = tension(st.S, params);
+  const target = st.done ? 0 : tension(st.S, params);
   if (dtMs > SETTLE_MS) { st.needlePos = target; st.needleVel = 0; return; }
   let remaining = dtMs / 1000;
   const sub = SPRING_SUBSTEP_MS / 1000;

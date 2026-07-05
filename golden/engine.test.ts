@@ -203,3 +203,34 @@ test('⑩ episode 分段：切段 + 复位', () => {
   for (let i = 0; i < 3; i++) { advanceTo(st, 300 + i, params); d3loops += ingest(st, f(300 + i), params).filter((x) => x.special === 'STUCK_LOOP').length; }
   assert.equal(d3loops, 1, '复位后重新计数，第3次才发 STUCK_LOOP');
 });
+
+// ㊹ DONE 断电落针（SOUND-R1 §5，引擎唯一例外）：phase=DONE → 针弹簧目标 0 走既有慢放翼；
+// S 账本照常衰减不动（归零是仪器的诚实物理，不是数据造假）；真实活动复励磁针回 T。
+test('㊹ DONE 断电落针：针落 0、S 账本不动、活动复励磁', () => {
+  const st = seed();
+  // 充能：同签名连败抬 S，走时让弹簧追上 T
+  for (let i = 0; i < 4; i++) {
+    advanceTo(st, 1000 * (i + 1), params);
+    ingest(st, mom({ t: 1000 * (i + 1), verb: 'WRITE', outcome: 'FAIL', sig: 'w:x' }), params);
+  }
+  for (let t = 5000; t <= 8000; t += 100) advanceTo(st, t, params);
+  const before = snapshot(st, 8000, params);
+  assert.ok(before.needle > 0.15 && before.T > 0.15, `断电前有真张力（needle=${before.needle.toFixed(3)} T=${before.T.toFixed(3)}）`);
+
+  ingest(st, mom({ t: 8000, special: 'DONE' }), params);
+  const sAtDone = st.S;
+  for (let t = 8100; t <= 12000; t += 100) advanceTo(st, t, params);
+  const after = snapshot(st, 12000, params);
+  assert.equal(after.phase, 'DONE');
+  assert.ok(after.needle < 0.05, `断电 4s 后针应落零域（needle=${after.needle.toFixed(3)}）`);
+  assert.ok(after.T > 0.1, `T 照常按账本衰减、不被断电清零（T=${after.T.toFixed(3)}）`);
+  const tauDecay = sAtDone * Math.exp(-4 / params.decay.tauActiveSec);
+  assert.ok(Math.abs(st.S - tauDecay) / sAtDone < 0.02, `S 只走 τ 衰减（实 ${st.S.toFixed(4)} vs 律 ${tauDecay.toFixed(4)}）`);
+
+  // 复励磁：真实活动清 done，针回追 T
+  ingest(st, mom({ t: 12000, verb: 'WRITE', outcome: 'FAIL', sig: 'w:x' }), params);
+  for (let t = 12100; t <= 13500; t += 100) advanceTo(st, t, params);
+  const back = snapshot(st, 13500, params);
+  assert.notEqual(back.phase, 'DONE');
+  assert.ok(back.needle > 0.1, `活动后针复起（needle=${back.needle.toFixed(3)}）`);
+});

@@ -48,7 +48,7 @@ switch (cmd) {
     console.error('  replay  离线跑蒸馏带 → REPORT.md（判定表/占空比/拐点）[--hz 10|20]');
     console.error('  live    尾随生长中的原始 JSONL，20Hz 广播（M1.9 §1.1，bounded）');
     console.error('  hunt    磁带狩猎 v2：真卡碟带 + 释放带（M1.9 §1.3 判据）');
-    console.error('  ear     声音层机器验收：五带床包络 × T 的 Pearson r（白皮书 §6.1）');
+    console.error('  ear     机器耳朵（SOUND-R1）：离线渲染 G1–G5 门（停止静默/总闸/床响度 active）');
     console.error('  probe   探针页（v1 声音相：床＋前景＋调音抽屉）');
     process.exit(cmd ? 2 : 1);
 }

@@ -24,7 +24,9 @@
     "slewMsSlow": 800,
     "doneSilenceSec": 4,
     "trimDb": -4,
-    "_trim": "床总闸（dB）：EAR-1 证词后新增；一颗旋钮管床整体响度，不动各 stem 配比"
+    "_trim": "床总闸（dB）：EAR-1 证词后新增；一颗旋钮管床整体响度，不动各 stem 配比",
+    "breathDepth": 0.12,
+    "_breath": "S1 呼吸深度（相对值，域 0.05–0.20）：SOUND-R1 方案 B——呼吸走独立乘法级，数学上永远是正身的百分比；EAR-4 根因（LFO 绝对深度直连增益参数）从结构上灭绝"
   },
   "foreground": {
     "peakGain": 0.26,

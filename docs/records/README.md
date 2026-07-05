@@ -5,7 +5,7 @@
 
 | 夹 | 轮次 | 内容 |
 |---|---|---|
-| `night1/` | 审计夜（M1.7→M1.8 间） | 恢复-审计与修复实录（ce25a3e2） |
+| `night1/` | 审计夜（M1.7→M1.8 间） | 恢复-审计与修复实录（ce25a3e2）＋ `audit/` 原始档（自仓库根迁入：AUDIT_REPORT/预注册/b/c 轮/handoff） |
 | `m15/` | M1.5 蒸馏工序 | 读我/FEEDBACK/施工方手记/params ＋ **storm 证据卷 1bb942f0**（旧引擎产物，不可复现，特批晋升） |
 | `m16/` | M1.6 扫参与五带 | FEEDBACK/手记/冰箱/params/verdict/sweep 全套 |
 | `m17/` | M1.7 判据二版＋耳朵上岗 | 必发（EAR_REPORT/FEEDBACK/SWEEP/verdict/手记）＋备查（盲听包等） |

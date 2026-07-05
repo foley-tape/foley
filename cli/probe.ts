@@ -273,13 +273,14 @@ function ensureAudio(){ if(ac) { if(ac.state==='suspended') ac.resume(); return;
   G.bedBus.connect(G.wowDelay); G.wowDelay.connect(G.lp);
   G.fgBus.connect(G.lp);         // 前景同过磁带总线（同一台机器出的声）
   G.lp.connect(G.shelf); G.shelf.connect(G.master); G.master.connect(ac.destination);
-  // S1 基底：暖 pad（EAR-1 修：sine 沉底 + triangle 在主音区——移出 55Hz 嗡鸣带；失谐放缓防"电机搏动"）
+  // S1 基底：暖 pad。EAR-3 移调：主能量上移到 ROOT/ROOT+12（约 110–420Hz）——
+  // 笔记本扬声器 ~200Hz 以下陡衰，pad 写在 55–110Hz 时"背景音乐"物理上不可闻，床只剩 hiss。
   G.s1=ac.createGain(); G.s1.gain.value=0; G.s1.connect(G.bedBus);
-  const padF=ac.createBiquadFilter(); padF.type='lowpass'; padF.frequency.value=700; padF.connect(G.s1);
+  const padF=ac.createBiquadFilter(); padF.type='lowpass'; padF.frequency.value=1200; padF.connect(G.s1);
   const o1=ac.createOscillator(),o2=ac.createOscillator(),o1g=ac.createGain(),o2g=ac.createGain();
-  o1.type='sine'; o2.type='triangle';
-  o1.frequency.value=midiHz(ROOT-12); o2.frequency.value=midiHz(ROOT)*1.002;
-  o1g.gain.value=0.5; o2g.gain.value=0.8;
+  o1.type='triangle'; o2.type='triangle';
+  o1.frequency.value=midiHz(ROOT); o2.frequency.value=midiHz(ROOT+12)*1.002;
+  o1g.gain.value=0.8; o2g.gain.value=0.5;
   o1.connect(o1g); o1g.connect(padF); o2.connect(o2g); o2g.connect(padF); o1.start(); o2.start();
   const b1=ac.createOscillator(),bg1=ac.createGain(),b2=ac.createOscillator(),bg2=ac.createGain();
   b1.frequency.value=1/7.3; b2.frequency.value=1/11.9;                 // Eno 互质
@@ -290,16 +291,18 @@ function ensureAudio(){ if(ac) { if(ac.state==='suspended') ac.resume(); return;
   G.room=noiseSrc(); G.roomG=ac.createGain(); G.roomG.gain.value=0;
   const roomF=ac.createBiquadFilter(); roomF.type='lowpass'; roomF.frequency.value=400;
   G.room.connect(roomF); roomF.connect(G.roomG); G.roomG.connect(G.bedBus);
-  // S3 张力弦（EAR-1 修：裸锯齿=工业蜂鸣 → 双 triangle 主体 + 一丝 saw 织体，滤波压到 800Hz）
+  // S3 张力弦（EAR-1：triangle 主体压蜂鸣；EAR-3：加 ROOT+12 高声部——张力在笔记本喇叭上也要可闻，
+  // 暗色靠滤波保持，不靠把音写进听不见的频段）
   G.s3=ac.createGain(); G.s3.gain.value=0; G.s3.connect(G.bedBus);
-  G.s3F=ac.createBiquadFilter(); G.s3F.type='lowpass'; G.s3F.frequency.value=800; G.s3F.Q.value=0.3; G.s3F.connect(G.s3);
+  G.s3F=ac.createBiquadFilter(); G.s3F.type='lowpass'; G.s3F.frequency.value=900; G.s3F.Q.value=0.3; G.s3F.connect(G.s3);
   G.v1=ac.createOscillator(); G.v1.type='triangle'; G.v1g=ac.createGain(); G.v1g.gain.value=0.6;
   G.v2=ac.createOscillator(); G.v2.type='triangle'; G.v2g=ac.createGain(); G.v2g.gain.value=0.42;
-  const vSaw=ac.createOscillator(); vSaw.type='sawtooth'; const vSawG=ac.createGain(); vSawG.gain.value=0.10;
-  G.v1.frequency.value=midiHz(ROOT); G.v2.frequency.value=midiHz(ROOT+7); vSaw.frequency.value=midiHz(ROOT)*0.999;
+  const vHi=ac.createOscillator(); vHi.type='triangle'; const vHiG=ac.createGain(); vHiG.gain.value=0.3;
+  const vSaw=ac.createOscillator(); vSaw.type='sawtooth'; const vSawG=ac.createGain(); vSawG.gain.value=0.08;
+  G.v1.frequency.value=midiHz(ROOT); G.v2.frequency.value=midiHz(ROOT+7); vHi.frequency.value=midiHz(ROOT+12)*0.999; vSaw.frequency.value=midiHz(ROOT)*0.999;
   G.v1.connect(G.v1g); G.v1g.connect(G.s3F); G.v2.connect(G.v2g); G.v2g.connect(G.s3F);
-  vSaw.connect(vSawG); vSawG.connect(G.s3F);
-  G.v1.start(); G.v2.start(); vSaw.start();
+  vHi.connect(vHiG); vHiG.connect(G.s3F); vSaw.connect(vSawG); vSawG.connect(G.s3F);
+  G.v1.start(); G.v2.start(); vHi.start(); vSaw.start();
   // S4 hiss（EAR-1 修：裸白噪高通=排气声 → 带限 2.2k–7.5k + 缓 Q，磁带底噪的柔和高频滚降）
   G.hiss=noiseSrc(); G.hissG=ac.createGain(); G.hissG.gain.value=0;
   const hf=ac.createBiquadFilter(); hf.type='highpass'; hf.frequency.value=2200; hf.Q.value=0.5;
@@ -479,7 +482,20 @@ function start(){ if(playing||takenOver) return; ensureAudio(); playing=true; se
   schedule(); raf=requestAnimationFrame(frame); }
 function stop(){ playing=false; cancelAnimationFrame(raf);
   if(!takenOver) setState('■ 已停止');
-  if(ac){ const at=ac.currentTime; ['s1','s2','s3','hissG','roomG'].forEach(k=>G[k].gain.setTargetAtTime(0,at,0.2)); } }
+  if(!ac) return;
+  const at=ac.currentTime;
+  // EAR-3 修：调度器把床参数预排到未来 ~150ms——停键只压零不撤单，停后最后一条预排指令
+  // 会把床拉回来永远嗡着（"曲线停了声音不停"）。停 = 撤销一切未来自动化 + 快速归零。
+  ['s1','s2','s3','hissG','roomG'].forEach(k=>{ G[k].gain.cancelScheduledValues(at); G[k].gain.setTargetAtTime(0,at,0.05); });
+  [G.bedBus.gain,G.lp.frequency,G.shelf.gain,G.wowAmt1.gain,G.wowAmt2.gain,G.v1.frequency,G.v2.frequency]
+    .forEach(p=>p.cancelScheduledValues(at));
+  G.wowAmt1.gain.setTargetAtTime(0,at,0.05); G.wowAmt2.gain.setTargetAtTime(0,at,0.05);
+  G.bedBus.gain.setTargetAtTime(1,at,0.05);
+  // 硬闸兜底（EAR-3 实测：个别 stem 的自动化在 cancel+setTarget 后仍被引擎钉住不衰减——
+  // 不与自动化语义辩经，300ms 淡出窗过后直接置零，停就是停）
+  setTimeout(()=>{ if(playing||!ac) return; const t2=ac.currentTime;
+    ['s1','s2','s3','hissG','roomG','wowAmt1','wowAmt2'].forEach(k=>{ G[k].gain.cancelScheduledValues(t2); G[k].gain.value=0; });
+  },300); }
 document.getElementById('play').onclick=start;
 document.getElementById('stop').onclick=stop;
 (function(){ const s=track.length?sampleAt(0):[0,0,0,0,0,0,0,0]; drawNeedle(s[1],s[4]); drawCurve(0); })();
@@ -499,7 +515,8 @@ try{ CHAN=new BroadcastChannel('foley-probe');
 }catch(_e){ /* file:// 降级：靠 build 时间戳与状态牌人工辨旧页 */ }
 // dev 诊断口（自动化验证用；后台标签 rAF 被掐时以此读真状态）
 window.__probe={ isPlaying:()=>playing, acState:()=>ac?ac.state:'none', acTime:()=>ac?ac.currentTime:-1,
-  playMs:()=>playing?playMs():-1, scheduled:()=>si, gridAt:()=>lastGridAt, takenOver:()=>takenOver };
+  playMs:()=>playing?playMs():-1, scheduled:()=>si, gridAt:()=>lastGridAt, takenOver:()=>takenOver,
+  gains:()=>ac?{s1:G.s1.gain.value,s2:G.s2.gain.value,s3:G.s3.gain.value,hiss:G.hissG.gain.value,room:G.roomG.gain.value}:null };
 
 // ===== 调音抽屉（?tuner=1，仅 dev；拧 SP → 实时生效 + 哈希重算） =====
 if(new URLSearchParams(location.search).get('tuner')==='1'){
@@ -524,7 +541,10 @@ if(new URLSearchParams(location.search).get('tuner')==='1'){
     const inp=document.createElement('input'); inp.type='range'; inp.min=lo; inp.max=hi; inp.step=(hi-lo)/200;
     inp.value=SP[sec][key];
     const v=document.createElement('span'); v.className='v'; v.textContent=(+SP[sec][key]).toFixed(3).replace(/\\.?0+$/,'');
-    inp.oninput=()=>{ SP[sec][key]=+inp.value; v.textContent=(+inp.value).toFixed(3).replace(/\\.?0+$/,''); refreshHash(); };
+    inp.oninput=()=>{ SP[sec][key]=+inp.value; v.textContent=(+inp.value).toFixed(3).replace(/\\.?0+$/,''); refreshHash();
+      // EAR-3：拖动立即生效（曾要等下一个 1/8 拍网格才应用，慢滑 slew 再拖 0.25–0.8s——
+      // 拖动像"没变化"。播放中即时重算当前床目标并即刻施加；网格调度照旧接管后续。
+      if(ac && playing){ const s=sampleAt(Math.min(playMs(),dur)); applyBed(bedTargets(s[2],s[3],s[6],s[5],s[7]),ac.currentTime,true); } };
     lab.append(k,inp,v); panel.append(lab);
   }
   refreshHash();

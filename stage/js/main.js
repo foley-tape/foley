@@ -1,10 +1,12 @@
-// 舞台点火：读 fixtures → 建三件器件 → 20Hz 广播 → rAF 渲染。
+// 舞台点火（M-S3 双模）：live 实流为默认；?tape=<name>（或 ?mode=replay）走 fixtures 回放。
 import { loadTape, Replayer } from './replay.js';
+import { LiveStream } from './live.js';
 import { VuMeter, ChartRecorder, Lamps } from './instruments.js';
 import { ReelDeck, Counter } from './deck.js';
 import { mountLens } from './lens.js';
 
 const params = new URLSearchParams(location.search);
+const mode = params.get('mode') || (params.get('tape') ? 'replay' : 'live');
 const tapeName = params.get('tape') || 'storm';
 
 async function boot() {
@@ -12,8 +14,9 @@ async function boot() {
   if (document.readyState !== 'complete') {
     await new Promise(r => window.addEventListener('load', r, { once: true }));
   }
-  const tape = await loadTape(tapeName);
-  const replayer = new Replayer(tape);
+  // live 没有拼接与前史：给走纸一张白骨架
+  const tape = mode === 'live' ? { splices: [], moments: [], duration: Infinity } : await loadTape(tapeName);
+  const replayer = mode === 'live' ? null : new Replayer(tape);
 
   const vu = new VuMeter(document.getElementById('vu-svg'));
   const chart = new ChartRecorder(document.getElementById('chart-canvas'), tape);
@@ -43,11 +46,13 @@ async function boot() {
 
   // 睡在暗处：IDLE 时画外灯压低一档（room 按 phase 着装）
   const room = document.getElementById('room');
-  replayer.onPacket.push(pkt => { room.dataset.phase = pkt.phase; });
-  replayer.onPacket.push((pkt, isSeek) => instruments.forEach(i => i.onPacket(pkt, isSeek)));
-  replayer.onMoment.push(m => instruments.forEach(i => i.onMoment && i.onMoment(m)));
+  const feedPacket = (pkt, isFirst) => {
+    room.dataset.phase = pkt.phase;
+    instruments.forEach(i => i.onPacket(pkt, isFirst));
+  };
+  const feedMoment = m => instruments.forEach(i => i.onMoment && i.onMoment(m));
 
-  // 渲染环（与广播环分离：广播走 20Hz 舞台网格，渲染走显示器帧率）
+  // 渲染环（与广播分离：广播走 20Hz 包流，渲染走显示器帧率）
   function render(now) {
     instruments.forEach(i => i.render(now));
     requestAnimationFrame(render);
@@ -55,19 +60,29 @@ async function boot() {
   requestAnimationFrame(render);
   window.addEventListener('resize', () => chart._resize());
 
-  // dev 抽屉：?hud=1 才现形，不属于面板
-  if (params.get('hud') === '1') {
-    const { mountHud } = await import('./hud.js');
-    mountHud(replayer, tapeName);
+  let live = null;
+  if (mode === 'live') {
+    live = new LiveStream();
+    live.onPacket.push(feedPacket);
+    live.onMoment.push(feedMoment);
+    live.connect();
+  } else {
+    replayer.onPacket.push(feedPacket);
+    replayer.onMoment.push(feedMoment);
+    // dev 抽屉：?hud=1 才现形，不属于面板；只属回放
+    if (params.get('hud') === '1') {
+      const { mountHud } = await import('./hud.js');
+      mountHud(replayer, tapeName);
+    }
+    const seek = Number(params.get('seek') || 0);
+    if (seek > 0) replayer.seek(seek * 1000);
+    const speed = Number(params.get('speed') || 1);
+    if (speed > 0) replayer.speed = speed;
+    if (params.get('paused') !== '1') replayer.play();
+    else replayer.seek(replayer.stageT); // 停机取景也要先上一包
   }
-  const seek = Number(params.get('seek') || 0);
-  if (seek > 0) replayer.seek(seek * 1000);
-  const speed = Number(params.get('speed') || 1);
-  if (speed > 0) replayer.speed = speed;
-  if (params.get('paused') !== '1') replayer.play();
-  else replayer.seek(replayer.stageT); // 停机取景也要先上一包
 
-  window.__stage = { replayer, tape, deck, counter, chart, lamps }; // 调试把手（dev）
+  window.__stage = { mode, replayer, live, tape, deck, counter, chart, lamps }; // 调试把手（dev）
 }
 
 boot().catch(err => {

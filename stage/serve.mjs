@@ -1,11 +1,24 @@
-// stage 静态服务器 —— 零依赖，运行时零外网。node stage/serve.mjs [port]
+// stage 服务器 —— 静态件 ＋ live 中继（M-S3）。零依赖，运行时零外网（localhost 即舞台后台）。
+//
+//   node stage/serve.mjs [port] [--replay-only] [--raw <jsonl>]
+//
+// live 为默认模式：起动即生 `cli live`（Track-FIX 真 20Hz 广播，stdout NDJSON），
+// 经 /live SSE 中继进浏览器。--replay-only 时只当静态服务器（性格照/回放捕捉用）。
+// 中继与钟都不依赖标签页可见性——藏页照走（M2.0 §2 验证件二）。
 import { createServer } from 'node:http';
 import { readFile } from 'node:fs/promises';
-import { join, extname, normalize } from 'node:path';
+import { join, extname, normalize, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { spawn } from 'node:child_process';
 
 const root = fileURLToPath(new URL('.', import.meta.url));
-const port = Number(process.argv[2] ?? 4173);
+const repoRoot = dirname(root.replace(/\/$/, ''));
+
+const args = process.argv.slice(2);
+const port = Number(args.find(a => /^\d+$/.test(a)) ?? process.env.PORT ?? 4173);
+const replayOnly = args.includes('--replay-only');
+const rawIdx = args.indexOf('--raw');
+const rawPath = rawIdx >= 0 ? args[rawIdx + 1] : null;
 
 const MIME = {
   '.html': 'text/html; charset=utf-8',
@@ -17,8 +30,52 @@ const MIME = {
   '.json': 'application/json',
 };
 
+// ---- live 中继：child stdout NDJSON → SSE 扇出（写出即丢，bounded 纪律同源）----
+const clients = new Set();
+let lastState = null; // 新客户端接入先喂末态，器件即刻上弦
+let liveChild = null;
+
+function broadcast(line) {
+  for (const res of clients) res.write(`data: ${line}\n\n`);
+}
+
+function startLive() {
+  const liveArgs = ['cli/index.ts', 'live', ...(rawPath ? [rawPath] : ['--latest'])];
+  liveChild = spawn('node', liveArgs, { cwd: repoRoot, stdio: ['ignore', 'pipe', 'pipe'] });
+  liveChild.stderr.on('data', d => process.stderr.write(`[live] ${d}`));
+  let buf = '';
+  liveChild.stdout.on('data', chunk => {
+    buf += chunk;
+    let nl;
+    while ((nl = buf.indexOf('\n')) >= 0) {
+      const line = buf.slice(0, nl); buf = buf.slice(nl + 1);
+      if (!line) continue;
+      if (line.includes('"state"')) lastState = line;
+      broadcast(line);
+    }
+  });
+  liveChild.on('exit', code => {
+    console.error(`[live] 子进程退出（${code}）`);
+    for (const res of clients) res.write(`event: gone\ndata: {}\n\n`);
+    liveChild = null;
+  });
+}
+
 createServer(async (req, res) => {
   const url = new URL(req.url, 'http://localhost');
+  if (url.pathname === '/live') {
+    if (replayOnly || !liveChild) { res.writeHead(503); res.end('live 未开'); return; }
+    res.writeHead(200, {
+      'content-type': 'text/event-stream',
+      'cache-control': 'no-cache',
+      'connection': 'keep-alive',
+    });
+    res.write(':stage live\n\n');
+    if (lastState) res.write(`data: ${lastState}\n\n`);
+    clients.add(res);
+    req.on('close', () => clients.delete(res));
+    return;
+  }
   let path = normalize(decodeURIComponent(url.pathname));
   if (path === '/' || path === '\\') path = '/index.html';
   const file = join(root, path);
@@ -31,5 +88,9 @@ createServer(async (req, res) => {
     res.writeHead(404); res.end('not found');
   }
 }).listen(port, () => {
-  console.log(`stage @ http://localhost:${port}/?tape=storm`);
+  console.log(`stage @ http://localhost:${port}/${replayOnly ? '?tape=storm（replay-only）' : '（live 默认；?tape=storm 走 replay）'}`);
 });
+
+if (!replayOnly) startLive();
+process.on('SIGINT', () => { liveChild?.kill('SIGINT'); process.exit(0); });
+process.on('SIGTERM', () => { liveChild?.kill('SIGTERM'); process.exit(0); });

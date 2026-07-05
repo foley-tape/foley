@@ -92,13 +92,19 @@ export function fnv1a(s: string): string {
   return h.toString(16).padStart(8, '0');
 }
 
-/** 归一化错误首行：抹路径/hex/长token/数字，供 sig 稳定聚类。截断 60（§3.2）。 */
+/** 归一化错误首行：抹凭据/路径/hex/token/数字，供 sig 稳定聚类。截断 60（§3.2）。
+ *  M1.8-F④ 补刀（B-2）：内联凭据/短口令/相对·Windows 路径/疑似令牌 → SECRET。宁可过抹——errClass 只为聚类。 */
 function normErr(text: string): string {
   const first = (text.split('\n')[0] ?? '').toLowerCase();
   return first
-    .replace(/[\/~][\w./@-]+/g, 'PATH')
+    .replace(/-[pp]\S+/g, 'SECRET')                                       // -pSECRET 内联凭据（已小写）
+    .replace(/\S*[=:]\S{3,}/g, 'SECRET')                                  // key=val / key:val 内联（含短口令、URL）
+    .replace(/[a-z]:\\[\\\S]*/g, 'PATH')                                  // Windows 路径 c:\...
+    .replace(/\.{0,2}\/[\w./@\\-]+/g, 'PATH')                             // 绝对/相对 路径（含 ./ ../ /abs）
+    .replace(/[~][\w./@-]+/g, 'PATH')                                     // ~ 家目录路径
     .replace(/0x[0-9a-f]+/g, 'HEX')
-    .replace(/[a-z0-9_-]{16,}/g, 'TOKEN') // 隐私加固：抹长 token（密钥/哈希）
+    .replace(/[a-z0-9_-]{16,}/g, 'TOKEN')                                 // 长 token（密钥/哈希）
+    .replace(/\b(?=[a-z0-9]*[a-z])(?=[a-z0-9]*\d)[a-z0-9]{4,15}\b/g, 'SECRET') // 4–15 位字母数字混合疑似令牌
     .replace(/\d+/g, '0')
     .replace(/\s+/g, ' ')
     .trim()
@@ -310,7 +316,7 @@ export function distillTape(text: string, params: Params): DistillResult {
 
       const input = (b.input && typeof b.input === 'object') ? b.input : undefined;
       const command = typeof input?.['command'] === 'string' ? (input['command'] as string) : undefined;
-      const verb: Verb = name === 'Bash' ? classifyBash(command) : verbOf(name, extra);
+      const verb: Verb = name === 'Bash' ? classifyBash(command, params.adapter) : verbOf(name, extra);
 
       const res = typeof b.id === 'string' ? resultsById.get(b.id) : undefined;
       if (res) pairedCount++; else unpairedToolUse++;
@@ -336,7 +342,7 @@ export function distillTape(text: string, params: Params): DistillResult {
         default: mKind = 'default'; mRaw = 0; // SAVE/ASK/SPAWN/OTHER 用默认幅度
       }
 
-      const tags = verb === 'RUN' || verb === 'SAVE' ? tagsForCommand(command) : [];
+      const tags = verb === 'RUN' || verb === 'SAVE' ? tagsForCommand(command, params.adapter) : [];
       const errClass = outcome === 'FAIL' ? normErr(res?.text ?? '') : null;
       const sig = fnv1a(`${verb}|${name}|${errClass ?? ''}`);
       const targetHash = targetHashOf(verb, input, command);

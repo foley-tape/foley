@@ -1,7 +1,8 @@
 {
-  "_source": "TAPE0 verdict/2（M1.7）。判据生命周期 status 三态（informational 记分不拦｜active 拦路｜retired 跳过计分仍记实测）。修订需提交信息架构师签核行。",
-  "verdictVersion": "verdict/2",
-  "_batteryCoverage": "三条泄能通路真实数据覆盖：破卡碟 ✅(jam 真×2)；test 转绿 / SAVE 仅金测试覆盖——留缺口，待出现高张力处 test 转绿或提交收尾的磁带时补一卷。",
+  "_source": "TAPE0 verdict/3（M1.8-F，NIGHT-1 修复轮）。判据生命周期 status 三态。修订需提交信息架构师签核行（本轮依据施工令 M18_DUAL §Track-FIX F1③）。",
+  "verdictVersion": "verdict/3",
+  "_M18F_note": "P1-3(卡碟塌缩)修复后：storm.stuckEdges→informational（F1③明令）；jam.stuckEdges→informational（同理延伸，待追认）。P1-3 揭示五带皆无单-episode 内 ≥3 同目标真卡碟——破卡碟泄能通路真实数据覆盖由『jam 真×2』**降为 0**，battery 缺口扩大（见下）。",
+  "_batteryCoverage": "三条泄能通路真实数据覆盖（M1.8-F 更新）：破卡碟 ❌（P1-3 修复后五带均无真 ok 型破卡碟——旧『jam 真×2』为跨目标伪影）；test 转绿 ❌（五带 honest test-OK=0，旧计数全为误贴）；SAVE 仅金测试覆盖。**三条泄能通路现均无真实磁带覆盖**——待补『有真解脱』磁带（架构师决策点）。",
   "_priorityCanon": "安全硬禁 > 协议冻结 > 判据 > 施工令实现细则 > 库偏好（M1.7 §5，写入 SPEC 附注待架构师落笔）",
   "rain": { "floor": 0.50, "unit": "T·min", "provisional": true, "_note": "R=∫max(0,T−floor)dt，活跃时间积分；双尺并行观察中" },
   "bands": {
@@ -26,14 +27,15 @@
     },
     "jam": {
       "_role": "卡碟叙事完整性",
+      "_M18F": "P1-3 修复揭示：jam 的旧『卡碟』亦为跨目标塌缩（bee4f76d+cbba5492 异命令共 errClass ee5139f9）。按目标分槽后，唯一 3-重复槽跨 episode 边界（ep0×2 + ep1×1），无单 episode 内 ≥3 同目标卡碟。stuckEdges 与 storm 同理降 informational。",
       "peakT": { "min": 0.50, "max": 0.90, "status": "active" },
-      "stuckEdges": { "min": 1, "max": 3, "status": "active" },
+      "stuckEdges": { "min": 1, "max": 3, "status": "informational", "reason": "M1.8-F③(B-3)：按目标分槽后诚实数字=0（旧值 2 为跨目标塌缩伪影）。与 storm.stuckEdges 同理降级，重校准前不拦路。此为对施工令 F1③ 降级理由（criterion 级）的忠实延伸——架构师请追认或改判。" },
       "jamMonotone": { "status": "active" }
     },
     "storm": {
       "_role": "灵敏度：真风暴要像风暴",
       "peakT": { "min": 0.65, "max": 0.92, "status": "active" },
-      "stuckEdges": { "min": 3, "max": 12, "status": "active" },
+      "stuckEdges": { "min": 3, "max": 12, "status": "informational", "reason": "M1.8-F③(施工令 F1③ 明令)：按目标分槽后诚实数字未知（旧值 9 含跨目标塌缩），重校准前不拦路。实测 4。" },
       "rainOrDuty": { "dutyMin": 0.15, "dutyMax": 0.45, "rMin": 2.0, "status": "active", "_note": "占空∈[15%,45%] 或 雨量R≥2.0" },
       "resolveOnOpportunity": { "status": "retired", "reason": "范畴错误：把磁带内容属性当引擎属性。迷路型风暴的解脱不是离散事件；泄能机制正确性已由金测试＋jam 带（真破卡碟×2）覆盖。消散的表达属 v1 连续层（张力回落/保真恢复/天空放晴），非第四音——现实中雨停无人奏和弦。" }
     }

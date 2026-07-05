@@ -71,8 +71,8 @@ test('③ T 0.72↔0.77 振荡 → STORM 只进一次不抖', () => {
   assert.equal(st.weather, 'STORM', '底部 0.72>0.60 不应退出 STORM');
 });
 
-// ④ ASK/DONE 从摄入到广播 ≤50ms（直通道）
-test('④ ASK/DONE 摄入→广播 ≤50ms', () => {
+// ④ ASK/DONE 状态转移正确（直通道；原名"≤50ms"经审计更名——测的是状态转移非计时）
+test('④ ASK/DONE 状态转移正确', () => {
   const st = seed();
   advanceTo(st, 5000, params);
   ingest(st, mom({ t: 5000, verb: 'ASK', outcome: 'NA' }), params);
@@ -99,15 +99,16 @@ test('⑤ 蒸馏→回放两跑 CSV 逐字节一致', () => {
   assert.equal(a.momentsCsv, b.momentsCsv, 'moments.csv 应逐字节一致');
 });
 
-// ⑥ 静默 5min → S 按 τ=120s（断流 >60s 后 τ=300s）分段衰减吻合
-test('⑥ 静默5min → 分段τ(120/300)衰减吻合', () => {
+// ⑥ 静默 5min → S 按活跃 τ（断流 >idleThreshold 后切 idle τ）分段衰减吻合（τ 值读 params，抗冠军漂移）
+test('⑥ 静默5min → 分段τ衰减吻合', () => {
+  const { tauActiveSec, tauIdleSec, idleThresholdSec } = params.decay;
   const st = seed();
   st.S = 1.0; st.lastEventT = 0; st.now = 0;
-  advanceTo(st, 60_000, params);
-  const at60 = Math.exp(-60 / 120); // ≈0.6065
-  assert.ok(Math.abs(st.S - at60) < 1e-4, `60s 后应≈${at60.toFixed(4)}，实际 ${st.S.toFixed(4)}`);
+  advanceTo(st, idleThresholdSec * 1000, params);
+  const atThr = Math.exp(-idleThresholdSec / tauActiveSec);
+  assert.ok(Math.abs(st.S - atThr) < 1e-4, `${idleThresholdSec}s 后应≈${atThr.toFixed(4)}，实际 ${st.S.toFixed(4)}`);
   advanceTo(st, 300_000, params);
-  const at300 = at60 * Math.exp(-240 / 300); // 前60s τ=120，其后 τ=300
+  const at300 = atThr * Math.exp(-(300 - idleThresholdSec) / tauIdleSec); // 前 idleThreshold τ=active，其后 τ=idle
   assert.ok(Math.abs(st.S - at300) < 1e-4, `5min 后应≈${at300.toFixed(4)}，实际 ${st.S.toFixed(4)}`);
 });
 

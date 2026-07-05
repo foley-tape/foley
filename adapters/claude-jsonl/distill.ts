@@ -7,14 +7,51 @@ import {
   distillTape, fnv1a, type DistillResult, type DistilledMoment, type DistillMeta,
 } from './parse.ts';
 
+/** 内建工具白名单——脱敏时保留其名（无隐私）；其余（含 MCP 自定义工具）哈希。 */
+const BUILTIN_TOOLS = new Set([
+  'Read', 'Grep', 'Glob', 'WebFetch', 'WebSearch', 'NotebookRead',
+  'Edit', 'Write', 'MultiEdit', 'NotebookEdit', 'Task', 'Agent', 'Bash',
+  'AskUserQuestion', 'ToolSearch', '',
+]);
+
+/** 每带随机盐（堵字典反演）。非密码学强度，够挡"已知明文→哈希"字典反查。 */
+function randomSalt(): string {
+  return Date.now().toString(36) + '.' + Math.random().toString(36).slice(2) + Math.random().toString(36).slice(2);
+}
+
 /**
- * 全脱敏（M1.6-A §1.二.4）：把唯一文本字段 errClass 换成其聚类哈希，产可分享形态。
- * 蒸馏带其余字段本就无明文（tool 名、tags、hash）。sig 不变（聚类键稳定）。默认不脱敏——本地抽检需人读错误模板。
+ * 全脱敏（M1.6-A §1.二.4 + M1.8-F④/B-2 三向量全堵）：产**经对抗测试最小化**的可分享形态。
+ * 堵三向量：(1) errClass → 加盐聚类 id（零模板文本）；(2) 工具名 → 内建保留、其余(含 MCP)加盐哈希；
+ * (3) 时间戳 → 改为相对首事件偏移（保节奏、去日历/时钟指纹）。sig/targetHash 每带随机盐重算。
+ * 文案纪律：这是"最小化"，**不是"零明文保证"**，仍不建议外传未审带（见 SPEC 附注 / FEEDBACK-FIX）。
+ * salt 可注入（金测试用固定盐）；缺省每带随机。
  */
-export function redactResult(d: DistillResult): DistillResult {
-  const records: DistilledMoment[] = d.records.map((r) =>
-    r.errClass ? { ...r, errClass: 'e' + fnv1a(r.errClass) } : r);
-  return { records, meta: { ...d.meta, distiller: d.meta.distiller + '+redact' } };
+export function redactResult(d: DistillResult, salt?: string): DistillResult {
+  const s = salt ?? randomSalt();
+  const h = (x: string): string => fnv1a(s + '|' + x);
+  const firstT = d.meta.stats.firstT ?? 0;
+  const rel = (t: number): number => t - firstT;
+  const relN = (t: number | null): number | null => (t === null ? null : t - firstT);
+  const records: DistilledMoment[] = d.records.map((r) => ({
+    ...r,
+    t: rel(r.t), useT: rel(r.useT), resolveT: relN(r.resolveT),
+    tool: r.tool && !BUILTIN_TOOLS.has(r.tool) ? 't' + h(r.tool) : r.tool,
+    errClass: r.errClass ? 'e' + h(r.errClass) : null,
+    sig: r.sig ? 's' + h(r.sig) : null,
+    targetHash: r.targetHash ? h(r.targetHash) : '',
+  }));
+  const episodes = d.meta.episodes.map((e) => ({ ...e, startT: rel(e.startT), endT: rel(e.endT) }));
+  // meta.stats.unknownTools 的**键**是原始工具名（含 MCP 自定义名）——同样脱敏：内建保留、其余哈希。
+  const unknownTools: Record<string, number> = {};
+  for (const [k, v] of Object.entries(d.meta.stats.unknownTools)) {
+    unknownTools[BUILTIN_TOOLS.has(k) ? k : 't' + h(k)] = v;
+  }
+  const stats = {
+    ...d.meta.stats, unknownTools,
+    firstT: firstT === 0 ? d.meta.stats.firstT : 0,
+    lastT: d.meta.stats.lastT === null ? null : rel(d.meta.stats.lastT),
+  };
+  return { records, meta: { ...d.meta, distiller: d.meta.distiller + '+redact', sourceHash: 'redacted', episodes, stats } };
 }
 
 /** 蒸馏带文本：meta 首行（kind:'meta'）+ 每记录一行。确定性。 */

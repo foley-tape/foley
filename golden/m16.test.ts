@@ -74,17 +74,26 @@ test('⑫ expiry STUCK_CLEARED 正典时刻 tick 无关 + 不泄能', () => {
   assert.equal(rA.filter((x) => x.special === 'RESOLVE').length, 0, 'expiry 不发 RESOLVE');
 });
 
-// ⑬ redact：全脱敏后无明文 errClass（仅 e+8hex 或 null），sig 不变
-test('⑬ redact 输出无明文 errClass，sig 保留', () => {
+// ⑬ redact（M1.8-F④ 三向量）：errClass/sig 加盐哈希、时间相对化、内建工具名保留
+test('⑬ redact 三向量：errClass/sig 加盐、时间相对化、内建工具名保留', () => {
   const raw = runEv('e1', 'somecmd', '2026-07-04T10:00:00.000Z', '2026-07-04T10:00:00.100Z', true).join('\n') + '\n';
   const d = distillTape(raw, params);
-  const red = redactResult(d);
+  const red = redactResult(d, 'FIXEDSALT'); // 固定盐 → 确定性
   for (const r of red.records) {
-    if (r.errClass !== null) assert.match(r.errClass, /^e[0-9a-f]{8}$/, `errClass 应为哈希: ${r.errClass}`);
+    if (r.errClass !== null) assert.match(r.errClass, /^e[0-9a-f]{8}$/, `errClass 应为加盐哈希: ${r.errClass}`);
+    if (r.sig !== null) assert.match(r.sig, /^s[0-9a-f]{8}$/, `sig 应为加盐哈希: ${r.sig}`);
   }
-  const failRec = red.records.find((r) => r.verb === 'RUN' && r.errClass);
-  assert.ok(failRec, '应有一条失败记录被脱敏');
-  assert.deepEqual(red.records.map((r) => r.sig), d.records.map((r) => r.sig), 'sig（聚类键）不变');
+  assert.ok(red.records.find((r) => r.verb === 'RUN' && r.errClass), '应有一条失败记录被脱敏');
+  // Bash 是内建工具 → 名保留
+  assert.equal(red.records.find((r) => !r.special)!.tool, 'Bash', '内建工具名保留');
+  // 时间相对化：首事件后所有 t 从 0 起（去日历指纹）
+  assert.equal(red.meta.stats.firstT, 0, '脱敏后 firstT 归 0（相对化）');
+  assert.ok(red.records.every((r) => r.t >= 0 && r.t < 1e12), '记录时间相对化（非 epoch 绝对值）');
+  // 盐改变 → sig 不同（堵字典反演）
+  const red2 = redactResult(d, 'OTHERSALT');
+  const s1 = red.records.find((r) => r.sig)!.sig;
+  const s2 = red2.records.find((r) => r.sig)!.sig;
+  assert.notEqual(s1, s2, '不同盐 → 不同 sig 哈希（每带盐防跨带关联）');
 });
 
 // ⑭ sweep 确定性：computeSweep 同输入两跑 → CSV 逐字节一致（§4.1）

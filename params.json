@@ -1,9 +1,9 @@
 {
-  "_source": "TAPE0 正式参数（hash 886928d1）。M1.7 §2：verdict/2 重扫 16/144 全绿，§4.3 全绿冠军规则机械转正（距 M1.5 基线最少改动 1.5 步、击败其余 15 组）。provisional 状态解除。",
+  "_source": "TAPE0 正式参数 M1.8-F（NIGHT-1 修复轮封版冠军，hash aac8e0db）。P1-3 目标分槽后重扫 4/144 全绿，冠军规则机械转正（较 M1.7 基线 886928d1：READ0.21→0.24 / failDefault0.4→0.5 / tau120→150，归一距离 1.333）。verdict/3。",
   "stress": {
     "S0": 1,
     "verbWeights": {
-      "READ": 0.21,
+      "READ": 0.24,
       "WRITE": 0.3,
       "RUN": 0.5,
       "SAVE": 0.6,
@@ -21,17 +21,19 @@
     "runSecCap": 120,
     "readKbCap": 100,
     "default": 0.3,
-    "failDefault": 0.4
+    "failDefault": 0.5
   },
   "release": {
     "testResolveMinS": 0.3,
     "testResolveFactor": 0.6,
     "saveFactor": 0.5,
     "jamBreakFactor": 0.7,
-    "jamBreakMinS": 0.25
+    "jamBreakMinS": 0.25,
+    "saveResolveMinS": 0.15
   },
   "decay": {
-    "tauActiveSec": 120,
+    "_dripNote": "M1.8-F③(B-5)：未决 RUN 滴灌是 live-only 机制（replay 中 result 恒已知、无真正未决态）。实测留待 v1-live 落地。",
+    "tauActiveSec": 150,
     "tauIdleSec": 300,
     "idleThresholdSec": 60,
     "pendingRunDripAfterSec": 30,
@@ -64,12 +66,41 @@
     }
   },
   "adapter": {
-    "askTimeoutSec": 15,
-    "doneSilenceSec": 600,
     "episodeGapMin": 30,
-    "tagTestRegex": "test|jest|vitest|pytest|cargo test|go test",
-    "tagBuildRegex": "build|tsc|webpack|vite build",
-    "saveRegex": "git\\s+commit",
+    "saveCommand": [
+      "git",
+      "commit"
+    ],
+    "testRunners": [
+      "jest",
+      "vitest",
+      "pytest",
+      "mocha",
+      "ava",
+      "phpunit",
+      "rspec",
+      "tox",
+      "cargo test",
+      "go test"
+    ],
+    "buildTools": [
+      "tsc",
+      "webpack",
+      "rollup",
+      "esbuild",
+      "make",
+      "gradle",
+      "vite build",
+      "cargo build",
+      "go build",
+      "docker build"
+    ],
+    "packageManagerRunners": [
+      "npm",
+      "pnpm",
+      "yarn",
+      "bun"
+    ],
     "verbMapExtra": {
       "AskUserQuestion": "ASK",
       "ToolSearch": "READ"

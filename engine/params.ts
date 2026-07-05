@@ -16,6 +16,7 @@ export interface Params {
   release: {
     testResolveMinS: number; testResolveFactor: number; saveFactor: number;
     jamBreakFactor: number; jamBreakMinS: number;
+    saveResolveMinS: number; // M1.8-F②：SAVE-OK 泄能照旧，但 RESOLVE 时刻仅 S≥此值才发（平静提交=卡座咔哒非和弦）
   };
   decay: {
     tauActiveSec: number;
@@ -35,13 +36,13 @@ export interface Params {
   };
   spring: { up: SpringLaw; down: SpringLaw };
   adapter: {
-    askTimeoutSec: number;
-    doneSilenceSec: number;
     episodeGapMin: number;
-    tagTestRegex: string;
-    tagBuildRegex: string;
-    saveRegex: string;
     verbMapExtra: Record<string, string>;
+    // M1.8-F①：token 集取代硬编码正则（分类改命令头结构化匹配，见 verbs.ts）。
+    saveCommand: string[];            // ["git","commit"]：段头等于此序列 → SAVE
+    testRunners: string[];            // 测试器：单词(jest/vitest/pytest…)或两词(cargo test/go test)
+    buildTools: string[];             // 构建器：单词(tsc/webpack…)或两词(vite build/cargo build…)
+    packageManagerRunners: string[];  // npm/pnpm/yarn/bun：run <script> 或直接 <script> 脚本名前缀匹配
   };
 }
 export interface SpringLaw { zeta: number; omegaN: number }

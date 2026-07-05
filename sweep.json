@@ -1,16 +1,50 @@
 {
-  "_source": "TAPE0 M1.6 §4.1 扫参网格 4×3×3×2×2 = 144 组。其余参数固定为 params.json 现值。baseline（M1.7 §5 由 current 改名）= 上一个正式参数，距离锚，仅在冠军转正时推进（此为 M1.5 正式基线）。",
+  "_source": "TAPE0 M1.6 §4.1 扫参网格 4×3×3×2×2 = 144 组。其余参数固定为 params.json 现值。baseline（M1.7 §5 由 current 改名）= 上一个正式参数，距离锚，仅在冠军转正时推进（M1.8-F 冠军 aac8e0db 转正 → baseline 推进至此（READ0.24/fD0.5/tau150/repCap4/tR0.3）。",
   "dims": [
-    { "path": "stress.verbWeights.READ", "values": [0.15, 0.18, 0.21, 0.24] },
-    { "path": "amplitude.failDefault", "values": [0.3, 0.4, 0.5] },
-    { "path": "decay.tauActiveSec", "values": [120, 150, 180] },
-    { "path": "stress.repCap", "values": [4, 6] },
-    { "path": "release.testResolveMinS", "values": [0.2, 0.3] }
+    {
+      "path": "stress.verbWeights.READ",
+      "values": [
+        0.15,
+        0.18,
+        0.21,
+        0.24
+      ]
+    },
+    {
+      "path": "amplitude.failDefault",
+      "values": [
+        0.3,
+        0.4,
+        0.5
+      ]
+    },
+    {
+      "path": "decay.tauActiveSec",
+      "values": [
+        120,
+        150,
+        180
+      ]
+    },
+    {
+      "path": "stress.repCap",
+      "values": [
+        4,
+        6
+      ]
+    },
+    {
+      "path": "release.testResolveMinS",
+      "values": [
+        0.2,
+        0.3
+      ]
+    }
   ],
   "baseline": {
-    "stress.verbWeights.READ": 0.21,
-    "amplitude.failDefault": 0.4,
-    "decay.tauActiveSec": 120,
+    "stress.verbWeights.READ": 0.24,
+    "amplitude.failDefault": 0.5,
+    "decay.tauActiveSec": 150,
     "stress.repCap": 4,
     "release.testResolveMinS": 0.3
   }

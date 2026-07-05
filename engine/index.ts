@@ -18,12 +18,13 @@ const SPRING_SUBSTEP_MS = 4;
 // 大跨度（空档/多日续跑）阈值：超此视为已稳定，解析跳跃而非逐步积分
 const SETTLE_MS = 2000;
 
-/** 每签名卡碟态（施工令 §4.2 边沿触发）。 */
+/** 每**目标槽**卡碟态（M1.8-F③：槽 = (verb,tool,targetHash) = clearSig，边沿触发）。
+ *  同一道槽（同目标）反复失败才叫卡碟；29 个不同 URL 各自成槽，是扫射不是跳针。 */
 interface SigState {
-  hits: number[];   // 窗内 FAIL 时刻（升序）——供 rep 计数
-  stuck: boolean;   // 已发 STUCK_LOOP、进入卡碟态（不再重复发射）
-  clearSig: string; // verb|tool 身份，供"同 verb+tool 的 OK"退出匹配
-  lastHit: number;  // 最近一次击中（供窗口过期判定）
+  hits: number[];    // 窗内 FAIL 时刻（升序）——供 rep 计数（按槽）
+  stuck: boolean;    // 已发 STUCK_LOOP、进入卡碟态（不再重复发射）
+  reportSig: string; // errClass 聚类签名，仅供报告/probe 显示（M1.8-F③：sig 降级为标签，不再驱动充能/卡碟）
+  lastHit: number;   // 最近一次击中（供窗口过期判定 + 过期驱逐）
 }
 
 /** 引擎离散输入：协议 MomentEvent + 可选 clearSig（driver 侧算，非协议广播字段）。 */
@@ -31,10 +32,12 @@ export interface IngestMoment extends MomentEvent {
   clearSig?: string;
 }
 
-/** 引擎派生时刻：协议 MomentEvent + 内部注记 clearedBy（ok/expiry）。
- *  clearedBy 非协议字段（schema 冻结）——仅供报告分列 STUCK_CLEARED 与"消散≠解决"纪律。 */
+/** 引擎派生时刻：协议 MomentEvent + 内部注记 clearedBy（ok/expiry）+ slot（目标槽键）。
+ *  clearedBy/slot 非协议字段（schema 冻结）——clearedBy 供报告分列"消散≠解决"；
+ *  slot 供报告与 jamMonotone 按目标槽分组（M1.8-F③）。 */
 export interface DerivedMoment extends MomentEvent {
   clearedBy?: 'ok' | 'expiry';
+  slot?: string;
 }
 
 export interface EngineState {
@@ -141,23 +144,27 @@ function updateWeather(st: EngineState, params: Params): void {
 // ---------- 连续：卡碟窗口过期 → STUCK_CLEARED ----------
 
 /** 卡碟态在 repWindow 内无新击中 → 解除，发 expiry 型 STUCK_CLEARED（§2.1 纪律：消散≠解决，不改 S、不 RESOLVE）。
- *  过期时刻取理论过期点 lastHit+win（M1.6-A §1.二.6 正典：回放与直播一致）。driver 在推进时钟后调用。 */
+ *  过期时刻取理论过期点 lastHit+win（M1.6-A §1.二.6 正典：回放与直播一致）。driver 在推进时钟后调用。
+ *  M1.8-F②（快修）：过期的槽从 map 驱逐（无终身累加器；size 有界；reap 不随时长退化）。 */
 export function reap(st: EngineState, params: Params): DerivedMoment[] {
   const out: DerivedMoment[] = [];
   const win = params.stress.repWindowMs;
-  for (const [sig, s] of st.sigStates) {
+  const dead: string[] = [];
+  for (const [slot, s] of st.sigStates) {
     if (s.stuck && st.now - s.lastHit > win) {
       s.stuck = false;
-      out.push(clearedEvent(sig, s.lastHit + win, 'expiry'));
+      out.push(clearedEvent(slot, s.reportSig, s.lastHit + win, 'expiry'));
     }
+    if (!s.stuck && st.now - s.lastHit > win) dead.push(slot); // 窗外无活动 → 驱逐
   }
+  for (const slot of dead) st.sigStates.delete(slot);
   return out;
 }
 
-function clearedEvent(sig: string, t: number, clearedBy: 'ok' | 'expiry'): DerivedMoment {
+function clearedEvent(slot: string, reportSig: string, t: number, clearedBy: 'ok' | 'expiry'): DerivedMoment {
   return {
     kind: 'moment', t, seq: -1, agent: 'main',
-    verb: 'OTHER', outcome: 'NA', m: 0, tags: [], special: 'STUCK_CLEARED', sig, clearedBy,
+    verb: 'OTHER', outcome: 'NA', m: 0, tags: [], special: 'STUCK_CLEARED', sig: reportSig, clearedBy, slot,
   };
 }
 
@@ -183,7 +190,10 @@ function alternationRate(outcomes: number[]): number {
     totW += w;
     if (outcomes[j] !== outcomes[j - 1]) flipW += w;
   }
-  return totW > 0 ? flipW / totW : 0;
+  const raw = totW > 0 ? flipW / totW : 0;
+  // F2 快修：样本 n<4 置信不足 → 打折（线性升到 n=4 满权），压小样本抖动误报
+  const conf = n >= 4 ? 1 : (n - 1) / 3;
+  return raw * conf;
 }
 
 // ---------- 离散事件 ----------
@@ -225,48 +235,52 @@ export function ingest(st: EngineState, m: IngestMoment, params: Params): Derive
   }
 
   if (m.outcome === 'FAIL') {
-    // 充能 + 卡碟边沿触发
-    const sig = m.sig ?? `${m.verb}|?`;
-    let s = st.sigStates.get(sig);
-    if (!s) { s = { hits: [], stuck: false, clearSig: m.clearSig ?? '', lastHit: m.t }; st.sigStates.set(sig, s); }
+    // M1.8-F③：充能 + 卡碟边沿触发一律按**目标槽** = clearSig = (verb,tool,targetHash)。
+    // sig（errClass 聚类）降级为报告标签（reportSig），不再驱动充能升级与卡碟判定。
+    // 同一道槽（同目标）反复失败才叫卡碟；29 个不同 URL 各自成槽 = 扫射，不是跳针。
+    const slot = (m.clearSig && m.clearSig.length) ? m.clearSig : (m.sig ?? `${m.verb}|?`);
+    let s = st.sigStates.get(slot);
+    if (!s) { s = { hits: [], stuck: false, reportSig: m.sig ?? slot, lastHit: m.t }; st.sigStates.set(slot, s); }
     const cutoff = m.t - params.stress.repWindowMs;
     s.hits = s.hits.filter((ts) => ts >= cutoff);
-    const k = s.hits.length; // 窗内已有 → 本次是第 k+1 次
+    const k = s.hits.length; // 窗内已有 → 本次是第 k+1 次（同一目标槽）
     const rep = Math.min(Math.pow(params.stress.repBase, k), params.stress.repCap);
     const w = params.stress.verbWeights[m.verb] ?? params.stress.verbWeights.OTHER;
     st.S += w * m.m * rep;
     s.hits.push(m.t);
     s.lastHit = m.t;
-    if (m.clearSig) s.clearSig = m.clearSig;
     if (!s.stuck && k >= params.stress.stuckLoopK) {
       s.stuck = true; // 边沿：只此一次发射，态内继续充能不再发
       derived.push({
         kind: 'moment', t: m.t, seq: -1, agent: m.agent,
-        verb: m.verb, outcome: 'FAIL', m: m.m, tags: m.tags, special: 'STUCK_LOOP', sig, k,
+        verb: m.verb, outcome: 'FAIL', m: m.m, tags: m.tags, special: 'STUCK_LOOP', sig: s.reportSig, k, slot,
       });
     }
   } else if (m.outcome === 'OK') {
     // RESOLVE 多态化（§2.1）。形态 1/2：测试转绿 / 提交——各自泄能并发 RESOLVE。
     let resolved = false;
+    const sBeforeRelease = st.S; // 被释放前的张力（供 saveResolveMinS 判定）
     if (m.verb === 'RUN' && m.tags.includes('test') && st.S > params.release.testResolveMinS) {
       st.S *= params.release.testResolveFactor;
       derived.push(resolveEvent(m));
       resolved = true;
     } else if (m.verb === 'SAVE') {
-      st.S *= params.release.saveFactor;
-      derived.push(resolveEvent(m)); // §2.1.2：提交现在也发 RESOLVE 时刻（原先只泄能）
+      st.S *= params.release.saveFactor; // 泄能照旧
+      // M1.8-F②（采纳审计分歧席#2）：解脱须与被释放的张力成正比。
+      // RESOLVE 时刻仅当 S≥saveResolveMinS 才发——平静时的提交是卡座咔哒（v1 foley），不是和弦。
+      if (sBeforeRelease >= params.release.saveResolveMinS) derived.push(resolveEvent(m));
       resolved = true;
     }
-    // 形态 3（卡碟打破）：仅同 verb+tool+target 的 OK 清对应卡碟（distill/2 §3 收紧；ok 型）。
-    // test/save 不再强清无关卡碟——清除权收敛到"同目标 OK"与"窗口过期"两条，合 §3 本旨。
+    // 形态 3（卡碟打破）：仅同目标槽（clearSig）的 OK 清对应卡碟（M1.8-F③：本就是槽键；ok 型）。
     if (m.clearSig) {
-      let broke = false;
-      for (const [sig, s] of st.sigStates) {
-        if (s.stuck && s.clearSig === m.clearSig) { s.stuck = false; derived.push(clearedEvent(sig, m.t, 'ok')); broke = true; }
-      }
-      if (broke && !resolved && st.S > params.release.jamBreakMinS) {
-        st.S *= params.release.jamBreakFactor; // §2.1.3：破卡碟泄能
-        derived.push(resolveEvent(m));
+      const s = st.sigStates.get(m.clearSig);
+      if (s && s.stuck) {
+        s.stuck = false;
+        derived.push(clearedEvent(m.clearSig, s.reportSig, m.t, 'ok'));
+        if (!resolved && st.S > params.release.jamBreakMinS) {
+          st.S *= params.release.jamBreakFactor; // §2.1.3：破卡碟泄能
+          derived.push(resolveEvent(m));
+        }
       }
     }
   }
@@ -285,9 +299,11 @@ export function addStress(st: EngineState, delta: number): void {
 export function snapshot(st: EngineState, t: number, params: Params): StatePacket {
   const T = tension(st.S, params);
   const A = 1 - Math.exp(-st.actRate / params.companions.activityRateScale);
+  // F2 快修：发射侧把 needle 硬夹 [0,1]（弹簧内部仍可欠阻尼过冲，但广播值不越满量程）
+  const needle = st.needlePos < 0 ? 0 : st.needlePos > 1 ? 1 : st.needlePos;
   return {
     kind: 'state', t, agent: 'main',
-    S: st.S, T, A, wow: st.wowSmoothed, needle: st.needlePos,
+    S: st.S, T, A, wow: st.wowSmoothed, needle,
     phase: phaseOf(st, t, params), weather: st.weather,
     pendingAsk: st.pendingAsk,
   };

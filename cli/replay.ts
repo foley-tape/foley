@@ -145,11 +145,14 @@ export function replayCore(distilledText: string, params: Params, rainFloor: num
       const r = records[ei]!;
       advanceTo(st, r.t, params); reapInto();
       const ev = momentOf(r, params);
-      const input = r.special ? ev : Object.assign({}, ev, { clearSig: clearSigOf(r) });
+      const clearSig = r.special ? undefined : clearSigOf(r);
+      const input = r.special ? ev : Object.assign({}, ev, { clearSig });
+      // M1.8-F③：给发射的常规事件挂上目标槽键，供 jamMonotone/报告按槽分组。
+      const emittedEv: DerivedMoment = r.special ? ev : { ...ev, slot: clearSig };
       const before = st.S;
       const derived = ingest(st, input, params);
       ledger.push({ t: r.t, seq: r.seq, label: labelOf(ev), dS: st.S - before });
-      emitted.push({ ev, emitT: r.t });
+      emitted.push({ ev: emittedEv, emitT: r.t });
       for (const dv of derived) emitted.push({ ev: dv, emitT: st.now });
       ei++;
     }
@@ -226,21 +229,24 @@ function computeMetrics(snaps: StatePacket[], emitted: Emit[], rainFloor: number
   };
 }
 
-/** 卡碟段内 T 走势单调不减（在同签名 FAIL 命中点抽样，直至 CLEARED 或段末）。 */
+/** 卡碟段内 T 走势单调不减（在**同目标槽** FAIL 命中点抽样，直至 CLEARED 或段末）。
+ *  M1.8-F③：按 slot（目标槽）分组，非 errClass sig；F2 快修：Tat 二分（去 super-linear）。 */
 function checkJamMonotone(snaps: StatePacket[], emitted: Emit[]): boolean {
   const Tat = (t: number): number => {
-    let best = 0;
-    for (const s of snaps) { if (s.t <= t) best = s.T; else break; }
-    return best;
+    // snaps 按 t 升序 → 二分找 ≤t 的最后一个
+    let lo = 0, hi = snaps.length - 1, best = -1;
+    while (lo <= hi) { const md = (lo + hi) >> 1; if (snaps[md]!.t <= t) { best = md; lo = md + 1; } else hi = md - 1; }
+    return best >= 0 ? snaps[best]!.T : 0;
   };
+  const slotOf = (e: Emit): string | undefined => (e.ev as DerivedMoment).slot;
   const loops = emitted.filter((e) => e.ev.special === 'STUCK_LOOP');
   for (const loop of loops) {
-    const sig = loop.ev.sig;
+    const slot = slotOf(loop);
     const start = loop.ev.t;
-    const clr = emitted.find((e) => e.ev.special === 'STUCK_CLEARED' && e.ev.sig === sig && e.ev.t >= start);
+    const clr = emitted.find((e) => e.ev.special === 'STUCK_CLEARED' && slotOf(e) === slot && e.ev.t >= start);
     const end = clr ? clr.ev.t : Infinity;
     const hits = emitted
-      .filter((e) => !e.ev.special && e.ev.outcome === 'FAIL' && e.ev.sig === sig && e.ev.t >= start && e.ev.t <= end)
+      .filter((e) => !e.ev.special && e.ev.outcome === 'FAIL' && slotOf(e) === slot && e.ev.t >= start && e.ev.t <= end)
       .map((e) => Tat(e.ev.t));
     for (let i = 1; i < hits.length; i++) {
       if (hits[i]! < hits[i - 1]! - 1e-6) return false;
@@ -302,9 +308,9 @@ function buildCurveCsv(snaps: StatePacket[]): string {
 }
 
 function buildMomentsCsv(emitted: Emit[]): string {
-  const head = 't,emitT,seq,verb,outcome,m,tags,special,sig,k,clearedBy';
+  const head = 't,emitT,seq,verb,outcome,m,tags,special,sig,k,clearedBy,slot';
   const rows = emitted.map(({ ev, emitT }) =>
-    `${ev.t},${emitT},${ev.seq},${ev.verb},${ev.outcome},${f6(ev.m)},${ev.tags.join('|')},${ev.special ?? ''},${ev.sig ?? ''},${ev.k ?? ''},${ev.clearedBy ?? ''}`);
+    `${ev.t},${emitT},${ev.seq},${ev.verb},${ev.outcome},${f6(ev.m)},${ev.tags.join('|')},${ev.special ?? ''},${ev.sig ?? ''},${ev.k ?? ''},${ev.clearedBy ?? ''},${(ev as DerivedMoment).slot ?? ''}`);
   return head + '\n' + rows.join('\n') + '\n';
 }
 

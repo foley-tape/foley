@@ -14,12 +14,12 @@ export const PACKET_MS = 50; // 20Hz
 export const PHASES = ['IDLE', 'WORKING', 'WAITING', 'DONE'];
 export const WEATHERS = ['CLEAR', 'OVERCAST', 'RAIN', 'STORM'];
 
-function parseCurve(text) {
+export function parseCurve(text) {
   const lines = text.split('\n');
   const n = lines.length;
   const t = new Float64Array(n), S = new Float64Array(n), T = new Float64Array(n),
     A = new Float64Array(n), wow = new Float64Array(n), needle = new Float64Array(n);
-  const phase = new Uint8Array(n), weather = new Uint8Array(n);
+  const phase = new Uint8Array(n), weather = new Uint8Array(n), pendingAsk = new Uint8Array(n);
   let k = 0;
   for (let i = 1; i < n; i++) {
     const line = lines[i];
@@ -29,12 +29,13 @@ function parseCurve(text) {
     wow[k] = +c[4]; needle[k] = +c[5];
     phase[k] = Math.max(0, PHASES.indexOf(c[6]));
     weather[k] = Math.max(0, WEATHERS.indexOf(c[7]));
+    pendingAsk[k] = c[8] === '1' ? 1 : 0; // 九列正典（M1.9 §1.2 交付，M2.1 §0.7 清账）
     k++;
   }
-  return { n: k, t, S, T, A, wow, needle, phase, weather };
+  return { n: k, t, S, T, A, wow, needle, phase, weather, pendingAsk };
 }
 
-function parseMoments(text) {
+export function parseMoments(text) {
   const lines = text.split('\n');
   const out = [];
   for (let i = 1; i < lines.length; i++) {
@@ -113,9 +114,7 @@ function packetAt(tape, i, f, tau) {
     needle: lerp(c.needle[i], c.needle[j], f),
     phase: PHASES[c.phase[i]],       // 离散场阶跃，取左值
     weather: WEATHERS[c.weather[i]],
-    // curve.csv 无 pendingAsk 列；engine/index.ts phaseOf 证明 WAITING ⇔ pendingAsk。
-    // 同源同钟：这仍是读同一字段的推导，非二次发明。已记入舞台手记提请补列。
-    pendingAsk: c.phase[i] === 2,
+    pendingAsk: c.pendingAsk[i] === 1, // 真字段直读；WAITING⇔pendingAsk 推导已清账（M2.1 §0.7）
   };
 }
 
@@ -176,6 +175,6 @@ export class Replayer {
       }
 
       if (this.stageT >= this.tape.duration) this.pause();
-    }, PACKET_MS);
+    }, PACKET_MS / 2); // 钟比包密一倍：hiccup 时少补发，光学不被迫追赶（影子指标①的教训）
   }
 }

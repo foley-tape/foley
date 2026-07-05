@@ -1,0 +1,17 @@
+{
+  "_": "五带性格照固定机位（素材诚实条款的机械化，M2.1 §1.4）。窗口即正典：改此文件即改机位，临场挑段无门。",
+  "viewport": { "width": 1280, "height": 800, "deviceScaleFactor": 2 },
+  "portraits": [
+    { "name": "portrait-storm-30s",   "tape": "storm",   "prefill": 876,  "from": 918,  "seconds": 30, "note": "雨转风暴→峰值→944s 卡碟咬合" },
+    { "name": "portrait-smooth-30s",  "tape": "smooth",  "prefill": 0,    "from": 10,   "seconds": 30, "note": "平湖：晨启，纸尚新" },
+    { "name": "portrait-busy-30s",    "tape": "busy",    "prefill": 5455, "from": 5495, "seconds": 30, "note": "高产无雨：带轴全速，墨线低伏" },
+    { "name": "portrait-jam-30s",     "tape": "jam",     "prefill": 1110, "from": 1150, "seconds": 30, "note": "反复横跳：wow 峰值，走带微醺" },
+    { "name": "portrait-silence-30s", "tape": "silence", "prefill": 320,  "from": 348,  "seconds": 30, "note": "静场：呼吸熄灭→成了→洗碗机时刻" },
+    { "name": "bonus-stuck-beat-12s", "tape": "storm",   "prefill": 905,  "from": 941,  "seconds": 12, "note": "卡碟拍特写：跳针的视觉孪生" }
+  ],
+  "stills": [
+    { "name": "still-4-deck-storm",  "tape": "storm",   "prefill": 905,  "at": 947 },
+    { "name": "still-5-loupe-macro", "tape": "busy",    "prefill": 5455, "at": 5500, "hoverCounter": true },
+    { "name": "still-6-asleep",      "tape": "silence", "prefill": 60,   "at": 120 }
+  ]
+}

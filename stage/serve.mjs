@@ -34,13 +34,16 @@ const MIME = {
 const clients = new Set();
 let lastState = null; // 新客户端接入先喂末态，器件即刻上弦
 let liveChild = null;
+let liveOutDir = null; // 今晨的纸：live 产物流目录（追赶史＋实时追加）
 
 function broadcast(line) {
   for (const res of clients) res.write(`data: ${line}\n\n`);
 }
 
 function startLive() {
-  const liveArgs = ['cli/index.ts', 'live', ...(rawPath ? [rawPath] : ['--latest'])];
+  const ts = new Date().toISOString().slice(0, 19).replace(/[:T]/g, '-');
+  liveOutDir = join(repoRoot, 'runs', `live-stage-${ts}`);
+  const liveArgs = ['cli/index.ts', 'live', ...(rawPath ? [rawPath] : ['--latest']), '--out', liveOutDir];
   liveChild = spawn('node', liveArgs, { cwd: repoRoot, stdio: ['ignore', 'pipe', 'pipe'] });
   liveChild.stderr.on('data', d => process.stderr.write(`[live] ${d}`));
   let buf = '';
@@ -63,6 +66,16 @@ function startLive() {
 
 createServer(async (req, res) => {
   const url = new URL(req.url, 'http://localhost');
+  // 今晨的纸：当前 live 产物流快照（curve 含追赶全史；页面铺纸后按 t 去重接 SSE）
+  if (url.pathname === '/today/curve.csv' || url.pathname === '/today/moments.csv') {
+    if (!liveOutDir) { res.writeHead(404); res.end(); return; }
+    try {
+      const body = await readFile(join(liveOutDir, url.pathname.slice(7)));
+      res.writeHead(200, { 'content-type': 'text/csv; charset=utf-8', 'cache-control': 'no-store' });
+      res.end(body);
+    } catch { res.writeHead(404); res.end(); }
+    return;
+  }
   if (url.pathname === '/live') {
     if (replayOnly || !liveChild) { res.writeHead(503); res.end('live 未开'); return; }
     res.writeHead(200, {

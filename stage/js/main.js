@@ -39,23 +39,42 @@ async function boot() {
   const instruments = [vu, chart, lamps, deck, counter];
 
   // 镜头法：WebGL 颗粒/暗角/漂移上岗则撤下 CSS 静态替身
-  if (mountLens(document.getElementById('lens'), document.getElementById('machine'))) {
+  const lens = mountLens(document.getElementById('lens'), document.getElementById('machine'));
+  if (lens) {
     document.getElementById('grain').style.display = 'none';
     document.getElementById('vignette').style.display = 'none';
   }
 
-  // 睡在暗处：IDLE 时画外灯压低一档（room 按 phase 着装）
+  // room 按 phase/weather 着装；IDLE 连续 5min 入深睡（v1.3 §1.5），唤醒钨丝速
   const room = document.getElementById('room');
+  let idleSince = null;
   const feedPacket = (pkt, isFirst) => {
     room.dataset.phase = pkt.phase;
+    room.dataset.weather = pkt.weather;
+    if (pkt.phase === 'IDLE') {
+      if (idleSince === null) idleSince = pkt.stageT;
+      const deep = pkt.stageT - idleSince >= 300000;
+      if (deep !== (room.dataset.sleep === 'deep')) {
+        if (deep) room.dataset.sleep = 'deep'; else delete room.dataset.sleep;
+        if (lens) lens.setDeep(deep);
+      }
+    } else if (idleSince !== null) {
+      idleSince = null;
+      delete room.dataset.sleep;
+      if (lens) lens.setDeep(false);
+    }
     instruments.forEach(i => i.onPacket(pkt, isFirst));
   };
   const feedMoment = m => instruments.forEach(i => i.onMoment && i.onMoment(m));
 
-  // 渲染环（与广播分离：广播走 20Hz 包流，渲染走显示器帧率）
+  // 渲染环（与广播分离：广播走 20Hz 包流，渲染 30fps 封顶——
+  // 体温法：数据 20Hz，渲染 60fps 是虚火；30fps 下重建照样平滑，恒迟不变）
+  let lastRender = -Infinity;
   function render(now) {
-    instruments.forEach(i => i.render(now));
     requestAnimationFrame(render);
+    if (now - lastRender < 33) return;
+    lastRender = now;
+    instruments.forEach(i => i.render(now));
   }
   requestAnimationFrame(render);
   window.addEventListener('resize', () => chart._resize());
@@ -65,7 +84,9 @@ async function boot() {
     live = new LiveStream();
     live.onPacket.push(feedPacket);
     live.onMoment.push(feedMoment);
-    live.connect();
+    live.connect();          // 先订流（缓冲）
+    await live.prime();      // 再吃今晨的纸
+    live.flushBuffer();      // 水位去重后接实时
   } else {
     replayer.onPacket.push(feedPacket);
     replayer.onMoment.push(feedMoment);

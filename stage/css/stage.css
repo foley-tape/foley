@@ -32,6 +32,7 @@ body {
   left: -9vw; width: 118vw;
   top: calc(50vh - 560px);
   filter: drop-shadow(0 46px 60px rgba(0, 0, 0, 0.85));
+  will-change: transform; /* 体温法：漂移只许合成，不许整机重栅格化 */
 }
 
 /* —— 走带甲板：哑光暗金属，反光极克制 —— */
@@ -203,6 +204,14 @@ body {
 /* —— 走纸记录仪 —— */
 .chart-bezel { width: 584px; }
 #chart-canvas { display: block; width: 560px; height: 252px; border-radius: 6px; }
+/* 纸槽内阴影（自 canvas 迁出——体温法：静态像素归 CSS，不上每帧账） */
+.chart-bezel .paper-shade {
+  position: absolute; inset: 11px; border-radius: 6px; pointer-events: none;
+  background: linear-gradient(180deg,
+    rgba(20, 12, 6, 0.35) 0%, rgba(20, 12, 6, 0) 12%,
+    rgba(20, 12, 6, 0) 88%, rgba(20, 12, 6, 0.4) 100%);
+}
+
 /* 烟色玻璃（M1.9 打磨①）：整体压一层烟，纸不再与 VU 抢亮度 */
 .chart-bezel .glass {
   position: absolute; inset: 11px; border-radius: 6px; pointer-events: none;
@@ -274,17 +283,39 @@ body {
 /* —— 面板铭牌 —— */
 #brand { position: absolute; top: 20px; left: 50%; transform: translateX(-50%); opacity: 0.75; }
 
-/* —— 画外那盏灯：暖、低角度、来自左上画外 —— */
+/* —— 画外那盏灯：暖、低角度、来自左上画外 ——
+   灯之归属注（v1.3）：画外灯是布景，weather 骑在光上合法；只压暗，不提亮。
+   钨丝物理：压暗即变暖——基层收光时暖层补色。 */
+#room {
+  --w-dim: 1; --w-warm: 0;       /* weather 档位 */
+  --idle-dim: 1;                  /* 睡姿档位 */
+}
+#room[data-weather="OVERCAST"] { --w-dim: 0.92; --w-warm: 0.14; }
+#room[data-weather="RAIN"]     { --w-dim: 0.82; --w-warm: 0.30; }
+#room[data-weather="STORM"]    { --w-dim: 0.70; --w-warm: 0.46; }
+#room[data-phase="IDLE"]       { --idle-dim: 0.55; }
+#room[data-sleep="deep"]       { --idle-dim: 0.34; }   /* 深睡：只余待机粒可辨 */
+
 #keylight {
   position: absolute; inset: 0; pointer-events: none;
   background:
     radial-gradient(105vw 85vh at 6% -10%,
       rgba(255, 200, 124, 0.22) 0%, rgba(255, 176, 90, 0.07) 36%, transparent 62%);
   mix-blend-mode: screen;
+  opacity: calc(var(--w-dim) * var(--idle-dim));
   transition: opacity 3s ease;
 }
-/* 睡在暗处：IDLE 时那盏灯压低一档（同一盏灯调暗，非换灯） */
-#room[data-phase="IDLE"] #keylight { opacity: 0.55; }
+#keylight::after { /* 暖层：同一盏灯烧得更红的那部分 */
+  content: ""; position: absolute; inset: 0;
+  background:
+    radial-gradient(100vw 80vh at 6% -10%,
+      rgba(255, 148, 72, 0.10) 0%, rgba(255, 120, 50, 0.04) 34%, transparent 60%);
+  opacity: calc(var(--w-warm) * var(--idle-dim));
+  transition: opacity 3s ease;
+}
+/* 唤醒走钨丝速度：一有活干，灯先亮 */
+#room[data-phase="WORKING"] #keylight,
+#room[data-phase="WORKING"] #keylight::after { transition-duration: 0.25s; }
 
 /* —— 镜头（WebGL：颗粒/暗角/抖动一张 shader）—— */
 #lens {

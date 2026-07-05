@@ -8,6 +8,12 @@
 
 import { PACKET_MS } from './replay.js';
 
+// 影子指标采样（M2.1 §2，informational）：?shadow=1 时上岗。
+// 品味验收的机器可判影子：光学不许比物理快；恒迟有界。
+const SHADOW = typeof location !== 'undefined'
+  && new URLSearchParams(location.search).get('shadow') === '1';
+if (SHADOW) window.__shadow = { needlePacketPeak: 0, needleRenderPeak: 0, delays: [] };
+
 // —— 两包重建器：显示值 = p0→p1 的线性插值，恒迟一包 ——
 export class PacketPair {
   constructor() { this.p0 = null; this.p1 = null; this.realT1 = 0; }
@@ -60,15 +66,35 @@ export class VuMeter {
       g.appendChild(line);
     }
   }
-  onPacket(pkt, isSeek) { this.pair.push(pkt, isSeek); }
+  onPacket(pkt, isSeek) {
+    if (SHADOW && this.pair.p1 && !isSeek) {
+      const s = Math.abs(pkt.needle - this.pair.p1.needle) / (PACKET_MS / 1000);
+      if (s > window.__shadow.needlePacketPeak) window.__shadow.needlePacketPeak = s;
+    }
+    this.pair.push(pkt, isSeek);
+  }
   render(now) {
     const v = Math.max(0, Math.min(1, this.pair.value('needle', now)));
+    if (SHADOW) {
+      const sh = window.__shadow;
+      if (this._lv !== undefined && now > this._ln) {
+        const rs = Math.abs(v - this._lv) / ((now - this._ln) / 1000);
+        if (rs > sh.needleRenderPeak) sh.needleRenderPeak = rs;
+      }
+      this._lv = v; this._ln = now;
+      if (sh.delays.length < 5000 && this.pair.p1) {
+        sh.delays.push((now - this.pair.realT1) + PACKET_MS * (1 - this.pair.frac(now)));
+      }
+    }
     const deg = -47 + v * SWEEP;
     this.needleEl.setAttribute('transform', `rotate(${deg.toFixed(3)} 150 168)`);
   }
 }
 
 // —— 走纸记录仪 ——
+// 体温法（M2.1 §1.2）：增量绘制。纸的像素只画一次——每帧把旧纸平移（blit）、
+// 右缘补一条新纸、笔在原位落一段新墨；纸槽内阴影挪去 CSS。物理即优化：
+// 笔本来就只在笔位写字，是纸把墨迹带走的。
 const PAPER_SPEED = 13;   // px / 舞台秒
 const STOP_TAU = 260;     // ms（舞台时间），纸停惯性
 export class ChartRecorder {
@@ -77,13 +103,14 @@ export class ChartRecorder {
     this.ctx = canvas.getContext('2d');
     this.tape = tape;
     this.pair = new PacketPair();
-    this.points = [];   // {pos, T}
+    this.points = [];   // {pos, T}（全量重画与指标采样之源）
     this.seams = [];    // 接带痕的纸位
     this.pos = 0;       // 纸的累计走位（px）
     this.v = PAPER_SPEED;
     this.lastStageT = 0;
     this.spliceIdx = 0;
     this.dpr = window.devicePixelRatio || 1;
+    this.needFull = true;
     this._resize();
   }
   _resize() {
@@ -92,6 +119,11 @@ export class ChartRecorder {
     this.canvas.width = r.width * this.dpr; this.canvas.height = r.height * this.dpr;
     this.ctx.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
     this.penX = this.w - 56;
+    // 纸的双缓冲（ping-pong blit 用；同尺寸位图）
+    this.ping = document.createElement('canvas');
+    this.pong = document.createElement('canvas');
+    for (const c of [this.ping, this.pong]) { c.width = this.canvas.width; c.height = this.canvas.height; }
+    this.needFull = true;
   }
   _yOf(T) { const top = 26, bot = this.h - 26; return bot - Math.max(0, Math.min(1, T)) * (bot - top); }
 
@@ -100,6 +132,7 @@ export class ChartRecorder {
       this.points = []; this.seams = []; this.spliceIdx = 0;
       this.pos = (pkt.stageT / 1000) * PAPER_SPEED;
       this.v = PAPER_SPEED; this.lastStageT = pkt.stageT;
+      this.needFull = true;
       while (this.spliceIdx < this.tape.splices.length && this.tape.splices[this.spliceIdx] < pkt.stageT) this.spliceIdx++;
     }
     const dt = Math.max(0, pkt.stageT - this.lastStageT);
@@ -128,82 +161,139 @@ export class ChartRecorder {
   }
 
   render(now) {
-    const { ctx, w, h } = this;
     if (!this.pair.p1) return;
-    // 纸位也走两包重建，与针同钟
+    // 纸位走两包重建，与针同钟
     const pos1 = this.pair.p1._pos ?? this.pos;
     const pos0 = this.pair.p0?._pos ?? pos1;
     const posNow = pos0 + (pos1 - pos0) * this.pair.frac(now);
+    const penY = this._yOf(this.pair.value('T', now));
 
-    // 纸面
-    const g = ctx.createLinearGradient(0, 0, 0, h);
-    g.addColorStop(0, '#DECDA2'); g.addColorStop(0.5, '#E9D9B2'); g.addColorStop(1, '#D9C79A');
-    ctx.fillStyle = g; ctx.fillRect(0, 0, w, h);
+    // blit 只走整数设备像素（亚像素位移反复自拷贝＝把墨抹成雾），余数入账下一帧
+    const rawShift = this.lastPosNow === undefined ? Infinity : posNow - this.lastPosNow;
+    if (this.needFull || rawShift < 0 || rawShift > 24) {
+      this._fullPaper(posNow);          // 开机/跳带/藏页归来：整窗重画一次
+      this.needFull = false;
+      this._subDev = 0;
+      this.paperPos = posNow;           // 纸位图当前对齐的纸位
+    } else {
+      const totalDev = rawShift * this.dpr + (this._subDev ?? 0);
+      const devShift = Math.floor(totalDev);
+      this._subDev = totalDev - devShift;
+      const penMoved = Math.abs(penY - (this.lastPenY ?? penY)) > 0.05;
+      if (devShift > 0) {
+        this._advancePaper(devShift / this.dpr, devShift, penY);
+        this.paperPos += devShift / this.dpr;
+      } else if (penMoved) {
+        // 纸没挪、笔在动：原位落竖墨（真实记录仪的做派）
+        const pctx = this.ping.getContext('2d');
+        pctx.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
+        this._inkStroke(pctx, this.penX, this.lastPenY ?? penY, this.penX, penY);
+      } else {
+        this.lastPosNow = posNow;
+        return;                         // 纸停笔停：零绘制帧（体温法）
+      }
+    }
+    this.lastPosNow = posNow; this.lastPenY = penY;
 
-    const xOf = (pos) => this.penX - (posNow - pos);
+    // 合成：纸位图 1:1 + 笔桥
+    const { ctx } = this;
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+    ctx.drawImage(this.ping, 0, 0);
+    ctx.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
+    this._drawPen(penY);
+  }
 
-    // 网格（无数字）：横 5 道、纵每 5 舞台秒一道，随纸走
-    ctx.strokeStyle = 'rgba(140,47,27,0.18)'; ctx.lineWidth = 1;
+  // 纸空间基准：pos(x) = posNow + (x − penX)；右缘 R = posNow + (w − penX)
+  _paperStrip(pctx, x0, R) {
+    const { w, h } = this;
+    const bg = pctx.createLinearGradient(0, 0, 0, h);
+    bg.addColorStop(0, '#DECDA2'); bg.addColorStop(0.5, '#E9D9B2'); bg.addColorStop(1, '#D9C79A');
+    pctx.fillStyle = bg; pctx.fillRect(x0, 0, w - x0 + 1, h);
+    const posLo = R - (w - x0);
+    pctx.strokeStyle = 'rgba(140,47,27,0.18)'; pctx.lineWidth = 1;
     for (let i = 0; i <= 4; i++) {
       const y = this._yOf(i / 4);
-      ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(w, y); ctx.stroke();
+      pctx.beginPath(); pctx.moveTo(x0, y); pctx.lineTo(w, y); pctx.stroke();
     }
     const gridPx = PAPER_SPEED * 5;
-    ctx.strokeStyle = 'rgba(140,47,27,0.11)';
-    for (let x = this.penX - Math.ceil((posNow % gridPx)); x > -gridPx; x -= gridPx) {
-      ctx.beginPath(); ctx.moveTo(x + gridPx, 14); ctx.lineTo(x + gridPx, h - 14); ctx.stroke();
+    pctx.strokeStyle = 'rgba(140,47,27,0.11)';
+    for (let m = Math.ceil(posLo / gridPx) * gridPx; m <= R; m += gridPx) {
+      const x = w - (R - m);
+      pctx.beginPath(); pctx.moveTo(x, 14); pctx.lineTo(x, h - 14); pctx.stroke();
     }
-
-    // 齿孔（介质的触感）
-    ctx.fillStyle = 'rgba(58,34,18,0.5)';
-    const holeStep = 26;
-    for (let x = this.penX - Math.ceil(posNow % holeStep); x < w + holeStep; x += holeStep) {
-      ctx.beginPath(); ctx.arc(x, 8, 2.2, 0, Math.PI * 2); ctx.arc(x, h - 8, 2.2, 0, Math.PI * 2); ctx.fill();
+    pctx.fillStyle = 'rgba(58,34,18,0.5)';
+    for (let m = Math.ceil((posLo - 3) / 26) * 26; m <= R + 3; m += 26) {
+      const x = w - (R - m);
+      pctx.beginPath(); pctx.arc(x, 8, 2.2, 0, Math.PI * 2); pctx.arc(x, h - 8, 2.2, 0, Math.PI * 2); pctx.fill();
     }
-
-    // 接带痕：一道细的斜浅痕
     for (const s of this.seams) {
-      const x = xOf(s);
-      if (x < -6 || x > w + 6) continue;
-      ctx.strokeStyle = 'rgba(58,34,18,0.22)'; ctx.lineWidth = 2;
-      ctx.beginPath(); ctx.moveTo(x + 3, 4); ctx.lineTo(x - 3, h - 4); ctx.stroke();
-      ctx.strokeStyle = 'rgba(255,250,235,0.35)'; ctx.lineWidth = 1;
-      ctx.beginPath(); ctx.moveTo(x + 4, 4); ctx.lineTo(x - 2, h - 4); ctx.stroke();
+      if (s < posLo - 6 || s > R + 6) continue;
+      const x = w - (R - s);
+      pctx.strokeStyle = 'rgba(58,34,18,0.22)'; pctx.lineWidth = 2;
+      pctx.beginPath(); pctx.moveTo(x + 3, 4); pctx.lineTo(x - 3, h - 4); pctx.stroke();
+      pctx.strokeStyle = 'rgba(255,250,235,0.35)'; pctx.lineWidth = 1;
+      pctx.beginPath(); pctx.moveTo(x + 4, 4); pctx.lineTo(x - 2, h - 4); pctx.stroke();
     }
+  }
 
-    // 牛血红墨线：先一遍洇痕，再一遍实线；接带处断笔
+  _inkStroke(pctx, x0, y0, x1, y1) {
+    for (const pass of [{ c: 'rgba(140,47,27,0.25)', wdt: 3.2 }, { c: '#8C2F1B', wdt: 1.5 }]) {
+      pctx.strokeStyle = pass.c; pctx.lineWidth = pass.wdt;
+      pctx.lineCap = 'round';
+      pctx.beginPath(); pctx.moveTo(x0, y0); pctx.lineTo(x1, y1); pctx.stroke();
+    }
+  }
+
+  _advancePaper(cssShift, devShift, penY) {
+    const pctx = this.pong.getContext('2d');
+    pctx.setTransform(1, 0, 0, 1, 0, 0);
+    pctx.clearRect(0, 0, this.pong.width, this.pong.height);
+    pctx.drawImage(this.ping, -devShift, 0);   // 整数设备像素：无重采样，纸永久锐利
+    pctx.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
+    const newPos = this.paperPos + cssShift;
+    const R = newPos + (this.w - this.penX);
+    this._paperStrip(pctx, this.w - cssShift - 8, R);
+    // 落墨：笔原地写，纸带走墨迹；接带越笔即断笔
+    const seamCross = this.seams.some(s => s > newPos - cssShift - 0.01 && s <= newPos + 0.01);
+    if (!seamCross) this._inkStroke(pctx, this.penX - cssShift, this.lastPenY ?? penY, this.penX, penY);
+    const t = this.ping; this.ping = this.pong; this.pong = t;
+  }
+
+  _fullPaper(posNow) {
+    const pctx = this.ping.getContext('2d');
+    pctx.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
+    const R = posNow + (this.w - this.penX);
+    this._paperStrip(pctx, 0, R);
+    // 全量墨线（points 之源）：洇痕与实线两遍，接带处断笔
+    const xOf = (pos) => this.penX - (posNow - pos);
     if (this.points.length > 1) {
       for (const pass of [{ c: 'rgba(140,47,27,0.25)', wdt: 3.2 }, { c: '#8C2F1B', wdt: 1.5 }]) {
-        ctx.strokeStyle = pass.c; ctx.lineWidth = pass.wdt;
-        ctx.lineJoin = 'round'; ctx.lineCap = 'round';
-        ctx.beginPath();
+        pctx.strokeStyle = pass.c; pctx.lineWidth = pass.wdt;
+        pctx.lineJoin = 'round'; pctx.lineCap = 'round';
+        pctx.beginPath();
         let started = false, seam = 0;
         for (const p of this.points) {
           const x = xOf(p.pos);
           if (x > this.penX + 1) break;
           while (seam < this.seams.length && this.seams[seam] < p.pos - 0.01) seam++;
           const brk = seam < this.seams.length && Math.abs(this.seams[seam] - p.pos) < 1.2;
-          if (!started || brk) { ctx.moveTo(x, this._yOf(p.T)); started = true; }
-          else ctx.lineTo(x, this._yOf(p.T));
+          if (!started || brk) { pctx.moveTo(x, this._yOf(p.T)); started = true; }
+          else pctx.lineTo(x, this._yOf(p.T));
         }
-        ctx.stroke();
+        pctx.stroke();
       }
     }
+  }
 
-    // 笔桥与笔尖：笔位即当刻 T（数据直驱，禁缓动）
-    const penY = this._yOf(this.pair.value('T', now));
+  _drawPen(penY) {
+    const { ctx, h } = this;
     ctx.fillStyle = 'rgba(30,22,14,0.85)';
     ctx.fillRect(this.penX + 8, 0, 7, h);
     ctx.strokeStyle = 'rgba(20,14,8,0.9)'; ctx.lineWidth = 3;
     ctx.beginPath(); ctx.moveTo(this.penX + 9, penY - 7); ctx.lineTo(this.penX + 1, penY); ctx.lineTo(this.penX + 9, penY + 7); ctx.stroke();
     ctx.fillStyle = '#8C2F1B';
     ctx.beginPath(); ctx.arc(this.penX, penY, 2, 0, Math.PI * 2); ctx.fill();
-
-    // 纸槽内阴影
-    const sh = ctx.createLinearGradient(0, 0, 0, h);
-    sh.addColorStop(0, 'rgba(20,12,6,0.35)'); sh.addColorStop(0.12, 'rgba(20,12,6,0)');
-    sh.addColorStop(0.88, 'rgba(20,12,6,0)'); sh.addColorStop(1, 'rgba(20,12,6,0.4)');
-    ctx.fillStyle = sh; ctx.fillRect(0, 0, w, h);
   }
   onMoment() {}
 }

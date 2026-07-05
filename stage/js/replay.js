@@ -71,6 +71,16 @@ function stageTimeOf(rawT, curve, st) {
   return st[lo] + Math.min(rawT - curve.t[lo], GAP_CLAMP);
 }
 
+// 纯装配（fetch 之外的全部）：Node 侧（金测试/工具）与浏览器共用同一份装配逻辑
+export function buildTape(name, curveText, momentsText = 't\n') {
+  const curve = parseCurve(curveText);
+  const { st, splices } = buildStageAxis(curve);
+  const moments = parseMoments(momentsText)
+    .map(m => ({ ...m, stageT: stageTimeOf(m.t, curve, st) }))
+    .sort((a, b) => a.stageT - b.stageT);
+  return { name, curve, st, splices, moments, duration: st[curve.n - 1] };
+}
+
 export async function loadTape(name) {
   // 日带（yesterday / YYYY-MM-DD）走 /dayroll 原料仓；其余走 fixtures 副本
   const isDay = /^(yesterday|\d{4}-\d{2}-\d{2})$/.test(name);
@@ -82,12 +92,10 @@ export async function loadTape(name) {
     }),
     fetch(urlOf('moments')).then(r => (r.ok ? r.text() : 't\n')),
   ]);
-  const curve = parseCurve(curveText);
-  const { st, splices } = buildStageAxis(curve);
-  const moments = parseMoments(momentsText)
-    .map(m => ({ ...m, stageT: stageTimeOf(m.t, curve, st) }))
-    .sort((a, b) => a.stageT - b.stageT);
-  return { name, curve, st, splices, moments, duration: st[curve.n - 1] };
+  const tape = buildTape(name, curveText, momentsText);
+  tape.curveText = curveText;     // dub 记账用（tapeHash 之源：曲线+时刻两件套）
+  tape.momentsText = momentsText;
+  return tape;
 }
 
 function lerp(a, b, f) { return a + (b - a) * f; }

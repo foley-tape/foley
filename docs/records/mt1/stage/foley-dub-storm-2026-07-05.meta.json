@@ -1,0 +1,59 @@
+{
+  "version": 1,
+  "kind": "foley-dub/M-T1-paper",
+  "tape": "storm",
+  "tapeHash": "650107fcc28d6884",
+  "paramsHash": "7607d8a357e4f99c",
+  "targetS": 45,
+  "segments": [
+    {
+      "role": "OPEN",
+      "t0": 0,
+      "t1": 24000,
+      "speed": 8
+    },
+    {
+      "role": "BRIDGE",
+      "t0": 24000,
+      "t1": 80000,
+      "speed": 16
+    },
+    {
+      "role": "RAMP",
+      "t0": 709000,
+      "t1": 721000,
+      "speed": 2
+    },
+    {
+      "role": "BRIDGE",
+      "t0": 721000,
+      "t1": 745000,
+      "speed": 16
+    },
+    {
+      "role": "PEAK",
+      "t0": 944000,
+      "t1": 959000,
+      "speed": 1
+    },
+    {
+      "role": "TURN",
+      "t0": 1087000,
+      "t1": 1091000,
+      "speed": 1
+    },
+    {
+      "role": "BRIDGE",
+      "t0": 1091000,
+      "t1": 1187000,
+      "speed": 16
+    },
+    {
+      "role": "CLOSE",
+      "t0": 3964000,
+      "t1": 3969472,
+      "speed": 1
+    }
+  ],
+  "createdAt": "2026-07-05T14:59:51.129Z"
+}

@@ -1,0 +1,15 @@
+{
+  "version": 1,
+  "density": { "a": 1.0, "b": 0.8, "c": 0.3 },
+  "bonus": { "stuckEdge": 0.5, "resolve": 0.6, "askEdge": 0.2, "weatherUp": 0.3, "done": 0.4 },
+  "grammar": {
+    "open":   { "viewerS": 3, "viewerMinS": 2, "speed": 8 },
+    "ramp":   { "viewerS": 6, "viewerMinS": 4, "viewerMaxS": 8, "speeds": [2, 4] },
+    "peak":   { "minS": 8, "maxS": 15, "speed": 1 },
+    "turn":   { "viewerS": 4, "viewerMinS": 3, "speed": 1, "minJump": 0.12 },
+    "close":  { "viewerS": 4, "viewerMinS": 3, "viewerMaxS": 6, "speed": 1, "tailS": 2 },
+    "bridge": { "speed": 16, "stageS": 24, "stageMinS": 8, "stageMaxS": 96, "maxCount": 3 }
+  },
+  "solver": { "targetsS": [30, 45, 60, 90], "defaultS": 45, "allowUnderrun": true },
+  "shadow": { "coverageMin": 0.6, "durationShareMax": 0.15 }
+}

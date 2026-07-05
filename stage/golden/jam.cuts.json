@@ -1,0 +1,51 @@
+{
+  "version": 1,
+  "tape": "jam",
+  "tapeHash": "cebb45fcd7286baf",
+  "paramsHash": "7607d8a357e4f99c",
+  "targetS": 45,
+  "segments": [
+    {
+      "role": "OPEN",
+      "t0": 0,
+      "t1": 24000,
+      "speed": 8
+    },
+    {
+      "role": "BRIDGE",
+      "t0": 24000,
+      "t1": 120000,
+      "speed": 16
+    },
+    {
+      "role": "RAMP",
+      "t0": 447000,
+      "t1": 459000,
+      "speed": 2
+    },
+    {
+      "role": "BRIDGE",
+      "t0": 459000,
+      "t1": 507000,
+      "speed": 16
+    },
+    {
+      "role": "PEAK",
+      "t0": 524000,
+      "t1": 539000,
+      "speed": 1
+    },
+    {
+      "role": "BRIDGE",
+      "t0": 539000,
+      "t1": 635000,
+      "speed": 16
+    },
+    {
+      "role": "CLOSE",
+      "t0": 3074000,
+      "t1": 3079426,
+      "speed": 1
+    }
+  ]
+}

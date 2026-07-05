@@ -75,6 +75,7 @@
           <div class="bezel chart-bezel">
             <canvas id="chart-canvas"></canvas>
             <div class="paper-shade"></div>
+            <canvas id="dub-overlay"></canvas>
             <div class="glass"></div>
           </div>
           <div class="silk">Recorder</div>
@@ -103,6 +104,17 @@
       </div>
 
       <div id="brand" class="silk">Tape · Zero</div>
+
+      <!-- DUB 剪辑组（M-T1）：操作件不承载读数；时长以纸长签呈现，无数字 -->
+      <div id="dub-group">
+        <div id="dub-lengths">
+          <button class="len-tab" data-s="30" style="width:18px"></button>
+          <button class="len-tab" data-s="45" data-on style="width:27px"></button>
+          <button class="len-tab" data-s="60" style="width:36px"></button>
+          <button class="len-tab" data-s="90" style="width:54px"></button>
+        </div>
+        <button id="dub-key">DUB</button>
+      </div>
     </div>
     <div id="walnut-rail"></div>
   </div>

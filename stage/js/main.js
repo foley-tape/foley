@@ -4,6 +4,7 @@ import { LiveStream } from './live.js';
 import { VuMeter, ChartRecorder, Lamps } from './instruments.js';
 import { ReelDeck, Counter } from './deck.js';
 import { mountLens } from './lens.js';
+import { DubController } from './dub.js';
 
 const params = new URLSearchParams(location.search);
 const mode = params.get('mode') || (params.get('tape') ? 'replay' : 'live');
@@ -50,7 +51,8 @@ async function boot() {
   // 回放倍速下机器不陪着快进打盹。
   const room = document.getElementById('room');
   let idleSince = null;
-  const feedPacket = (pkt, isFirst) => {
+  // 喂包本体：dub 演出直调它（预告片的房间戏剧照走）；常规喂包经闸门（下）
+  const feedRaw = (pkt, isFirst) => {
     room.dataset.phase = pkt.phase;
     room.dataset.weather = pkt.weather;
     if (pkt.phase === 'IDLE') {
@@ -67,7 +69,12 @@ async function boot() {
     }
     instruments.forEach(i => i.onPacket(pkt, isFirst));
   };
-  const feedMoment = m => instruments.forEach(i => i.onMoment && i.onMoment(m));
+  const feedMomentRaw = m => instruments.forEach(i => i.onMoment && i.onMoment(m));
+  // dub 演出期间真流入闸：state 包取末态即可（恢复时接 lastPkt），
+  // moments 有状态语义（卡碟/脱卡），欠着记账、恢复时按序补喂
+  let dub = null;
+  const feedPacket = (pkt, isFirst) => { if (dub?.eats()) return; feedRaw(pkt, isFirst); };
+  const feedMoment = m => { if (dub?.eats()) { dub.noteMoment(m); return; } feedMomentRaw(m); };
 
   // 渲染环（与广播分离：广播走 20Hz 包流，渲染 30fps 封顶——
   // 体温法：数据 20Hz，渲染 60fps 是虚火；30fps 下重建照样平滑，恒迟不变）
@@ -77,9 +84,10 @@ async function boot() {
     if (now - lastRender < 33) return;
     lastRender = now;
     instruments.forEach(i => i.render(now));
+    if (dub) dub.render(now);
   }
   requestAnimationFrame(render);
-  window.addEventListener('resize', () => chart._resize());
+  window.addEventListener('resize', () => { chart._resize(); dub && dub.onResize(); });
 
   let live = null;
   if (mode === 'live') {
@@ -105,7 +113,18 @@ async function boot() {
     else replayer.seek(replayer.stageT); // 停机取景也要先上一包
   }
 
-  window.__stage = { mode, replayer, live, tape, deck, counter, chart, lamps }; // 调试把手（dev）
+  // DUB 剪辑机构（M-T1）：预览与导出同吃 cuts 时刻表；机器提议，人来撕
+  dub = new DubController({
+    mode, tapeName, tape, replayer, live, chart, deck,
+    feed: feedRaw, feedMoment: feedMomentRaw,
+    keyEl: document.getElementById('dub-key'),
+    tabsEl: document.getElementById('dub-lengths'),
+    overlayEl: document.getElementById('dub-overlay'),
+    chartCanvas: document.getElementById('chart-canvas'),
+    railEl: document.getElementById('walnut-rail'),
+  });
+
+  window.__stage = { mode, replayer, live, tape, deck, counter, chart, lamps, dub }; // 调试把手（dev）
 }
 
 boot().catch(err => {

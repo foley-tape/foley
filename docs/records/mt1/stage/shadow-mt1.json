@@ -1,0 +1,72 @@
+{
+  "kind": "dub-shadow/M-T1 首采（informational）",
+  "note": "raw 覆盖率对长带数学不可达（基线×小时数≫45s 任何选段）；盈余口径与选择效率并采候裁",
+  "createdAt": "2026-07-05T15:00:25.857Z",
+  "tapes": [
+    {
+      "tape": "storm",
+      "tapeHash": "650107fcc28d6884",
+      "paramsHash": "7607d8a357e4f99c",
+      "bins": 3970,
+      "activeMs": 3962000,
+      "viewerMs": 44472,
+      "selectedStageMs": 236472,
+      "coverage": 0.06238446210494759,
+      "excessCoverage": 0.06259890372419252,
+      "efficiency": 0.3222770627613024,
+      "durationShare": 0.05968500757193337
+    },
+    {
+      "tape": "smooth",
+      "tapeHash": "4bfc2fb58fe71a12",
+      "paramsHash": "7607d8a357e4f99c",
+      "bins": 3837,
+      "activeMs": 3726000,
+      "viewerMs": 44740,
+      "selectedStageMs": 208740,
+      "coverage": 0.2598475955997677,
+      "excessCoverage": 0.35810050714507724,
+      "efficiency": 0.6147851206525479,
+      "durationShare": 0.05602254428341385
+    },
+    {
+      "tape": "busy",
+      "tapeHash": "ca0f776137e42532",
+      "paramsHash": "7607d8a357e4f99c",
+      "bins": 11398,
+      "activeMs": 11198000,
+      "viewerMs": 44989,
+      "selectedStageMs": 296989,
+      "coverage": 0.15058386954788108,
+      "excessCoverage": 0.25907638572768954,
+      "efficiency": 0.7121895879883859,
+      "durationShare": 0.026521611001964637
+    },
+    {
+      "tape": "jam",
+      "tapeHash": "cebb45fcd7286baf",
+      "paramsHash": "7607d8a357e4f99c",
+      "bins": 3080,
+      "activeMs": 3069000,
+      "viewerMs": 44426,
+      "selectedStageMs": 296426,
+      "coverage": 0.2790430432362999,
+      "excessCoverage": 0.4587308963576934,
+      "efficiency": 0.6868588749629259,
+      "durationShare": 0.09658716194200065
+    },
+    {
+      "tape": "silence",
+      "tapeHash": "16f26aac50b67f8c",
+      "paramsHash": "7607d8a357e4f99c",
+      "bins": 1752,
+      "activeMs": 1750000,
+      "viewerMs": 35501,
+      "selectedStageMs": 236501,
+      "coverage": 0.2364268520994911,
+      "excessCoverage": 0.317357817161838,
+      "efficiency": 0.6606875934230269,
+      "durationShare": 0.13514342857142858
+    }
+  ]
+}

@@ -1,0 +1,39 @@
+{
+  "version": 1,
+  "tape": "silence",
+  "tapeHash": "16f26aac50b67f8c",
+  "paramsHash": "7607d8a357e4f99c",
+  "targetS": 45,
+  "segments": [
+    {
+      "role": "OPEN",
+      "t0": 0,
+      "t1": 24000,
+      "speed": 8
+    },
+    {
+      "role": "BRIDGE",
+      "t0": 24000,
+      "t1": 120000,
+      "speed": 16
+    },
+    {
+      "role": "PEAK",
+      "t0": 669000,
+      "t1": 684000,
+      "speed": 1
+    },
+    {
+      "role": "BRIDGE",
+      "t0": 684000,
+      "t1": 780000,
+      "speed": 16
+    },
+    {
+      "role": "CLOSE",
+      "t0": 1746000,
+      "t1": 1751501,
+      "speed": 1
+    }
+  ]
+}

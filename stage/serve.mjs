@@ -6,7 +6,8 @@
 // 经 /live SSE 中继进浏览器。--replay-only 时只当静态服务器（性格照/回放捕捉用）。
 // 中继与钟都不依赖标签页可见性——藏页照走（M2.0 §2 验证件二）。
 import { createServer } from 'node:http';
-import { readFile } from 'node:fs/promises';
+import { readFile, writeFile, mkdir } from 'node:fs/promises';
+import { existsSync } from 'node:fs';
 import { join, extname, normalize, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { spawn } from 'node:child_process';
@@ -95,6 +96,35 @@ createServer(async (req, res) => {
       } catch { res.writeHead(404); res.end(`${date} 无卷`); }
       return;
     }
+  }
+  // dub 落盘（M-T1）：撕下的纸条自动归档 runs/dubs/（runs 即弃即建，正片提拔走 records）
+  if (req.method === 'POST' && url.pathname === '/dub/save') {
+    let body = '', size = 0, tooBig = false;
+    req.on('data', d => {
+      size += d.length;
+      if (size > 32e6) { tooBig = true; req.destroy(); return; }
+      body += d;
+    });
+    req.on('end', async () => {
+      if (tooBig) return;
+      try {
+        const { tape, png, meta } = JSON.parse(body);
+        const dir = join(repoRoot, 'runs', 'dubs');
+        await mkdir(dir, { recursive: true });
+        const stem = `foley-dub-${String(tape).replace(/[^\w.-]/g, '_')}-${localDate()}`;
+        let n = 1;
+        while (existsSync(join(dir, `${stem}${n > 1 ? '-' + n : ''}.png`))) n++;
+        const nm = `${stem}${n > 1 ? '-' + n : ''}`;
+        await writeFile(join(dir, `${nm}.png`), Buffer.from(png, 'base64'));
+        await writeFile(join(dir, `${nm}.meta.json`), JSON.stringify(meta, null, 2) + '\n');
+        res.writeHead(200, { 'content-type': 'application/json' });
+        res.end(JSON.stringify({ saved: [`runs/dubs/${nm}.png`, `runs/dubs/${nm}.meta.json`] }));
+        console.log(`[dub] 落盘 runs/dubs/${nm}.png`);
+      } catch (e) {
+        res.writeHead(400); res.end(String(e));
+      }
+    });
+    return;
   }
   if (url.pathname === '/live') {
     if (replayOnly || !liveChild) { res.writeHead(503); res.end('live 未开'); return; }

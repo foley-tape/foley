@@ -26,7 +26,14 @@ export function mountHud(replayer, tapeName) {
   setInterval(() => {
     if (replayer.playing) $('#hud-seek').value = Math.round((replayer.stageT / replayer.tape.duration) * 1000);
     const s = replayer.stageT / 1000;
+    // dub 的精确数字只活在这里（面板上是纸长与齿孔间距）
+    const dub = window.__stage?.dub;
+    let dubTxt = '';
+    if (dub?.doc) {
+      const viewer = dub.doc.segments.reduce((t, x) => t + Math.round((x.t1 - x.t0) / x.speed), 0);
+      dubTxt = ` · dub ${dub.doc.targetS || '手'}s→${(viewer / 1000).toFixed(1)}s/${dub.doc.segments.length}段/${dub.state}`;
+    }
     $('#hud-read').textContent =
-      `${s.toFixed(1)}s / ${(replayer.tape.duration / 1000).toFixed(0)}s`;
+      `${s.toFixed(1)}s / ${(replayer.tape.duration / 1000).toFixed(0)}s${dubTxt}`;
   }, 250);
 }

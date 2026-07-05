@@ -95,7 +95,7 @@ export class VuMeter {
 // 体温法（M2.1 §1.2）：增量绘制。纸的像素只画一次——每帧把旧纸平移（blit）、
 // 右缘补一条新纸、笔在原位落一段新墨；纸槽内阴影挪去 CSS。物理即优化：
 // 笔本来就只在笔位写字，是纸把墨迹带走的。
-const PAPER_SPEED = 13;   // px / 舞台秒
+export const PAPER_SPEED = 13; // px / 舞台秒（dub 的齿孔映射与纸条渲染同此尺）
 const STOP_TAU = 260;     // ms（舞台时间），纸停惯性
 export class ChartRecorder {
   constructor(canvas, tape) {
@@ -111,6 +111,7 @@ export class ChartRecorder {
     this.spliceIdx = 0;
     this.dpr = window.devicePixelRatio || 1;
     this.needFull = true;
+    this.retain = false; // dub 演出中不修剪墨账（撕纸要整条重渲）
     this._resize();
   }
   _resize() {
@@ -147,17 +148,57 @@ export class ChartRecorder {
       this.seams.push(this.pos);
       this.spliceIdx++;
     }
-    // 墨点（纸停时不堆点）
+    // 墨点（纸停时不堆点）；st 随记——纸位↔舞台时反查之源（dub 手动拖选用）
     const last = this.points[this.points.length - 1];
-    if (!last || this.pos - last.pos > 0.15) this.points.push({ pos: this.pos, T: pkt.T });
-    else if (last) last.T = pkt.T; // 纸停、笔仍随 T 立着
-    // 清理滚出画外的旧墨
-    const cutoff = this.pos - this.penX - 40;
-    let drop = 0;
-    while (drop < this.points.length - 1 && this.points[drop + 1].pos < cutoff) drop++;
-    if (drop > 0) this.points.splice(0, drop);
-    if (this.seams.length && this.seams[0] < cutoff) this.seams.shift();
+    if (!last || this.pos - last.pos > 0.15) this.points.push({ pos: this.pos, T: pkt.T, st: pkt.stageT });
+    else if (last) { last.T = pkt.T; last.st = pkt.stageT; } // 纸停、笔仍随 T 立着
+    // 清理滚出画外的旧墨（dub 保留模式下欠着不剪）
+    if (!this.retain) {
+      const cutoff = this.pos - this.penX - 40;
+      let drop = 0;
+      while (drop < this.points.length - 1 && this.points[drop + 1].pos < cutoff) drop++;
+      if (drop > 0) this.points.splice(0, drop);
+      if (this.seams.length && this.seams[0] < cutoff) this.seams.shift();
+    }
     this.pair.push(pkt, isSeek);
+  }
+
+  // —— dub 剪辑机构的三件小 API（M-T1）：接带痕 / 纸位反查 / 撕除伤口 ——
+  markSeam() { this.seams.push(this.pos); } // 段接处打一道真接带痕（落在纸上，随纸走）
+  posToStageT(pos) {
+    const pts = this.points;
+    if (pts.length === 0) return null;
+    let lo = 0, hi = pts.length - 1;
+    if (pos <= pts[0].pos) return pts[0].st;
+    if (pos >= pts[hi].pos) return pts[hi].st;
+    while (hi - lo > 1) { const mid = (lo + hi) >> 1; if (pts[mid].pos <= pos) lo = mid; else hi = mid; }
+    return pts[lo].st;
+  }
+  woundRange(pos0, pos1) {
+    // 撕走的纸：位图上露出机腔暗槽，墨账同步剜除（needFull 也不还魂）；两侧算接带痕
+    const pctx = this.ping.getContext('2d');
+    pctx.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
+    const posNow = this.paperPos ?? this.pos;
+    const x0 = Math.max(-4, this.penX - (posNow - pos0));
+    const x1 = Math.min(this.w + 4, this.penX - (posNow - pos1));
+    if (x1 > x0) { pctx.fillStyle = '#0E0905'; pctx.fillRect(x0, 0, x1 - x0, this.h); }
+    this.points = this.points.filter(p => p.pos < pos0 - 0.5 || p.pos > pos1 + 0.5);
+    this.seams = this.seams.filter(s => s < pos0 - 0.5 || s > pos1 + 0.5);
+    this.seams.push(pos0, pos1);
+    this.seams.sort((a, b) => a - b);
+  }
+
+  // 纸条重渲（撕纸的产物之源）：纸空间全等红利——points/seams 即墨迹账本，
+  // 任意窗宽离屏重渲与实走逐像素同种（同一支 _paperStrip/_inkPaths 笔法）。
+  renderStrip(pos0, pos1) {
+    const wCss = Math.max(1, pos1 - pos0);
+    const c = document.createElement('canvas');
+    c.width = Math.ceil(wCss * this.dpr); c.height = Math.round(this.h * this.dpr);
+    const pctx = c.getContext('2d');
+    pctx.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
+    this._paperStrip(pctx, 0, pos1, wCss);
+    this._inkPaths(pctx, pos => pos - pos0, wCss, pos0 - 4, pos1 + 4);
+    return c;
   }
 
   render(now) {
@@ -205,8 +246,9 @@ export class ChartRecorder {
   }
 
   // 纸空间基准：pos(x) = posNow + (x − penX)；右缘 R = posNow + (w − penX)
-  _paperStrip(pctx, x0, R) {
-    const { w, h } = this;
+  // wOpt：dub 纸条离屏重渲传任意窗宽，常规走 this.w
+  _paperStrip(pctx, x0, R, wOpt) {
+    const w = wOpt ?? this.w, { h } = this;
     const bg = pctx.createLinearGradient(0, 0, 0, h);
     bg.addColorStop(0, '#DECDA2'); bg.addColorStop(0.5, '#E9D9B2'); bg.addColorStop(1, '#D9C79A');
     pctx.fillStyle = bg; pctx.fillRect(x0, 0, w - x0 + 1, h);
@@ -265,24 +307,28 @@ export class ChartRecorder {
     pctx.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
     const R = posNow + (this.w - this.penX);
     this._paperStrip(pctx, 0, R);
-    // 全量墨线（points 之源）：洇痕与实线两遍，接带处断笔
-    const xOf = (pos) => this.penX - (posNow - pos);
-    if (this.points.length > 1) {
-      for (const pass of [{ c: 'rgba(140,47,27,0.25)', wdt: 3.2 }, { c: '#8C2F1B', wdt: 1.5 }]) {
-        pctx.strokeStyle = pass.c; pctx.lineWidth = pass.wdt;
-        pctx.lineJoin = 'round'; pctx.lineCap = 'round';
-        pctx.beginPath();
-        let started = false, seam = 0;
-        for (const p of this.points) {
-          const x = xOf(p.pos);
-          if (x > this.penX + 1) break;
-          while (seam < this.seams.length && this.seams[seam] < p.pos - 0.01) seam++;
-          const brk = seam < this.seams.length && Math.abs(this.seams[seam] - p.pos) < 1.2;
-          if (!started || brk) { pctx.moveTo(x, this._yOf(p.T)); started = true; }
-          else pctx.lineTo(x, this._yOf(p.T));
-        }
-        pctx.stroke();
+    this._inkPaths(pctx, pos => this.penX - (posNow - pos), this.penX);
+  }
+
+  // 全量墨线（points 之源）：洇痕与实线两遍，接带处断笔。窗重画与纸条重渲共用一支笔。
+  _inkPaths(pctx, xOf, xMax, posLo = -Infinity, posHi = Infinity) {
+    if (this.points.length < 2) return;
+    for (const pass of [{ c: 'rgba(140,47,27,0.25)', wdt: 3.2 }, { c: '#8C2F1B', wdt: 1.5 }]) {
+      pctx.strokeStyle = pass.c; pctx.lineWidth = pass.wdt;
+      pctx.lineJoin = 'round'; pctx.lineCap = 'round';
+      pctx.beginPath();
+      let started = false, seam = 0;
+      for (const p of this.points) {
+        if (p.pos < posLo) continue;
+        if (p.pos > posHi) break;
+        const x = xOf(p.pos);
+        if (x > xMax + 1) break;
+        while (seam < this.seams.length && this.seams[seam] < p.pos - 0.01) seam++;
+        const brk = seam < this.seams.length && Math.abs(this.seams[seam] - p.pos) < 1.2;
+        if (!started || brk) { pctx.moveTo(x, this._yOf(p.T)); started = true; }
+        else pctx.lineTo(x, this._yOf(p.T));
       }
+      pctx.stroke();
     }
   }
 

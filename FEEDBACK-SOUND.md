@@ -1,6 +1,6 @@
 # FEEDBACK-SOUND —— 声音相台账（Track-SOUND：SOUND-R1 重启 → EAR-5~11 战役 → SOUND-R2 床的重做 → SOUND-R3 唱机改造）
 
-## SOUND-R3 交付（2026-07-06，候合并哈希回填）
+## SOUND-R3 交付（2026-07-06，97f558a）
 
 **结论一句话**：唱机上位、作曲机退役——出厂唱片 4 张（open-lofi CC0，12.9MB，BPM 76–83 全窗内）＋唱片总线全处置（T=低通/磨损/wow 加深、wow=音高微醺 playbackRate 真身、STUCK=跳针啃唱片+每回绕一声针嗒、ASK=duck、DONE=tape-stop 滑停、IDLE=房间层接管——全排程纪律，离线/浏览器同一份代码）；机器耳 v3 四 active 门全绿（**G7 v3 唱片在位 −20.79 LUFS 一次定标即中**，catalog.lufs 锚数据驱动归一），G4v2 消融对照 **r=−0.878**、G8 谱距离 **22.1dB/基线 3.9dB** informational 双过；金测试 **79/79**（新增 52–58＋契约测试 4）；立法四件全落（契约测试/verify-probe.mjs/launch 自持/cli calibrate）；renderCuts 钩子交付（dub 授权卫生 --with-record + meta 四件）；美学对照包一键出（锚+A/B/C+判读表）；白皮书 v2 落 docs/canon/。**候复核庭过庭 → 按预言请一次耳朵（申请见文末）。**
 

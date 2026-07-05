@@ -198,9 +198,10 @@ function alternationRate(outcomes: number[]): number {
 
 // ---------- 离散事件 ----------
 
-/** 摄入一个 MomentEvent（离散效果）。返回引擎派生时刻（STUCK_LOOP/RESOLVE/STUCK_CLEARED）。 */
+/** 摄入一个 MomentEvent（离散效果）。返回引擎派生时刻（STUCK_LOOP/RESOLVE/STUCK_CLEARED）。
+ *  M1.9：时钟单调护栏——迟到/回溯事件（live 抖动、DONE 因果延迟）不回拨 st.now（审计 B-7 逆时防护）。 */
 export function ingest(st: EngineState, m: IngestMoment, params: Params): DerivedMoment[] {
-  st.now = m.t;
+  if (m.t > st.now) st.now = m.t;
   const derived: DerivedMoment[] = [];
 
   // 标点

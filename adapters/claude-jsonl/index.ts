@@ -13,6 +13,8 @@ export { magnitudeOf, momentOf, clearSigOf } from './consume.ts';
 export {
   serializeTape, parseDistilled, distillFile, loadDistilled, writeDistilled, redactResult,
 } from './distill.ts';
+export { createIncrementalDistiller } from './incremental.ts';
+export type { LiveOp, IncrementalDistiller, IncrementalStats } from './incremental.ts';
 
 /** §9 体检表指标。RESOLVE 为体检代理（test-tagged RUN-OK 存在）；精确 RESOLVE 属引擎。 */
 export interface HealthCard {

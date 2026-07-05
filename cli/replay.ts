@@ -1,5 +1,7 @@
-// cli replay <tape.tape.jsonl> --out runs/<ts>/ —— 离线跑蒸馏带 → REPORT.md + curve.csv + moments.csv。
-// 只消费蒸馏带（§3）。时钟由本文件注入；引擎纯确定性。同带两跑逐字节一致。
+// cli replay <tape.tape.jsonl> --out runs/<ts>/ [--hz 10|20] —— 离线跑蒸馏带 → REPORT.md + curve.csv + moments.csv。
+// 只消费蒸馏带（§3）。时钟由 driver 注入；引擎纯确定性。同带两跑逐字节一致。
+// M1.9：回放主回路移入共享因果 driver（cli/driver.ts）——replay 与 live 同核，逐字节等价靠共享代码。
+// --hz：默认 10（100ms 存档级，sweep/冠军基准栅格）；20（50ms 渲染级，live 正典频率，内存翻倍自担）。
 // 判定由 verdict.json 驱动（M1.6-A §3.4）；雨量 R、机会审计、clearedBy 分列、金时刻评分（REPORT v3.1）。
 
 import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
@@ -7,25 +9,24 @@ import { execSync } from 'node:child_process';
 import { join, basename, relative } from 'node:path';
 import type { MomentEvent, StatePacket, Weather } from '../protocol/index.ts';
 import {
-  parseDistilled, healthOf, momentOf, clearSigOf,
+  parseDistilled, healthOf,
   type DistillResult, type HealthCard,
 } from '../adapters/claude-jsonl/index.ts';
-import {
-  createEngine, advanceTo, ingest, addStress, snapshot, reap, type DerivedMoment,
-} from '../engine/index.ts';
+import type { DerivedMoment } from '../engine/index.ts';
 import { resolveParams, hashParams, hashJson, type Params } from '../engine/params.ts';
 import {
   judgeBand, type Verdict, type MetricsView, type JudgeRow, type Landmark, type LandmarkResult,
 } from '../engine/verdict.ts';
+import {
+  createDriver, actionsOf, runActions, ARCHIVE_SNAP_MS,
+  type Emit, type LedgerEntry,
+} from './driver.ts';
 
-const SNAP_MS = 100;          // curve.csv 采样率 10Hz
-const IDLE_CAP_MS = 120_000;  // 单空档最多步进 2min，其余解析跳跃（防多日续跑爆炸）
 const ACTIVE_GAP_MS = 600_000; // 占空/雨量分母：相邻采样间隔 <10min 且非 IDLE 相态才计活跃
 
 export type TapeKind = 'silence' | 'smooth' | 'busy' | 'jam' | 'storm' | null;
 
-export interface Emit { ev: DerivedMoment; emitT: number }
-interface LedgerEntry { t: number; seq: number; label: string; dS: number }
+export type { Emit } from './driver.ts';
 
 export interface ReplayMeta {
   engineSha: string; paramsHash: string; tapeName: string; kind?: TapeKind;
@@ -70,34 +71,16 @@ export function toMetricsView(m: Metrics): MetricsView {
 
 export interface ReplayCore { d: DistillResult; snaps: StatePacket[]; emitted: Emit[]; ledger: LedgerEntry[]; metrics: Metrics }
 
-/** 纯回放引擎核（无 fs、无字符串产物）：蒸馏带 + params + 雨量 floor → 采样/时刻/指标。sweep 走此轻路。 */
-export function replayCore(distilledText: string, params: Params, rainFloor: number): ReplayCore {
+/** 纯回放引擎核（无 fs、无字符串产物）：蒸馏带 + params + 雨量 floor → 采样/时刻/指标。sweep 走此轻路。
+ *  M1.9：主回路 = 共享因果 driver（actionsOf → runActions），replay 与 live 同核。 */
+export function replayCore(distilledText: string, params: Params, rainFloor: number, snapMs: number = ARCHIVE_SNAP_MS): ReplayCore {
   const d = parseDistilled(distilledText);
   const records = d.records; // 已按 (t,seq) 排序，含标点
   const { firstT, lastT } = d.meta.stats;
 
-  const st = createEngine(params);
   const snaps: StatePacket[] = [];
   const emitted: Emit[] = [];
   const ledger: LedgerEntry[] = [];
-
-  // 未决 RUN 滴灌区间：[useT+30s, resolveT]，速率 0.02×m /min（m 消费时按原料量算）
-  const drips = records
-    .filter((r) => (r.verb === 'RUN' || r.verb === 'SAVE') && r.resolveT !== null && !r.special)
-    .map((r) => ({
-      start: r.useT + params.decay.pendingRunDripAfterSec * 1000,
-      end: r.resolveT as number,
-      ratePerMs: (params.decay.pendingRunDripPerMin * momentOf(r, params).m) / 60000,
-    }))
-    .filter((x) => x.end > x.start);
-  const dripFor = (a: number, b: number): number => {
-    let s = 0;
-    for (const x of drips) {
-      const lo = Math.max(a, x.start), hi = Math.min(b, x.end);
-      if (hi > lo) s += (hi - lo) * x.ratePerMs;
-    }
-    return s;
-  };
 
   if (firstT === null || lastT === null || records.length === 0) {
     const empty: Metrics = {
@@ -108,65 +91,23 @@ export function replayCore(distilledText: string, params: Params, rainFloor: num
     return { d, snaps, emitted, ledger, metrics: empty };
   }
 
-  const reapInto = (): void => {
-    for (const ev of reap(st, params)) emitted.push({ ev, emitT: ev.t });
-  };
-
-  st.now = records[0]!.t;
-  snaps.push(snapshot(st, st.now, params));
-
-  const stepGrid = (from: number, to: number): void => {
-    let cursor = from;
-    let stepped = 0;
-    while (cursor < to) {
-      if (stepped >= IDLE_CAP_MS && to - cursor > SNAP_MS) {
-        advanceTo(st, to, params); reapInto();
-        snaps.push(snapshot(st, to, params));
-        return;
-      }
-      const next = Math.min(to, cursor + SNAP_MS);
-      const drip = dripFor(cursor, next);
-      advanceTo(st, next, params);
-      if (drip > 0) addStress(st, drip);
-      reapInto();
-      snaps.push(snapshot(st, next, params));
-      stepped += next - cursor;
-      cursor = next;
-    }
-  };
-
-  let ei = 0;
-  let cursor = records[0]!.t;
-  while (cursor < lastT || ei < records.length) {
-    const nextEvT = ei < records.length ? records[ei]!.t : Infinity;
-    const target = Math.min(nextEvT, lastT);
-    if (target > cursor) { stepGrid(cursor, target); cursor = target; }
-    while (ei < records.length && records[ei]!.t <= cursor) {
-      const r = records[ei]!;
-      advanceTo(st, r.t, params); reapInto();
-      const ev = momentOf(r, params);
-      const clearSig = r.special ? undefined : clearSigOf(r);
-      const input = r.special ? ev : Object.assign({}, ev, { clearSig });
-      // M1.8-F③：给发射的常规事件挂上目标槽键，供 jamMonotone/报告按槽分组。
-      const emittedEv: DerivedMoment = r.special ? ev : { ...ev, slot: clearSig };
-      const before = st.S;
-      const derived = ingest(st, input, params);
-      ledger.push({ t: r.t, seq: r.seq, label: labelOf(ev), dS: st.S - before });
-      emitted.push({ ev: emittedEv, emitT: r.t });
-      for (const dv of derived) emitted.push({ ev: dv, emitT: st.now });
-      ei++;
-    }
-    if (cursor >= lastT && ei >= records.length) break;
-  }
+  // replay 收集数组（报告需要）；live 的 sinks 写完即丢——bounded 是 live 的纪律，不是 driver 的负担
+  const driver = createDriver(params, snapMs, {
+    snap: (s) => snaps.push(s),
+    moment: (e) => emitted.push(e),
+    ledger: (l) => ledger.push(l),
+  });
+  const streamEnd = records[records.length - 1]!.t;
+  runActions(driver, actionsOf(records, streamEnd), streamEnd);
 
   const metrics = computeMetrics(snaps, emitted, rainFloor);
   return { d, snaps, emitted, ledger, metrics };
 }
 
 /** 纯回放：蒸馏带文本 + params → 全部产物（CSV/REPORT）。金测试/CLI 用。 */
-export function replayText(distilledText: string, params: Params, meta: ReplayMeta): ReplayOutput {
+export function replayText(distilledText: string, params: Params, meta: ReplayMeta, snapMs: number = ARCHIVE_SNAP_MS): ReplayOutput {
   const rainFloor = meta.verdict?.rain.floor ?? 0.5;
-  const core = replayCore(distilledText, params, rainFloor);
+  const core = replayCore(distilledText, params, rainFloor, snapMs);
   if (core.snaps.length === 0) {
     return { curveCsv: 'no-events\n', momentsCsv: '', report: '# RUN REPORT\n(空磁带)\n', snaps: core.snaps, emitted: core.emitted, metrics: core.metrics };
   }
@@ -300,14 +241,15 @@ export function evalLandmarks(landmarks: Landmark[], kind: TapeKind, snaps: Stat
 
 const f6 = (n: number): string => n.toFixed(6);
 
-function buildCurveCsv(snaps: StatePacket[]): string {
-  const head = 't,S,T,A,wow,needle,phase,weather';
+export function buildCurveCsv(snaps: StatePacket[]): string {
+  // M1.9 §1.2：+pendingAsk 列（产物格式，协议不动）——舞台琥珀管的呼吸信号
+  const head = 't,S,T,A,wow,needle,phase,weather,pendingAsk';
   const rows = snaps.map((s) =>
-    `${s.t},${f6(s.S)},${f6(s.T)},${f6(s.A)},${f6(s.wow)},${f6(s.needle)},${s.phase},${s.weather}`);
+    `${s.t},${f6(s.S)},${f6(s.T)},${f6(s.A)},${f6(s.wow)},${f6(s.needle)},${s.phase},${s.weather},${s.pendingAsk ? 1 : 0}`);
   return head + '\n' + rows.join('\n') + '\n';
 }
 
-function buildMomentsCsv(emitted: Emit[]): string {
+export function buildMomentsCsv(emitted: Emit[]): string {
   const head = 't,emitT,seq,verb,outcome,m,tags,special,sig,k,clearedBy,slot';
   const rows = emitted.map(({ ev, emitT }) =>
     `${ev.t},${emitT},${ev.seq},${ev.verb},${ev.outcome},${f6(ev.m)},${ev.tags.join('|')},${ev.special ?? ''},${ev.sig ?? ''},${ev.k ?? ''},${ev.clearedBy ?? ''},${(ev as DerivedMoment).slot ?? ''}`);
@@ -456,7 +398,7 @@ _纪律：expiry 型消散不泄能、不 RESOLVE（§2.1）。_
 
 ## 曲线
 T 全程：\`${sparkline(Tvals)}\`  (峰值 T=${metrics.peakT.toFixed(3)})
-curve.csv（t,S,T,A,wow,needle,phase,weather）｜moments.csv（+clearedBy 列）
+curve.csv（t,S,T,A,wow,needle,phase,weather,pendingAsk）｜moments.csv（+clearedBy 列）
 
 ## 三大拐点抽检（两两间隔 ≥120s）
 ${turnBlocks || '（事件过少）'}
@@ -477,10 +419,15 @@ export function loadVerdict(): { verdict: Verdict; hash: string } {
 
 export function runReplay(argv: string[]): void {
   const tapePath = argv[0];
-  if (!tapePath) { console.error('用法: node cli/index.ts replay <tape.tape.jsonl> [--out runs/<ts>/] [--kind silence|smooth|busy|jam|storm]'); process.exit(2); return; }
+  if (!tapePath) { console.error('用法: node cli/index.ts replay <tape.tape.jsonl> [--out runs/<ts>/] [--kind silence|smooth|busy|jam|storm] [--hz 10|20]'); process.exit(2); return; }
   const outIdx = argv.indexOf('--out');
   const kindIdx = argv.indexOf('--kind');
   const kind = (kindIdx >= 0 ? argv[kindIdx + 1] : undefined) as TapeKind | undefined;
+  // M1.9 §1.2：--hz 旗标。默认 10（100ms 存档级）；20（50ms 渲染级，live 正典频率，内存翻倍自担）。
+  const hzIdx = argv.indexOf('--hz');
+  const hz = hzIdx >= 0 ? Number(argv[hzIdx + 1]) : 10;
+  if (!Number.isFinite(hz) || hz < 1 || hz > 100) { console.error(`--hz 非法: ${argv[hzIdx + 1]}（允许 1–100，正典 10 存档 / 20 渲染）`); process.exit(2); return; }
+  const snapMs = Math.round(1000 / hz);
   const engineSha = gitSha();
   const paramsRaw = JSON.parse(readFileSync(new URL('../params.json', import.meta.url), 'utf8'));
   const params = resolveParams(paramsRaw);
@@ -488,7 +435,7 @@ export function runReplay(argv: string[]): void {
   const { verdict, hash: verdictHash } = loadVerdict();
 
   const tapeText = readFileSync(tapePath, 'utf8');
-  const out = replayText(tapeText, params, { engineSha, paramsHash, tapeName: basename(tapePath), kind: kind ?? null, verdict, verdictHash });
+  const out = replayText(tapeText, params, { engineSha, paramsHash, tapeName: basename(tapePath), kind: kind ?? null, verdict, verdictHash }, snapMs);
 
   const now = new Date();
   const ts = now.toISOString().replace(/[:.]/g, '-');

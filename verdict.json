@@ -3,6 +3,7 @@
   "verdictVersion": "verdict/3",
   "_M18F_note": "P1-3(卡碟塌缩)修复后：storm.stuckEdges→informational（F1③明令）；jam.stuckEdges→informational（同理延伸，待追认）。P1-3 揭示五带皆无单-episode 内 ≥3 同目标真卡碟——破卡碟泄能通路真实数据覆盖由『jam 真×2』**降为 0**，battery 缺口扩大（见下）。",
   "_batteryCoverage": "三条泄能通路真实数据覆盖（M1.8-F 更新）：破卡碟 ❌（P1-3 修复后五带均无真 ok 型破卡碟——旧『jam 真×2』为跨目标伪影）；test 转绿 ❌（五带 honest test-OK=0，旧计数全为误贴）；SAVE 仅金测试覆盖。**三条泄能通路现均无真实磁带覆盖**——待补『有真解脱』磁带（架构师决策点）。",
+  "_huntV2": "M1.9 §1.3 狩猎 v2 结果（2026-07-05，近 14 天 41 卷）：真卡碟带 ❌ 记缺——唯一达标候选（单 ep 同槽 ×3、WebFetch）sourceHash=d98d3543 即 storm 源卷，一卷不两册；释放带 ❌ 记缺——全场无 T≥0.40 处 RESOLVE（最高 SAVE@T=0.226）。根因（真发现）：施工 agent 惯用『cmd 2>&1 | tail && echo』管道包裹，退出码被吞——M1.8 修复会话 99 result 中 is_error=0、code 全缺，38 金测红绿循环在骨架层不可见。释放带缺口不是磁带荒，是源可观测性遮蔽；v1 线索：errClass 域内的失败文本探测（仍在隐私膜内）或等未包裹的原生会话。狩猎器（cli hunt）已在真数据上验明能击发。",
   "_priorityCanon": "安全硬禁 > 协议冻结 > 判据 > 施工令实现细则 > 库偏好（M1.7 §5，写入 SPEC 附注待架构师落笔）",
   "rain": { "floor": 0.50, "unit": "T·min", "provisional": true, "_note": "R=∫max(0,T−floor)dt，活跃时间积分；双尺并行观察中" },
   "bands": {

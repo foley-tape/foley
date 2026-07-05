@@ -94,7 +94,7 @@ export function fnv1a(s: string): string {
 
 /** 归一化错误首行：抹凭据/路径/hex/token/数字，供 sig 稳定聚类。截断 60（§3.2）。
  *  M1.8-F④ 补刀（B-2）：内联凭据/短口令/相对·Windows 路径/疑似令牌 → SECRET。宁可过抹——errClass 只为聚类。 */
-function normErr(text: string): string {
+export function normErr(text: string): string {
   const first = (text.split('\n')[0] ?? '').toLowerCase();
   return first
     .replace(/-[pp]\S+/g, 'SECRET')                                       // -pSECRET 内联凭据（已小写）
@@ -122,7 +122,7 @@ function sanitizeToken(t: string): string {
  * targetHash 键（distill/2 §3）：卡碟"同目标"清除用。RUN 取命令头前 2 token（净化路径/长token）；
  * READ/WRITE 取主目标路径；其余动词空。返回 fnv1a hex 或 ''（键为空时不参与"同目标"约束）。
  */
-function targetHashOf(verb: Verb, input: Record<string, unknown> | undefined, command: string | undefined): string {
+export function targetHashOf(verb: Verb, input: Record<string, unknown> | undefined, command: string | undefined): string {
   let key = '';
   if (verb === 'RUN' || verb === 'SAVE') {
     if (command) key = command.trim().split(/\s+/).slice(0, 2).map(sanitizeToken).join(' ');
@@ -136,7 +136,7 @@ function targetHashOf(verb: Verb, input: Record<string, unknown> | undefined, co
 }
 
 /** 从 tool_result 的 content（string 或 block[]）提取文本。仅蒸馏内部用，不落盘。 */
-function resultText(content: unknown): string {
+export function resultText(content: unknown): string {
   if (typeof content === 'string') return content;
   if (Array.isArray(content)) {
     return content
@@ -146,12 +146,12 @@ function resultText(content: unknown): string {
   return '';
 }
 
-function num(v: unknown): number | undefined {
+export function num(v: unknown): number | undefined {
   return typeof v === 'number' && Number.isFinite(v) ? v : undefined;
 }
 
 // ---- 松散日志行类型 ----
-interface ContentBlock {
+export interface ContentBlock {
   type?: string;
   id?: string;
   name?: string;
@@ -161,12 +161,12 @@ interface ContentBlock {
   content?: unknown;
   text?: string;
 }
-interface RawMessage {
+export interface RawMessage {
   role?: string;
   content?: ContentBlock[] | string;
   stop_reason?: string | null;
 }
-interface RawLine {
+export interface RawLine {
   type?: string;
   timestamp?: string;
   uuid?: string;
@@ -178,7 +178,8 @@ interface RawLine {
 
 // ---------- 原料量提取（原始 → mRaw；m 归一在消费侧 consume.ts） ----------
 
-function writeDiffLines(input: Record<string, unknown> | undefined, tur: Record<string, unknown> | undefined): number {
+/** result 侧：structuredPatch 的改动行数；无有效 patch → null。（增量蒸馏两段式之一） */
+export function patchLines(tur: Record<string, unknown> | undefined): number | null {
   const patch = tur?.['structuredPatch'];
   if (Array.isArray(patch)) {
     let changed = 0;
@@ -193,6 +194,11 @@ function writeDiffLines(input: Record<string, unknown> | undefined, tur: Record<
     }
     if (changed > 0) return changed;
   }
+  return null;
+}
+
+/** use 侧：仅凭 tool_use input 的兜底行数（增量蒸馏在 use 时刻预存此值，不留原文）。 */
+export function inputFallbackLines(input: Record<string, unknown> | undefined): number {
   const content = input?.['content'];
   if (typeof content === 'string') return content.split('\n').length;
   const oldS = typeof input?.['old_string'] === 'string' ? (input['old_string'] as string) : '';
@@ -200,14 +206,18 @@ function writeDiffLines(input: Record<string, unknown> | undefined, tur: Record<
   return Math.max(oldS.split('\n').length, newS.split('\n').length);
 }
 
-function runSeconds(tur: Record<string, unknown> | undefined, useT: number, resT: number | null): number {
+export function writeDiffLines(input: Record<string, unknown> | undefined, tur: Record<string, unknown> | undefined): number {
+  return patchLines(tur) ?? inputFallbackLines(input);
+}
+
+export function runSeconds(tur: Record<string, unknown> | undefined, useT: number, resT: number | null): number {
   const d = num(tur?.['durationMs']);
   if (d !== undefined) return d / 1000;
   if (resT !== null && resT > useT) return (resT - useT) / 1000;
   return 0;
 }
 
-function readKb(tur: Record<string, unknown> | undefined, rtext: string): number {
+export function readKb(tur: Record<string, unknown> | undefined, rtext: string): number {
   const file = tur?.['file'];
   if (file && typeof file === 'object') {
     const bytes = num((file as Record<string, unknown>)['bytes']);

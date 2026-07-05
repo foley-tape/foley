@@ -118,9 +118,11 @@ export function runProbe(argv: string[]): void {
   const repoKey = anon ? anonLabel! : core.d.meta.sourceHash; // 每仓库一调的 replay 近似（见文件头现实修正）
   const data = anon
     ? { tape: anonLabel, kind: '', engineSha: '—', paramsHash: '—', verdictHash: '—', soundHash,
+        buildTs: new Date().toISOString().slice(0, 16).replace('T', ' '),
         anon: true, durationMs, peakT: 0, stuck: 0, resolves: 0, repoKey, track, sounds }
     : { tape: basename(tapePath), kind: kind ?? '', engineSha: gitSha(), paramsHash: hashParams(paramsRaw),
-        verdictHash, soundHash, anon: false, durationMs, peakT: core.metrics.peakT,
+        verdictHash, soundHash, buildTs: new Date().toISOString().slice(0, 16).replace('T', ' '),
+        anon: false, durationMs, peakT: core.metrics.peakT,
         stuck: core.metrics.stuckEdges, resolves: core.metrics.resolves, repoKey, track, sounds };
 
   const html = buildProbeHtml(data, soundRaw);
@@ -130,9 +132,14 @@ export function runProbe(argv: string[]): void {
   mkdirSync(outDir, { recursive: true });
   const outFile = join(outDir, 'probe.html');
   writeFileSync(outFile, html, 'utf8');
+  // EAR-3：固定路径镜像——船长永远只开这一个地址，旧时间戳目录不再进 open 肌肉记忆
+  const latestDir = join(process.cwd(), 'runs', 'probe-latest');
+  mkdirSync(latestDir, { recursive: true });
+  writeFileSync(join(latestDir, 'probe.html'), html, 'utf8');
   const cnt = (c: number): number => sounds.filter((s) => s[1] === c).length;
   process.stderr.write(
     `探针 v1声音相 ${basename(tapePath)}${kind ? `（${kind}）` : ''} → ${relative(process.cwd(), outFile)}\n` +
+    `  固定入口：runs/probe-latest/probe.html（旧标签页会被新页自动静音接管）\n` +
     `  sound-params ${soundHash}｜轨迹 ${track.length} 点｜前景 ${sounds.length}` +
     `（拨弦${cnt(0)}/闷弦${cnt(1)}/纸页${cnt(2)}/铃${cnt(3)}/卡座${cnt(4)}/声部${cnt(5)}｜和弦${cnt(6)}/跳针${cnt(7)}/ASK${cnt(8)}｜DONE${cnt(9)}）\n` +
     `  浏览器打开 probe.html 点『▶』（用户手势解锁音频）。?tuner=1 开调音抽屉。自包含、零网络。\n`,
@@ -173,6 +180,8 @@ function buildProbeHtml(data: unknown, soundRaw: unknown): string {
   <span class="muted">params</span> <span id="mPar"></span>
   <span class="muted">verdict</span> <span id="mVer"></span>
   <span class="muted">sound</span> <span id="mSnd"></span>
+  <span class="muted">build</span> <span id="mBuild"></span>
+  <span class="badge" id="mState">■ 未播放</span>
 </header>
 <div class="wrap">
   <canvas id="needle" width="260" height="260"></canvas>
@@ -200,6 +209,7 @@ document.getElementById('mEng').textContent = D.engineSha;
 document.getElementById('mPar').textContent = D.paramsHash;
 document.getElementById('mVer').textContent = D.verdictHash;
 document.getElementById('mSnd').textContent = D.soundHash;
+document.getElementById('mBuild').textContent = D.buildTs;
 
 const WX=['CLEAR','OVERCAST','RAIN','STORM'];
 const WXC=['#2a6','#7a3','#59c','#c53'];
@@ -460,7 +470,7 @@ function frame(){ const pm=Math.min(playMs(),dur); const s=sampleAt(pm);
   const bt=bedTargets(s[2],s[3],s[6],s[5],s[7]);
   document.getElementById('bed').textContent=(bt.silence?'静默':bt.hover?'悬停':'S1 '+bt.s1.toFixed(2)+' S2 '+bt.s2.toFixed(2)+' S3 '+bt.s3.toFixed(2));
   if(playing && pm<dur) raf=requestAnimationFrame(frame); else if(pm>=dur) stop(); }
-function start(){ if(playing) return; ensureAudio(); playing=true; perf0=performance.now(); audio0=ac.currentTime+0.05; si=0;
+function start(){ if(playing||takenOver) return; ensureAudio(); playing=true; setState('▶ 播放中'); perf0=performance.now(); audio0=ac.currentTime+0.05; si=0;
   habLog.clear(); doneSilentUntil=-1; lastGridAt=audio0; lastBarAt=audio0; lastAskRepeat=-1e9; wxLatch=0;
   G.bedBus.gain.cancelScheduledValues(ac.currentTime); G.bedBus.gain.setValueAtTime(1,ac.currentTime);
   // 起播首拍：床参数按 t=0 状态立即就位（EAR-2：不从残留/默认态滑过来）
@@ -468,13 +478,28 @@ function start(){ if(playing) return; ensureAudio(); playing=true; perf0=perform
   applyBed(bedTargets(s0[2],s0[3],s0[6],s0[5],s0[7]),ac.currentTime,true);
   schedule(); raf=requestAnimationFrame(frame); }
 function stop(){ playing=false; cancelAnimationFrame(raf);
+  if(!takenOver) setState('■ 已停止');
   if(ac){ const at=ac.currentTime; ['s1','s2','s3','hissG','roomG'].forEach(k=>G[k].gain.setTargetAtTime(0,at,0.2)); } }
 document.getElementById('play').onclick=start;
 document.getElementById('stop').onclick=stop;
 (function(){ const s=track.length?sampleAt(0):[0,0,0,0,0,0,0,0]; drawNeedle(s[1],s[4]); drawCurve(0); })();
+// ===== 单实例接管（EAR-3）：新探针页广播接管，旧页收到即静音——多标签叠噪结构性根治 =====
+// file:// 下 BroadcastChannel 不保证跨页，故 try/catch 降级；http(localhost) 下全效。
+const TABID=Math.random().toString(36).slice(2);
+let takenOver=false;
+function setState(txt,warn){ const b=document.getElementById('mState'); b.textContent=txt; b.style.color=warn?'#e0b050':''; }
+function onTaken(){ if(takenOver) return; takenOver=true; stop();
+  if(ac) G.master.gain.setTargetAtTime(0,ac.currentTime,0.05);
+  setState('⛔ 已被新探针接管（本页静音）',true);
+  document.getElementById('play').disabled=true; }
+let CHAN=null;
+try{ CHAN=new BroadcastChannel('foley-probe');
+  CHAN.onmessage=e=>{ if(e.data&&e.data.type==='takeover'&&e.data.id!==TABID) onTaken(); };
+  CHAN.postMessage({type:'takeover',id:TABID});
+}catch(_e){ /* file:// 降级：靠 build 时间戳与状态牌人工辨旧页 */ }
 // dev 诊断口（自动化验证用；后台标签 rAF 被掐时以此读真状态）
 window.__probe={ isPlaying:()=>playing, acState:()=>ac?ac.state:'none', acTime:()=>ac?ac.currentTime:-1,
-  playMs:()=>playing?playMs():-1, scheduled:()=>si, gridAt:()=>lastGridAt };
+  playMs:()=>playing?playMs():-1, scheduled:()=>si, gridAt:()=>lastGridAt, takenOver:()=>takenOver };
 
 // ===== 调音抽屉（?tuner=1，仅 dev；拧 SP → 实时生效 + 哈希重算） =====
 if(new URLSearchParams(location.search).get('tuner')==='1'){

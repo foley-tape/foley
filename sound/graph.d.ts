@@ -53,11 +53,11 @@ export interface SoundEngine {
   ROOT: number;
   registry: Registry;
   nodes: Record<string, SoundNodeLike & { gain?: SoundParamLike }>;
-  readonly transport: { audio0: number; speed: number; track: TrackRow[]; durMs: number } | null;
+  readonly transport: { audio0: number; speed: number; track: TrackRow[]; durMs: number; startPm: number } | null;
   readonly lastGridAt: number;
   readonly doneSilentUntil: number;
   applyBed(bt: BedTargets, at: number, imm: boolean): void;
-  startTransport(audio0: number, speed: number, track: TrackRow[], durMs: number): void;
+  startTransport(audio0: number, speed: number, track: TrackRow[], durMs: number, startPm?: number): void;
   scheduleGridUntil(untilSec: number): void;
   trigger(cls: number, atSec: number, deg: number, vel: number): void;
   applyBedNow(pm: number): void;

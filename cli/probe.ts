@@ -289,7 +289,8 @@ function ensureAudio(){
 
 // ===== 双时钟播放（针走墙钟；声音走音频钟；调度与量化全在 graph.js）=====
 let playing=false, perf0=0, audio0=0, speed=1, si=0, raf=0; // 原速法（SOUND-R2 §1）：听感入口默认 1×，倍速只在 HUD
-function playMs(){ return (performance.now()-perf0)*speed; }
+let startPm=0; // 跳转起点（EAR-11：原速法使跳转成刚需——66 分钟带没人从头听）
+function playMs(){ return startPm + (performance.now()-perf0)*speed; }
 document.getElementById('speed').oninput=e=>{ speed=+e.target.value; document.getElementById('speedV').textContent=speed+'×';
   if(engine&&playing&&engine.transport) engine.transport.speed=speed; };
 
@@ -329,19 +330,27 @@ function frame(){ const pm=Math.min(playMs(),dur); const s=sampleAt(track,pm);
   document.getElementById('prog').textContent=(pm/1000).toFixed(0)+'s / '+(dur/1000).toFixed(0)+'s';
   document.getElementById('wx').textContent=WX[s[4]];
   const bt=bedTargets({T:s[2],A:s[3],wow:s[6],phase:PHASE_IDX[s[5]]||'WORKING',weather:'CLEAR',pendingAsk:s[7]===1},SP);
-  document.getElementById('bed').textContent=(bt.silence?'静默':bt.hover?'悬停':'S1 '+bt.s1.toFixed(2)+' S2 '+bt.s2.toFixed(2)+' S3 '+bt.s3.toFixed(2));
+  document.getElementById('bed').textContent=(bt.silence?'静默':bt.hover?'悬停':'L1 '+bt.l1.toFixed(3)+' L2 '+bt.l2.toFixed(3)+' S3 '+bt.s3.toFixed(3)+' 磨损 '+(bt.crackle+bt.hissLin).toFixed(4));
   if(playing && pm<dur) raf=requestAnimationFrame(frame); else if(pm>=dur) stopPlay(); }
 
-function start(){ if(playing) return;
+function start(fromPm){ if(playing) return;
   // EAR-6 修：接管语义从"后开的页永久独占"改为"谁按▶谁发声"——被接管页按播放即夺回
-  // （A/B 对照两页都开着时，旧语义把先开的页锁死：按▶无声、状态牌又不起眼——船长"什么声音都没有"的元凶）
   if(takenOver){ takenOver=false; try{ CHAN&&CHAN.postMessage({type:'takeover',id:TABID}); }catch(_e){}
     if(engine) engine.unmuteMaster(ac.currentTime); }
   ensureAudio(); playing=true; setState('▶ 播放中');
-  perf0=performance.now(); audio0=ac.currentTime+0.05; si=0;
-  engine.startTransport(audio0, speed, track, dur);        // 复位：习惯化/静默闩/bedBus/首拍 imm 就位（EAR-2）
+  startPm=Math.max(0,Math.min(fromPm===undefined?startPm:fromPm,dur)); // 无参=从上次位置续播
+  perf0=performance.now(); audio0=ac.currentTime+0.05;
+  si=0; while(si<sounds.length&&sounds[si][0]<startPm) si++;  // 前景快进到起点
+  engine.startTransport(audio0, speed, track, dur, startPm);  // 复位：习惯化/静默闩/首拍 imm 就位（EAR-2）
   schedule(); raf=requestAnimationFrame(frame); }
-function stopPlay(){ playing=false; cancelAnimationFrame(raf);
+// 跳转（EAR-11）：曲线画布点击/拖动 = 立即从该处播放；停着点则只挪起点
+function seekTo(pm){ pm=Math.max(0,Math.min(pm,dur));
+  if(playing){ engine.stop(ac.currentTime); playing=false; cancelAnimationFrame(raf); start(pm); }
+  else { startPm=pm; const s=sampleAt(track,pm); drawNeedle(s[1],s[4]); drawCurve(pm);
+    document.getElementById('prog').textContent=(pm/1000).toFixed(0)+'s / '+(dur/1000).toFixed(0)+'s'; } }
+function stopPlay(){
+  if(playing){ const pmNow=Math.min(playMs(),dur); startPm=pmNow>=dur?0:pmNow; } // 记住位置，▶ 续播；带尾归零
+  playing=false; cancelAnimationFrame(raf);
   if(!takenOver) setState('■ 已停止');
   if(!engine) return;
   // 停 = 注册表遍历：撤单+快速归零+300ms 自动化硬闸（graph.js stopAll）；一次性源当场枪毙
@@ -349,8 +358,15 @@ function stopPlay(){ playing=false; cancelAnimationFrame(raf);
   // EAR-3 浏览器兜底带（个别引擎钉参数不衰减）：300ms 后直接置零——若已重新起播则让位
   setTimeout(()=>{ if(!playing&&engine) engine.hardMute(); },300);
 }
-document.getElementById('play').onclick=start;
+document.getElementById('play').onclick=()=>start(); // 勿直挂 start：onclick 会把事件对象误作 fromPm
 document.getElementById('stop').onclick=stopPlay;
+// 跳转手柄（EAR-11）：曲线画布按下/拖动/松开——松开即跳
+(function(){ cc.style.cursor='crosshair'; let scrubbing=false;
+  const pmOf=(e)=>{ const r=cc.getBoundingClientRect(); return Math.max(0,Math.min((e.clientX-r.left)/r.width,1))*dur; };
+  cc.addEventListener('mousedown',(e)=>{ scrubbing=true; drawCurve(pmOf(e)); });
+  cc.addEventListener('mousemove',(e)=>{ if(scrubbing) drawCurve(pmOf(e)); });
+  window.addEventListener('mouseup',(e)=>{ if(!scrubbing) return; scrubbing=false; seekTo(pmOf(e)); });
+})();
 (function(){ const s=track.length?sampleAt(track,0):[0,0,0,0,0,0,0,0]; drawNeedle(s[1],s[4]); drawCurve(0); })();
 
 // ===== 隔离板（EAR-7）：层禁声走引擎（engine.setMute），不动 SP/哈希；起播前的勾选先记账后施加 =====

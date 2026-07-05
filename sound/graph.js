@@ -517,23 +517,24 @@ export function buildEngine(ctx, SP, opts) {
   }
 
   // ---- transport 与调度（probe 页与机器耳朵共用的唯一调度体；SOUND-R1 沿革） ----
-  function startTransport(audio0, speed, track, durMs) {
-    E.transport = { audio0, speed, track, durMs };
+  // startPm（EAR-11 增）：从压缩轴任意毫秒起播——原速法把"跳转"变成刚需（66 分钟带没人从头听）。
+  function startTransport(audio0, speed, track, durMs, startPm = 0) {
+    E.transport = { audio0, speed, track, durMs, startPm };
     E.lastGridAt = audio0; E.lastBarAt = audio0; E.lastAskRepeat = -1e9;
     E.doneSilentUntil = -1; E.wxLatch = 0; E.habLog.clear();
     for (const bus of [bedBus, wearBus]) {
       bus.gain.cancelScheduledValues(ctx.currentTime);
       bus.gain.setValueAtTime(1, ctx.currentTime);
     }
-    const s0 = track.length ? sampleAt(track, 0) : [0, 0, 0, 0, 0, 0, 0, 0];
+    const s0 = track.length ? sampleAt(track, Math.min(startPm, durMs)) : [0, 0, 0, 0, 0, 0, 0, 0];
     applyBed(bedTargets(stateOf(s0), SP), ctx.currentTime, true);
   }
   const stateOf = (s) => ({ T: s[2], A: s[3], wow: s[6], phase: ['IDLE', 'WORKING', 'WAITING', 'DONE'][s[5]] || 'WORKING', weather: 'CLEAR', pendingAsk: s[7] === 1 });
 
   function scheduleGridUntil(untilSec) {
-    const { audio0, speed, track, durMs } = E.transport;
+    const { audio0, speed, track, durMs, startPm } = E.transport;
     while (E.lastGridAt <= untilSec) {
-      const at = E.lastGridAt, gpm = (at - audio0) * 1000 * speed;
+      const at = E.lastGridAt, gpm = (at - audio0) * 1000 * speed + (startPm || 0);
       const s = sampleAt(track, Math.min(gpm, durMs));
       const bt = bedTargets(stateOf(s), SP);
       if (at > E.doneSilentUntil) applyBed(bt, at, false);

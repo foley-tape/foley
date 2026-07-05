@@ -1,0 +1,44 @@
+{
+  "_source": "SOUND-R2 §2 L1 织体体资产清单。rmsDb 为定标锚（graph 数据驱动归一）；fnv 为内容哈希（ear 双哈希之资产哈希原料）。获取自 Freesound HQ 预览（CC0 授权对预览与原件同效），afconvert 转 32k/mono/PCM16，接缝淡化 0.8s。",
+  "assets": [
+    {
+      "name": "l1-roomtone",
+      "file": "l1-roomtone.wav",
+      "seconds": 15.9,
+      "sampleRate": 32000,
+      "rmsDb": -13.33,
+      "fnv": "74926c22",
+      "bytes": 1017644,
+      "source": "https://freesound.org/people/leonelmail/sounds/329533/",
+      "author": "leonelmail",
+      "title": "Room Tone In An Apartment Living Room 2",
+      "license": "CC0-1.0"
+    },
+    {
+      "name": "l1-filmstatic",
+      "file": "l1-filmstatic.wav",
+      "seconds": 12.7,
+      "sampleRate": 32000,
+      "rmsDb": -27.59,
+      "fnv": "09ec2fd2",
+      "bytes": 812844,
+      "source": "https://freesound.org/people/joedeshon/sounds/329673/",
+      "author": "joedeshon",
+      "title": "film_static_04.wav",
+      "license": "CC0-1.0"
+    },
+    {
+      "name": "l1-crackle",
+      "file": "l1-crackle.wav",
+      "seconds": 18.3,
+      "sampleRate": 32000,
+      "rmsDb": -18.1,
+      "fnv": "10233947",
+      "bytes": 1171244,
+      "source": "https://freesound.org/people/3bagbrew/sounds/57746/",
+      "author": "3bagbrew",
+      "title": "gramophone_crackle.wav",
+      "license": "CC0-1.0"
+    }
+  ]
+}

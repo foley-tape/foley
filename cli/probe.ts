@@ -15,6 +15,8 @@ import { join, basename, relative } from 'node:path';
 import { resolveParams, hashParams, hashJson } from '../engine/params.ts';
 import { replayCore, loadVerdict, type TapeKind } from './replay.ts';
 import { resolveSoundParams, degreeOf, buildTrack } from '../sound/index.ts';
+import { assetsHash } from '../sound/assets.js';
+import { loadAssetsNode } from './assets-node.ts';
 import type { DerivedMoment } from '../engine/index.ts';
 
 // 前景类别（页内以索引编码）：0 pluckOk / 1 pluckFail / 2 page / 3 bell / 4 save / 5 spawn
@@ -46,9 +48,21 @@ function inlineSoundSource(): string {
     .map((l) => l.replace(/^export (function|const|class)/, '$1'))
     .join('\n');
   const core = strip(readFileSync(new URL('../sound/core.js', import.meta.url), 'utf8'));
+  const assets = strip(readFileSync(new URL('../sound/assets.js', import.meta.url), 'utf8'));
   const graph = strip(readFileSync(new URL('../sound/graph.js', import.meta.url), 'utf8'));
   return `// ===== 内嵌真源 sound/core.js（构建时逐字拷贝，剥模块语法）=====\n${core}\n` +
+    `// ===== 内嵌真源 sound/assets.js（同上）=====\n${assets}\n` +
     `// ===== 内嵌真源 sound/graph.js（同上；与 cli ear 离线渲染同一份代码）=====\n${graph}`;
+}
+
+/** L1 资产 → 页内嵌 base64 条目（自包含、零网络；assets.js 解出时校验内容哈希）。 */
+function embeddedAssets(): { json: string; hash: string } {
+  const { assets, manifest } = loadAssetsNode();
+  const entries = manifest.map((m) => ({
+    name: m.name, rmsDb: m.rmsDb, seconds: m.seconds, fnv: m.fnv,
+    b64: readFileSync(new URL(`../sound/assets/${m.file}`, import.meta.url)).toString('base64'),
+  }));
+  return { json: JSON.stringify(entries), hash: assetsHash(assets) };
 }
 
 export function runProbe(argv: string[]): void {
@@ -133,7 +147,8 @@ export function runProbe(argv: string[]): void {
         anon: false, durationMs, peakT: core.metrics.peakT,
         stuck: core.metrics.stuckEdges, resolves: core.metrics.resolves, repoKey, track, sounds };
 
-  const html = buildProbeHtml(data, soundRaw);
+  const emb = embeddedAssets();
+  const html = buildProbeHtml(data, soundRaw, emb);
   const ts = new Date().toISOString().replace(/[:.]/g, '-');
   const tapeBase = basename(tapePath).replace(/\.tape\.jsonl$/, '').replace(/\.jsonl$/, ''); // M2.0 §1.2 命名规约
   const outDir = outIdx >= 0 && argv[outIdx + 1] ? argv[outIdx + 1]! : join(process.cwd(), 'runs', `probe-${tapeBase}-${ts}`);
@@ -151,7 +166,7 @@ export function runProbe(argv: string[]): void {
   }
   const cnt = (c: number): number => sounds.filter((s) => s[1] === c).length;
   process.stderr.write(
-    `探针 声音相(SOUND-R1) ${basename(tapePath)}${kind ? `（${kind}）` : ''} → ${relative(process.cwd(), outFile)}\n` +
+    `探针 声音相(SOUND-R2) ${basename(tapePath)}${kind ? `（${kind}）` : ''} → ${relative(process.cwd(), outFile)}\n` +
     `  固定入口：runs/probe-latest/probe.html（旧标签页会被新页自动静音接管）\n` +
     `  sound-params ${soundHash}｜轨迹 ${track.length} 点｜前景 ${sounds.length}` +
     `（拨弦${cnt(0)}/闷弦${cnt(1)}/纸页${cnt(2)}/铃${cnt(3)}/卡座${cnt(4)}/声部${cnt(5)}｜和弦${cnt(6)}/跳针${cnt(7)}/ASK${cnt(8)}｜DONE${cnt(9)}）\n` +
@@ -164,7 +179,7 @@ function gitSha(): string { try { return execSync('git rev-parse --short HEAD', 
 
 // ---------- probe.html（自包含：内联 CSS/JS + 内嵌数据/声参 + 内嵌 sound/ 真源；无外部 URL） ----------
 
-function buildProbeHtml(data: unknown, soundRaw: unknown): string {
+function buildProbeHtml(data: unknown, soundRaw: unknown, emb: { json: string; hash: string }): string {
   const json = JSON.stringify(data);
   const spJson = JSON.stringify(soundRaw);
   return `<!doctype html>
@@ -193,6 +208,7 @@ function buildProbeHtml(data: unknown, soundRaw: unknown): string {
   <span class="muted">params</span> <span id="mPar"></span>
   <span class="muted">verdict</span> <span id="mVer"></span>
   <span class="muted">sound</span> <span id="mSnd"></span>
+  <span class="muted">assets</span> <span id="mAst">${emb.hash}</span>
   <span class="muted">build</span> <span id="mBuild"></span>
   <span class="badge" id="mState">■ 未播放</span>
   <span class="muted" id="mHealth" title="实时音频线程健康（EAR-8）：欠载=爆音串的机器证据">载荷 —</span>
@@ -204,7 +220,7 @@ function buildProbeHtml(data: unknown, soundRaw: unknown): string {
 <div class="ctl">
   <button id="play">▶ 播放</button>
   <button id="stop">■ 停</button>
-  <span class="muted">速度</span><input id="speed" type="range" min="1" max="60" value="12"><span id="speedV">12×</span>
+  <span class="muted">速度</span><input id="speed" type="range" min="1" max="60" value="1"><span id="speedV">1×</span>
   <span class="muted">｜进度</span><span id="prog">0s</span>
   <span class="muted">｜天气</span><span id="wx">CLEAR</span>
   <span class="muted">｜床</span><span id="bed">—</span>
@@ -217,6 +233,7 @@ function buildProbeHtml(data: unknown, soundRaw: unknown): string {
 <div id="tuner"></div>
 <script id="d" type="application/json">${json}</script>
 <script id="sp" type="application/json">${spJson}</script>
+<script id="assets" type="application/json">${emb.json}</script>
 <script>
 "use strict";
 ${inlineSoundSource()}
@@ -254,7 +271,8 @@ function ensureAudio(){
   // EAR-8：latencyHint 'playback'——这是收听仪器不是演奏乐器，大缓冲换实时线程欠载免疫
   // （欠载爆音"滋滋啦啦"骑在当刻最响的层上、且与磁带版本无关——正是历轮"噪声一模一样"的候选机理）
   ac=new (window.AudioContext||window.webkitAudioContext)({ latencyHint:'playback' });
-  engine=buildEngine(ac, SP, { repoKey: D.repoKey, seed: D.repoKey });
+  const assets=assetsFromEmbedded(JSON.parse(document.getElementById('assets').textContent)); // 内容哈希校验在内
+  engine=buildEngine(ac, SP, { repoKey: D.repoKey, seed: D.repoKey, assets });
   for(const k of isoMutes) engine.setMute(k,true); // 起播前勾掉的层，建图即施加
   // 欠载记录仪（Chrome AudioRenderCapacity；不支持则显示 n/a）——船长页头可见，机器证据入 __probe
   try{
@@ -270,7 +288,7 @@ function ensureAudio(){
 }
 
 // ===== 双时钟播放（针走墙钟；声音走音频钟；调度与量化全在 graph.js）=====
-let playing=false, perf0=0, audio0=0, speed=12, si=0, raf=0;
+let playing=false, perf0=0, audio0=0, speed=1, si=0, raf=0; // 原速法（SOUND-R2 §1）：听感入口默认 1×，倍速只在 HUD
 function playMs(){ return (performance.now()-perf0)*speed; }
 document.getElementById('speed').oninput=e=>{ speed=+e.target.value; document.getElementById('speedV').textContent=speed+'×';
   if(engine&&playing&&engine.transport) engine.transport.speed=speed; };
@@ -338,7 +356,7 @@ document.getElementById('stop').onclick=stopPlay;
 // ===== 隔离板（EAR-7）：层禁声走引擎（engine.setMute），不动 SP/哈希；起播前的勾选先记账后施加 =====
 const isoMutes=new Set();
 (function(){ const board=document.getElementById('isoBoard');
-  const LAYERS=[['s1','S1 基底(pad)'],['s2','S2 律动'],['s3','S3 张力弦'],['hiss','S4 底噪hiss'],['room','房间感'],['fg','前景+呼唤']];
+  const LAYERS=[['l1','L1 织体体'],['crackle','磨损crackle'],['l2','L2 和声垫'],['s2','S2 律动'],['s3','S3 张力弦'],['hiss','底噪hiss'],['fg','前景+呼唤']];
   for(const [key,label] of LAYERS){
     const lab=document.createElement('label'); lab.style.cssText='display:flex;gap:4px;align-items:center';
     const cb=document.createElement('input'); cb.type='checkbox'; cb.checked=true;

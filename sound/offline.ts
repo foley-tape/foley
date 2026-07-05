@@ -272,26 +272,55 @@ class DelayNode extends OfflineNode {
 
 class OfflineBuffer {
   readonly data: Float32Array;
-  constructor(len: number) { this.data = new Float32Array(len); }
+  readonly sampleRate: number;
+  constructor(len: number, sr: number) { this.data = new Float32Array(len); this.sampleRate = sr; }
   getChannelData(_ch: number): Float32Array { return this.data; }
+  copyToChannel(src: Float32Array, _ch: number): void { this.data.set(src.subarray(0, this.data.length)); }
 }
 
 class BufferSourceNode extends OfflineNode {
   buffer: OfflineBuffer | null = null;
   loop = false;
+  // SOUND-R2：资产缓冲带自有采样率（32k vendor）+ playbackRate（repo-key 变奏）——分数步进+线性插值重放
+  readonly playbackRate: OfflineParam;
   private startAt = Infinity;
   private stopAt = Infinity;
+  private pos = 0; // 缓冲内分数读头
+  constructor(ctx: OfflineCtx) { super(ctx); this.playbackRate = new OfflineParam(ctx, 1, 0, 64); }
   start(t?: number): void { this.startAt = t ?? this.ctx.currentTime; }
   stop(t?: number): void { this.stopAt = t ?? this.ctx.currentTime; }
-  protected render(_bi: number, sf: number, n: number): void {
+  protected render(bi: number, sf: number, n: number): void {
     const sr = this.ctx.sampleRate;
     const d = this.buffer ? this.buffer.data : null;
+    const bufSr = this.buffer ? this.buffer.sampleRate : sr;
+    const rate = this.playbackRate.computeBlock(bi, sf, n);
     for (let i = 0; i < n; i++) {
       const t = (sf + i) / sr;
       if (!d || d.length === 0 || t < this.startAt || t >= this.stopAt) { this.out[i] = 0; continue; }
-      let k = Math.floor((t - this.startAt) * sr);
-      if (this.loop) k %= d.length;
-      this.out[i] = k < d.length ? d[k]! : 0;
+      const step = (bufSr / sr) * rate[i]!;
+      let p = this.pos;
+      if (this.loop) p %= d.length;
+      else if (p >= d.length) { this.out[i] = 0; continue; }
+      const k0 = Math.floor(p), fr = p - k0;
+      const a = d[k0 % d.length]!;
+      const b = this.loop ? d[(k0 + 1) % d.length]! : (k0 + 1 < d.length ? d[k0 + 1]! : 0);
+      this.out[i] = a + (b - a) * fr;
+      this.pos = p + step;
+    }
+  }
+}
+
+class WaveShaperNode extends OfflineNode {
+  curve: Float32Array | null = null; // 与浏览器同语义：x∈[-1,1] 映射到曲线索引，线性插值
+  protected render(_bi: number, _sf: number, n: number, insum: Float32Array): void {
+    const c = this.curve;
+    if (!c || c.length < 2) { this.out.set(insum.subarray(0, n)); return; }
+    const L = c.length;
+    for (let i = 0; i < n; i++) {
+      const x = Math.max(-1, Math.min(1, insum[i]!));
+      const idx = ((x + 1) / 2) * (L - 1);
+      const k0 = Math.floor(idx), fr = idx - k0;
+      this.out[i] = k0 + 1 < L ? c[k0]! + (c[k0 + 1]! - c[k0]!) * fr : c[L - 1]!;
     }
   }
 }
@@ -313,8 +342,9 @@ export class OfflineCtx {
   createOscillator(): OscillatorNode { return new OscillatorNode(this); }
   createBiquadFilter(): BiquadFilterNode { return new BiquadFilterNode(this); }
   createDelay(maxSec: number): DelayNode { return new DelayNode(this, maxSec); }
-  createBuffer(_ch: number, len: number, _sr: number): OfflineBuffer { return new OfflineBuffer(len); }
+  createBuffer(_ch: number, len: number, sr: number): OfflineBuffer { return new OfflineBuffer(len, sr); }
   createBufferSource(): BufferSourceNode { return new BufferSourceNode(this); }
+  createWaveShaper(): WaveShaperNode { return new WaveShaperNode(this); }
 
   /** 登记录音点（如 bedBus）：render 后经返回句柄取整段波形。 */
   tap(node: OfflineNode): () => Float32Array {
@@ -360,6 +390,66 @@ export function envelope1sDb(x: Float32Array, sr: number): number[] {
   const out: number[] = [];
   for (let s = 0; s + sr <= x.length; s += sr) out.push(rmsDb(x, sr, s / sr, s / sr + 1));
   return out;
+}
+
+/**
+ * BS.1770 系积分响度（LUFS）——G7 响度门的执法仪器（SOUND-R2 §3）。
+ * K 加权两级双二阶（规范系数，48kHz 专用——EAR_SR 冻结 48k，异率即抛）＋400ms 窗 75% 重叠
+ * ＋两级门控（绝对 −70 LUFS，相对 均值−10）。单声道通道权重 1.0。
+ * 自研依据：ITU-R BS.1770-4 公开规范；形态参照通行开源实现（借骨不搬库）。
+ */
+export function measureLufs(x: Float32Array, sr: number, fromSec = 0, toSec?: number): number {
+  if (sr !== 48000) throw new Error('measureLufs：K 加权系数为 48k 专用（EAR_SR 冻结）');
+  const a = Math.max(0, Math.floor(fromSec * sr));
+  const b = Math.min(x.length, Math.floor((toSec ?? x.length / sr) * sr));
+  // 级1：高架（+4dB 高频，规范系数@48k）
+  const h1b = [1.53512485958697, -2.69169618940638, 1.19839281085285];
+  const h1a = [-1.69065929318241, 0.73248077421585];
+  // 级2：高通（~38Hz，规范系数@48k）
+  const h2b = [1.0, -2.0, 1.0];
+  const h2a = [-1.99004745483398, 0.99007225036621];
+  let z11 = 0, z12 = 0, z21 = 0, z22 = 0;
+  const y = new Float32Array(b - a);
+  for (let i = a; i < b; i++) {
+    const x0 = x[i]!;
+    const y1 = h1b[0]! * x0 + z11;
+    z11 = h1b[1]! * x0 - h1a[0]! * y1 + z12;
+    z12 = h1b[2]! * x0 - h1a[1]! * y1;
+    const y2 = h2b[0]! * y1 + z21;
+    z21 = h2b[1]! * y1 - h2a[0]! * y2 + z22;
+    z22 = h2b[2]! * y1 - h2a[1]! * y2;
+    y[i - a] = y2;
+  }
+  // 400ms 窗、75% 重叠的块响度
+  const win = Math.floor(0.4 * sr), hop = Math.floor(0.1 * sr);
+  const blocks: number[] = [];
+  for (let s = 0; s + win <= y.length; s += hop) {
+    let e = 0;
+    for (let i = s; i < s + win; i++) e += y[i]! * y[i]!;
+    blocks.push(-0.691 + 10 * Math.log10(Math.max(e / win, 1e-30)));
+  }
+  if (!blocks.length) return -180;
+  // 门控：绝对 −70，再相对 均值−10
+  const mean = (arr: number[]): number => {
+    let acc = 0;
+    for (const l of arr) acc += Math.pow(10, (l + 0.691) / 10);
+    return -0.691 + 10 * Math.log10(acc / arr.length);
+  };
+  const abs = blocks.filter((l) => l > -70);
+  if (!abs.length) return -180;
+  const rel = abs.filter((l) => l > mean(abs) - 10);
+  return rel.length ? mean(rel) : -180;
+}
+
+/** G6 织体占用度量具：200Hz–8kHz 对数均分 8 带的带 RMS（dBFS）。 */
+export function octaveBandsDb(x: Float32Array, sr: number, fromSec: number, toSec: number): { lo: number; hi: number; db: number }[] {
+  const bands: { lo: number; hi: number; db: number }[] = [];
+  const ratio = Math.pow(8000 / 200, 1 / 8);
+  for (let k = 0; k < 8; k++) {
+    const lo = 200 * Math.pow(ratio, k), hi = 200 * Math.pow(ratio, k + 1);
+    bands.push({ lo: Math.round(lo), hi: Math.round(hi), db: bandRmsDb(x, sr, lo, hi, fromSec, toSec) });
+  }
+  return bands;
 }
 
 /** 频带 RMS（dB）：双二阶带通两级级联后测 RMS（呼唤穿透 G5 的量具）。 */

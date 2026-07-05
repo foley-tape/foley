@@ -21,8 +21,8 @@ import {
   type BedState, type TrackRow, type SoundParams,
 } from '../sound/index.ts';
 import { buildEngine, createRegistry } from '../sound/graph.js';
-import { OfflineCtx, OfflineNode, rmsDb } from '../sound/offline.ts';
-import { prepBand, g1StopSilence, g2Trim, g3Band, g3Gate, EAR_SR } from '../cli/ear.ts';
+import { OfflineCtx, OfflineNode, rmsDb, bandRmsDb, measureLufs } from '../sound/offline.ts';
+import { prepBand, g1StopSilence, g2Trim, g3Band, g3Gate, g6Texture, g7Loudness, earAssets, EAR_SR } from '../cli/ear.ts';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const params = resolveParams(JSON.parse(readFileSync(join(here, '..', 'params.json'), 'utf8')));
@@ -56,15 +56,16 @@ test('㉚ 床映射律：能量随 T 单调；IDLE 唯余基底；DONE 真静默
   }
   const idle = bedTargets(st({ phase: 'IDLE', A: 0.9, T: 0 }), sp);
   assert.equal(idle.s2, 0, 'IDLE 无律动');
+  assert.equal(idle.l2, 0, 'IDLE 无和声垫');
   // EAR-1 后 targets 含床总闸（trimDb）——验收能量模型与渲染器同一数字
   const trim = Math.pow(10, sp.bed.trimDb / 20);
-  assert.ok(Math.abs(idle.s1 - trim * sp.bed.s1IdleGain) < 1e-12, 'IDLE 基底最弱态（含总闸）');
+  assert.ok(Math.abs(idle.l1 - trim * sp.bed.l1IdleGain) < 1e-12, 'IDLE 唯余 L1 织体最弱态（含总闸）');
   const done = bedTargets(st({ phase: 'DONE', T: 0.5, A: 0.5 }), sp);
-  assert.ok(done.silence && done.s1 === 0 && done.s3 === 0 && done.hissLin === 0, 'DONE 真静默');
+  assert.ok(done.silence && done.l1 === 0 && done.l2 === 0 && done.s3 === 0 && done.hissLin === 0 && done.crackle === 0, 'DONE 真静默');
   assert.ok(bedTargets(st({ pendingAsk: true }), sp).hover, 'WAITING（pendingAsk）床悬停');
-  // 滤波随 T 下压、磨损随 T 上行
+  // 滤波随 T 下压、磨损（hiss+crackle）随 T 上行
   const lo = bedTargets(st({ T: 0.1 }), sp), hi = bedTargets(st({ T: 0.9 }), sp);
-  assert.ok(hi.filterHz < lo.filterHz && hi.hissLin > lo.hissLin && hi.hfShelfDb < lo.hfShelfDb, 'T↑ → 暗、糙');
+  assert.ok(hi.filterHz < lo.filterHz && hi.hissLin > lo.hissLin && hi.crackle > lo.crackle && hi.hfShelfDb < lo.hfShelfDb, 'T↑ → 暗、糙');
 });
 
 test('㉛ §6.1 设计律：storm 床设计包络（1s 窗）× T 的 Pearson r ≥ 0.6', () => {
@@ -158,20 +159,24 @@ test('㊲ 注册表禁手：直连 AudioParam 即抛（规矩③）', () => {
   assert.doesNotThrow(() => (R as { connect(a: unknown, b: unknown): void }).connect(lfo, victim), '节点→节点照常');
 });
 
-test('㊳ 方案 B 呼吸有界：床包络 ∈ 正身×(1±breathDepth)；depth=0 即无呼吸', () => {
-  // T=0/A=0：床只剩 S1（hiss −64dB、房间 −78dB 不扰界判）。26s 覆盖 7.3/11.9s 双肺拍
+test('㊳ 方案 B 呼吸有界：L1 包络 ∈ 正身×(1±breathDepth)；depth=0 无呼吸（fallback 织体口径）', () => {
+  // T=0/A=0：L1 独响（l2 在册但 tap 只看 l1Level）。fallback 粉噪统计平稳，界判可行；
+  // 真采样有天然起伏，其呼吸由结构（乘法级）保证——此测锁结构，不锁素材。
   const bt = bedTargets(st({ T: 0, A: 0 }), sp);
   const run = (depth: number): { max: number; min: number } => {
     const raw = JSON.parse(JSON.stringify(soundRaw));
     raw.bed.breathDepth = depth;
-    const { ctx, eng } = bedEngine(resolveSoundParams(raw), constTrack(0, 0), 60000);
-    const getTap = ctx.tap(eng.nodes['s1Level'] as unknown as OfflineNode);
+    const ctx = new OfflineCtx(EAR_SR);
+    const eng = buildEngine(ctx, resolveSoundParams(raw), { repoKey: 'golden' }); // 无资产→fallback
+    eng.startTransport(0, 1, constTrack(0, 0), 60000);
+    const getTap = ctx.tap(eng.nodes['l1Level'] as unknown as OfflineNode);
     eng.scheduleGridUntil(26);
     ctx.render(26);
     const tap = getTap();
     let max = -Infinity, min = Infinity;
-    for (let from = 2; from + 0.25 <= 26; from += 0.25) {
-      const w = Math.pow(10, rmsDb(tap, EAR_SR, from, from + 0.25) / 20);
+    // 1s 窗：把织体统计涨落平均掉（0.25s 窗下粉噪天然 ±0.6dB），呼吸周期 7.3/11.9s 不受影响
+    for (let from = 2; from + 1 <= 26; from += 0.5) {
+      const w = Math.pow(10, rmsDb(tap, EAR_SR, from, from + 1) / 20);
       if (w > max) max = w;
       if (w < min) min = w;
     }
@@ -179,25 +184,29 @@ test('㊳ 方案 B 呼吸有界：床包络 ∈ 正身×(1±breathDepth)；depth
   };
   const d = sp.bed.breathDepth;
   const withBreath = run(d);
-  assert.ok(withBreath.max <= bt.s1 * (1 + d) * 1.05, `包络峰 ${withBreath.max.toFixed(5)} ≤ 正身×(1+${d})——副肺不可能压过正身`);
-  assert.ok(withBreath.min >= bt.s1 * (1 - d) * 0.95, `包络谷 ${withBreath.min.toFixed(5)} ≥ 正身×(1−${d})——不可能反相`);
-  assert.ok(withBreath.max / withBreath.min > 1 + d * 0.8, '呼吸确实在动（不是死床）');
+  assert.ok(withBreath.max <= bt.l1 * (1 + d) * 1.08, `包络峰 ${withBreath.max.toFixed(5)} ≤ 正身×(1+${d})——副肺不可能压过正身`);
+  assert.ok(withBreath.min >= bt.l1 * (1 - d) * 0.92, `包络谷 ${withBreath.min.toFixed(5)} ≥ 正身×(1−${d})——不可能反相`);
+  assert.ok(withBreath.max / withBreath.min > 1 + d * 0.7, '呼吸确实在动（不是死床）');
   const still = run(0);
-  assert.ok(still.max / still.min < 1.03, `depth=0 床应静止（实测摆幅 ${(still.max / still.min).toFixed(4)}）`);
+  assert.ok(still.max / still.min < 1.10, `depth=0 床应近静止（织体统计涨落内，实测摆幅 ${(still.max / still.min).toFixed(4)}）`);
 });
 
-test('㊴ stem 定标锁：四 stem 渲染 RMS 贴设计电平（CALIB/S2_CREST 漂移即红）', () => {
+test('㊴ stem 定标锁 v2：六 stem 渲染 RMS 贴设计电平（CALIB/manifest 定标漂移即红）', () => {
   const bt = bedTargets(st({ T: 0.8, A: 0.5, wow: 0.2 }), sp);
-  const { ctx, eng } = bedEngine(sp, constTrack(0.8, 0.5), 60000);
+  const ctx = new OfflineCtx(EAR_SR);
+  const eng = buildEngine(ctx, sp, { repoKey: 'ear:storm', assets: earAssets() });
+  eng.startTransport(0, 1, constTrack(0.8, 0.5), 60000);
   const taps = new Map<string, () => Float32Array>();
-  for (const k of ['s1Level', 's2Level', 's3Level', 'hissLevel'] as const) {
+  for (const k of ['l1Level', 'crackleLevel', 'l2Level', 's2Level', 's3Level', 'hissLevel'] as const) {
     taps.set(k, ctx.tap(eng.nodes[k] as unknown as OfflineNode));
   }
   eng.scheduleGridUntil(60);
   ctx.render(60);
   const meas = (k: string): number => rmsDb(taps.get(k)!(), EAR_SR, 5, 60);
   const dB = (x: number): number => 20 * Math.log10(x);
-  assert.ok(Math.abs(meas('s1Level') - dB(bt.s1)) <= 1, `S1 ${meas('s1Level').toFixed(2)} vs 设计 ${dB(bt.s1).toFixed(2)}（±1dB）`);
+  assert.ok(Math.abs(meas('l1Level') - dB(bt.l1)) <= 1, `L1 ${meas('l1Level').toFixed(2)} vs 设计 ${dB(bt.l1).toFixed(2)}（±1dB）`);
+  assert.ok(Math.abs(meas('crackleLevel') - dB(bt.crackle)) <= 1, `crackle ${meas('crackleLevel').toFixed(2)} vs ${dB(bt.crackle).toFixed(2)}`);
+  assert.ok(Math.abs(meas('l2Level') - dB(bt.l2)) <= 1, `L2 ${meas('l2Level').toFixed(2)} vs ${dB(bt.l2).toFixed(2)}`);
   assert.ok(Math.abs(meas('s3Level') - dB(bt.s3)) <= 1, `S3 ${meas('s3Level').toFixed(2)} vs ${dB(bt.s3).toFixed(2)}`);
   assert.ok(Math.abs(meas('hissLevel') - dB(bt.hissLin)) <= 1, `hiss ${meas('hissLevel').toFixed(2)} vs ${dB(bt.hissLin).toFixed(2)}`);
   const s2Design = dB(bt.s2 * S2_CREST * Math.sqrt(bt.density / S2_REF_DENSITY));
@@ -240,4 +249,51 @@ test('㊸ 渲染确定性：同图同种子两次渲染逐样本相等', () => {
   for (let i = 0; i < a.length; i++) {
     if (a[i] !== b[i]) assert.fail(`样本 ${i} 不等：${a[i]} vs ${b[i]}（确定性破裂）`);
   }
+});
+
+test('㊺ 三关铁律（SOUND-R2 §2 L2）：L2/S3 自述过关；l2Gain≥l1Gain 即参数层拦死', () => {
+  const ctx = new OfflineCtx(EAR_SR);
+  const eng = buildEngine(ctx, sp, { repoKey: 'golden' });
+  for (const [name, info] of Object.entries(eng.stackInfo)) {
+    assert.ok(info.voices >= 3, `${name} 声部 ${info.voices} ≥ 3（关一：失谐堆叠）`);
+    const detuned = info.detunesCents.filter((c) => Math.abs(c) >= 3 && Math.abs(c) <= 10);
+    assert.ok(detuned.length >= info.voices - 1, `${name} 失谐 ±3–10 音分（首声部可为 0）：${info.detunesCents}`);
+    assert.ok(info.filterLfos >= 2, `${name} 动低通 LFO ${info.filterLfos} ≥ 2（关二）`);
+    assert.ok(info.saturation, `${name} 轻饱和在路（关三）`);
+  }
+  const bad = JSON.parse(JSON.stringify(soundRaw));
+  bad.bed.l2Gain = bad.bed.l1Gain;
+  assert.throws(() => resolveSoundParams(bad), /铁律/, '和声垫电平不得 ≥ 织体体——resolve 执法');
+});
+
+test('㊻ G7 执法仪器自检：997Hz 正弦 −20dBFS → −20±0.5 LUFS（BS.1770 K 加权基准点）', () => {
+  const sr = EAR_SR, n = sr * 10;
+  const x = new Float32Array(n);
+  const amp = Math.pow(10, -20 / 20) * Math.SQRT2; // RMS −20dBFS 的正弦幅度
+  for (let i = 0; i < n; i++) x[i] = amp * Math.sin(2 * Math.PI * 997 * i / sr);
+  const lufs = measureLufs(x, sr, 0.5, 9.5);
+  assert.ok(Math.abs(lufs - (-20)) <= 0.5, `997Hz@−20dBFS 应测得 ≈−20 LUFS（实测 ${lufs.toFixed(2)}）`);
+});
+
+test('㊼ G7 响度门（active）：中张力 1× 段 −26±2 LUFS；G6 织体占用度 ≥5/8 带', () => {
+  const { gate: g6, wav } = g6Texture(sp);
+  const g7 = g7Loudness(wav, sp);
+  assert.ok(g7.pass, `G7 ${g7.measured}`);
+  assert.ok(g6.pass, `G6 ${g6.measured}`); // informational 门，但首轮实测 8/8——锁住防退化
+});
+
+test('㊽ L3 hiss 出低通实证（设计自打架修复）：高 T 下 hiss 带摆幅回归设计', () => {
+  // R1 事故：hiss 的 18dB 设计摆被 S4 低通收窗对消至 Δ6.7dB。v2 hiss 直达输出——摆幅应 ≥12dB。
+  const run = (T: number): number => {
+    const ctx = new OfflineCtx(EAR_SR);
+    const eng = buildEngine(ctx, sp, { repoKey: 'ear:storm', assets: earAssets() });
+    eng.setMute('crackle', true); // 隔离 crackle 的同带贡献，单问 hiss
+    eng.setMute('l1', true); eng.setMute('l2', true); eng.setMute('s2', true); eng.setMute('s3', true);
+    eng.startTransport(0, 1, constTrack(T, 0.2, 30000), 30000);
+    eng.scheduleGridUntil(20);
+    const wav = ctx.render(20);
+    return bandRmsDb(wav, EAR_SR, 2200, 7500, 5, 20);
+  };
+  const lo = run(0.05), hi = run(0.95);
+  assert.ok(hi - lo >= 12, `hiss 带摆幅 ${(hi - lo).toFixed(1)}dB 应 ≥12dB（设计 18dB；R1 时被低通对消只剩 6.7dB）`);
 });

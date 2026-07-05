@@ -1,21 +1,26 @@
 {
-  "_source": "TAPE0 声音相 v1 起手值（M1.9 §1.4，白皮书 §2.2/§3.2/§7）。与 params.json 同级治理：hash 上报（_ 键不入哈希）、改值即改行为。感知常量标定于 n=1 语料（船长耳朵），公测后社区复校（冰箱：开箱调音）。",
+  "_source": "TAPE0 声音相 v2 起手值（SOUND-R2 三层床重做；白皮书 v1.1）。与 params.json 同级治理：hash 上报（_ 键不入哈希）、改值即改行为。响度以 G7（BS.1770 −26±2 LUFS）执法。",
   "bpm": 72,
   "gridDiv": 8,
   "bed": {
-    "_stems": "S1 基底常驻｜S2 律动 A 门控｜S3 张力 T 门控｜S4 磁带总线挂整体输出",
-    "s1Gain": 0.055,
-    "s1IdleGain": 0.018,
-    "s2Gain": 0.06,
+    "_layers": "L1 织体体（真采样为体，crackle 随 T）｜L2 和声垫（三关铁律，永低于 L1）｜S2 律动 A 门控｜S3 张力弦（过三关）｜L3 hiss 出低通直达输出",
+    "l1Gain": 0.066,
+    "l1IdleGain": 0.026,
+    "l1AirRatio": 0.45,
+    "crackleDbLo": -51.5,
+    "crackleDbHi": -28.5,
+    "l2Gain": 0.032,
+    "_l2": "铁律：l2Gain 必须 < l1Gain（resolve 执法）——和声垫永远躺在织体下面",
+    "s2Gain": 0.17,
     "s2GateA": 0.3,
     "s2DensityLo": 0.2,
     "s2DensityHi": 0.9,
-    "s3Gain": 0.1,
+    "s3Gain": 0.072,
     "s3GateT": 0.35,
     "filterHzHi": 8000,
     "filterHzLo": 1800,
-    "hissDbLo": -64,
-    "hissDbHi": -46,
+    "hissDbLo": -55.5,
+    "hissDbHi": -37.5,
     "wowCentsLo": 3,
     "wowCentsHi": 22,
     "hfShelfDbLo": 0,
@@ -23,10 +28,10 @@
     "slewMsFast": 250,
     "slewMsSlow": 800,
     "doneSilenceSec": 4,
-    "trimDb": -4,
-    "_trim": "床总闸（dB）：EAR-1 证词后新增；一颗旋钮管床整体响度，不动各 stem 配比",
+    "trimDb": 0,
+    "_trim": "床总闸（dB）：EAR-1 沿革。v2 电平整体上抬（SOUND-R2 §2）：出厂 0，响度由 G7 校准执法",
     "breathDepth": 0.12,
-    "_breath": "S1 呼吸深度（相对值，域 0.05–0.20）：SOUND-R1 方案 B——呼吸走独立乘法级，数学上永远是正身的百分比；EAR-4 根因（LFO 绝对深度直连增益参数）从结构上灭绝"
+    "_breath": "呼吸乘法级（方案 B 沿革）：挂 L1 织体体正身，永远是正身的百分比"
   },
   "foreground": {
     "peakGain": 0.26,
@@ -47,7 +52,7 @@
     "askRepeatSec": 90
   },
   "loudness": {
-    "_": "起手值（LUFS 为设计目标，v1.0 以静态增益分级近似；实测校准入冰箱）",
+    "_": "G7 执法（SOUND-R2）：床积分响度 K 加权门控积分，中张力段 1× 原速测。",
     "bedLufs": -26,
     "bedSwingDb": 4,
     "fgPeakLufs": -18,
@@ -55,7 +60,7 @@
     "truePeakDbTp": -1
   },
   "scale": {
-    "_": "每仓库一调：repoKey→主音；五声音阶。replay 侧以磁带 sourceHash 代 repoKey（蒸馏带无 repo 身份，见现实修正）。",
+    "_": "每仓库一调：repoKey→主音；五声音阶。replay 侧以磁带 sourceHash 代 repoKey（现实修正沿革）。",
     "pentatonic": [
       0,
       2,

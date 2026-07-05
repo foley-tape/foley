@@ -17,6 +17,11 @@ export function resolveSoundParams(raw) {
     if (out[k] === undefined || out[k] === null) throw new Error(`sound-params 缺少 ${k}`);
   }
   if (typeof out.bed.breathDepth !== 'number') throw new Error('sound-params 缺少 bed.breathDepth（SOUND-R1 方案 B）');
+  for (const k of ['l1Gain', 'l1IdleGain', 'l1AirRatio', 'crackleDbLo', 'crackleDbHi', 'l2Gain']) {
+    if (typeof out.bed[k] !== 'number') throw new Error(`sound-params 缺少 bed.${k}（SOUND-R2 三层床）`);
+  }
+  // 铁律执法（SOUND-R2 §2 L2）：和声垫电平永远低于织体体——参数层就把违例拦死
+  if (out.bed.l2Gain >= out.bed.l1Gain) throw new Error(`铁律：l2Gain(${out.bed.l2Gain}) 必须 < l1Gain(${out.bed.l1Gain})——和声垫永远躺在织体下面`);
   return out;
 }
 
@@ -32,14 +37,19 @@ export function bedTargets(s, sp) {
   const idle = s.phase === 'IDLE';
   const silence = s.phase === 'DONE';
   const trim = dbToLin(b.trimDb); // 床总闸进 targets：验收能量模型与渲染器同一数字
-  const s1 = trim * (silence ? 0 : idle ? b.s1IdleGain : b.s1Gain);
+  // L1 织体体（真采样为体；IDLE 唯余此层最弱态——白皮书 v1.1 §2.1）
+  const l1 = trim * (silence ? 0 : idle ? b.l1IdleGain : b.l1Gain);
+  // crackle 磨损织体（T 驱动，与 hiss 同属介质噪声，直达输出）
+  const crackle = trim * (silence ? 0 : dbToLin(b.crackleDbLo + (b.crackleDbHi - b.crackleDbLo) * T));
+  // L2 和声垫（三关铁律成品；永低于 L1——resolve 已执法）
+  const l2 = trim * (silence || idle ? 0 : b.l2Gain);
   const s2gate = clamp01((A - b.s2GateA) / (1 - b.s2GateA));
   const s2 = trim * (silence || idle ? 0 : b.s2Gain * s2gate);
   const s3gate = clamp01((T - b.s3GateT) / (1 - b.s3GateT));
   const s3 = trim * (silence ? 0 : b.s3Gain * s3gate);
   const hissLin = trim * (silence ? 0 : dbToLin(b.hissDbLo + (b.hissDbHi - b.hissDbLo) * T));
   return {
-    s1, s2, s3, hissLin,
+    l1, crackle, l2, s2, s3, hissLin,
     filterHz: b.filterHzHi + (b.filterHzLo - b.filterHzHi) * T,
     hfShelfDb: b.hfShelfDbLo + (b.hfShelfDbHi - b.hfShelfDbLo) * T,
     wowCents: b.wowCentsLo + (b.wowCentsHi - b.wowCentsLo) * wow,
@@ -52,7 +62,8 @@ export function bedTargets(s, sp) {
 
 /** 床能量（dB）：不相关源的 RMS 合成。抽象设计能量——单调性/门控律的口径（金测试 ㉚）。 */
 export function bedEnergyDb(bt) {
-  const e = Math.sqrt(bt.s1 * bt.s1 + bt.s2 * bt.s2 + bt.s3 * bt.s3 + bt.hissLin * bt.hissLin);
+  const e = Math.sqrt(bt.l1 * bt.l1 + bt.crackle * bt.crackle + bt.l2 * bt.l2
+    + bt.s2 * bt.s2 + bt.s3 * bt.s3 + bt.hissLin * bt.hissLin);
   return e <= 1e-9 ? -120 : 20 * Math.log10(e);
 }
 
@@ -68,7 +79,8 @@ export const S2_REF_DENSITY = 0.55;
 export const S2_CREST = 0.02615; // 离线渲染实测冻结（@48k，参考密度 0.55，定标轮 SOUND-R1）
 export function bedRmsDb(bt) {
   const s2eff = bt.s2 * S2_CREST * Math.sqrt(Math.max(bt.density, 0) / S2_REF_DENSITY);
-  const e = Math.sqrt(bt.s1 * bt.s1 + s2eff * s2eff + bt.s3 * bt.s3 + bt.hissLin * bt.hissLin);
+  const e = Math.sqrt(bt.l1 * bt.l1 + bt.crackle * bt.crackle + bt.l2 * bt.l2
+    + s2eff * s2eff + bt.s3 * bt.s3 + bt.hissLin * bt.hissLin);
   return e <= 1e-9 ? -120 : 20 * Math.log10(e);
 }
 

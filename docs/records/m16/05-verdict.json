@@ -1,0 +1,41 @@
+{
+  "_source": "TAPE0 M1.6-A §3.4『判据即数据』：bands + landmarks + 雨量阈值迁入此处，schema 化，hash 进每份 REPORT。修订由施工方起草、需提交信息中的架构师签核行（与协议同级治理）。",
+  "verdictVersion": "verdict/1",
+  "rain": { "floor": 0.50, "unit": "T·min", "provisional": true, "_note": "R=∫max(0,T−floor)dt，活跃时间积分；换尺 M1.6-A §2，双尺并行一轮" },
+  "bands": {
+    "silence": {
+      "_role": "零输入守恒：零就该是零",
+      "peakT": { "max": 0.02 },
+      "stuckEdges": { "eq": 0 }
+    },
+    "smooth": {
+      "_role": "克制：有小噪声仍安分（灵敏度反向卡尺）",
+      "dutyTlt30": { "min": 0.99 },
+      "stuckEdges": { "eq": 0 }
+    },
+    "busy": {
+      "_role": "特异度：高产忙碌日不得误报为风暴",
+      "peakT": { "max": 0.55 },
+      "dutyRainStorm": { "max": 0.05 },
+      "rainR": { "max": 0.3 }
+    },
+    "jam": {
+      "_role": "卡碟叙事完整性",
+      "peakT": { "min": 0.50, "max": 0.90 },
+      "stuckEdges": { "min": 1, "max": 3 },
+      "jamMonotone": true
+    },
+    "storm": {
+      "_role": "灵敏度：真风暴要像风暴",
+      "peakT": { "min": 0.65, "max": 0.92 },
+      "stuckEdges": { "min": 3, "max": 12 },
+      "rainOrDuty": { "dutyMin": 0.15, "dutyMax": 0.45, "rMin": 2.0, "_note": "占空∈[15%,45%] 或 雨量R≥2.0（换尺 §2，阵发风暴对占空结构性不友好）" },
+      "resolveOnOpportunity": true
+    }
+  },
+  "landmarks": [
+    { "id": "L1", "tape": "storm", "desc": "读失败爆发窗内 T 触及 ≥0.50", "kind": "peakInWindow", "fromUtc": "2026-06-10T07:33:30Z", "toUtc": "2026-06-10T07:37:00Z", "minPeakT": 0.50 },
+    { "id": "L2", "tape": "storm", "desc": "无充能 120s 内 T 非增且相对下降 ≥25%", "kind": "decayDrop", "fromUtc": "2026-06-10T07:55:54Z", "windowSec": 120, "minRelDrop": 0.25 },
+    { "id": "L3", "tape": "storm", "desc": "全局峰值 T 落在 episode 0", "kind": "peakEpisode", "episode": 0 }
+  ]
+}

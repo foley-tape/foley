@@ -1,0 +1,78 @@
+{
+  "_source": "TAPE0 正式参数（hash 886928d1）。M1.7 §2：verdict/2 重扫 16/144 全绿，§4.3 全绿冠军规则机械转正（距 M1.5 基线最少改动 1.5 步、击败其余 15 组）。provisional 状态解除。",
+  "stress": {
+    "S0": 1,
+    "verbWeights": {
+      "READ": 0.21,
+      "WRITE": 0.3,
+      "RUN": 0.5,
+      "SAVE": 0.6,
+      "ASK": 0,
+      "SPAWN": 0.3,
+      "OTHER": 0.2
+    },
+    "repWindowMs": 600000,
+    "repBase": 1.5,
+    "repCap": 4,
+    "stuckLoopK": 2
+  },
+  "amplitude": {
+    "writeDiffCap": 500,
+    "runSecCap": 120,
+    "readKbCap": 100,
+    "default": 0.3,
+    "failDefault": 0.4
+  },
+  "release": {
+    "testResolveMinS": 0.3,
+    "testResolveFactor": 0.6,
+    "saveFactor": 0.5,
+    "jamBreakFactor": 0.7,
+    "jamBreakMinS": 0.25
+  },
+  "decay": {
+    "tauActiveSec": 120,
+    "tauIdleSec": 300,
+    "idleThresholdSec": 60,
+    "pendingRunDripAfterSec": 30,
+    "pendingRunDripPerMin": 0.02
+  },
+  "weather": {
+    "up": {
+      "OVERCAST": 0.25,
+      "RAIN": 0.5,
+      "STORM": 0.75
+    },
+    "hysteresis": 0.1,
+    "stormExit": 0.6
+  },
+  "companions": {
+    "activityRateScale": 6,
+    "wowWindow": 20,
+    "wowSmoothingSec": 30,
+    "idlePhaseSec": 120,
+    "activityEmaSec": 30
+  },
+  "spring": {
+    "up": {
+      "zeta": 0.6,
+      "omegaN": 33
+    },
+    "down": {
+      "zeta": 1,
+      "omegaN": 8
+    }
+  },
+  "adapter": {
+    "askTimeoutSec": 15,
+    "doneSilenceSec": 600,
+    "episodeGapMin": 30,
+    "tagTestRegex": "test|jest|vitest|pytest|cargo test|go test",
+    "tagBuildRegex": "build|tsc|webpack|vite build",
+    "saveRegex": "git\\s+commit",
+    "verbMapExtra": {
+      "AskUserQuestion": "ASK",
+      "ToolSearch": "READ"
+    }
+  }
+}

@@ -1,0 +1,24 @@
+═══ 红队C-1 · 酷刑磁带：禁 crash ═══
+
+  distill+replay 完成：记录 1009｜坏行 1｜未配对 1005｜覆盖率 99.9%
+  同毫秒 1000 事件已吞；曲线采样 1252；峰值 T=0.000
+  → ✅ 未崩（坏行跳过计数、孤儿result忽略、无result记NA）
+
+═══ 红队C-2 · 极端未来时间戳 → 报告 toISOString 是否抛 RangeError ═══
+
+  Date.parse("+275760-09-13T00:00:00.000Z") = 8640000000000000 (finite=true)
+  Date.parse("+275760-09-14T00:00:00.000Z") = NaN (finite=false)
+  Date.parse("9999-12-31T23:59:59.999Z") = 253402300799999 (finite=true)
+  最大合法时间戳带：报告长度 1133B，未抛。
+  → ✅ DEFENDED：超范围 ISO 被 Date.parse→NaN 挡在门外，合法范围内 toISOString 不抛
+
+═══ 红队C-3 · 性能拐点：合成 N 事件磁带，测 distill+replay ═══
+
+  N事件 | cadence | distill ms | replay ms | snaps | curveCSV MB | heapUsed MB
+     500 | 2000ms  |         2 |       10 |   9981 |        0.7 |       19.6
+    5000 | 2000ms  |        16 |      178 |  99981 |        7.0 |      159.8
+   50000 | 2000ms  |       148 |    21064 | 999981 |       69.6 |     1459.4
+
+  拐点观察：snaps 与 curveCSV 随「墙钟跨度 ÷ 100ms 采样」线性膨胀（非随事件数）。
+  50000 事件×2s = 27.7h 跨度 → 100ms 网格产出百万级 StatePacket / 数十 MB CSV。
+  → replay 内存/输出正比于磁带墙钟时长；长跑(6-8h live)若沿用累积式采样，内存单调增长（soak 重点验证）。

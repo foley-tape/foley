@@ -168,7 +168,7 @@ ${relRows}`}
 `;
 
   const ts = new Date().toISOString().replace(/[:.]/g, '-');
-  const outDir = join(process.cwd(), 'runs', ts);
+  const outDir = join(process.cwd(), 'runs', `hunt-all-${ts}`);
   mkdirSync(outDir, { recursive: true });
   writeFileSync(join(outDir, 'HUNT_REPORT.md'), report, 'utf8');
   process.stdout.write(report);

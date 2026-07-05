@@ -1,0 +1,23 @@
+═══ 红队C · tag/SAVE 正则误匹配面 ═══
+
+这些命令都不是测试/提交，但被贴标签/升格：
+
+  RUN  tags=[test]  ← grep -rn "test" src/  ⚠️ 误判
+  RUN  tags=[test]  ← ./scripts/test.sh --dry  ⚠️ 误判
+  RUN  tags=[]  ← cat notes_about_test_plan.md
+  SAVE tags=[]  ← echo "remember to git commit later"  ⚠️ 误判
+  RUN  tags=[]  ← git log --grep="commit fix"
+  RUN  tags=[test]  ← rm -rf ./test  ⚠️ 误判
+  RUN  tags=[build]  ← docker build -t app .
+
+═══ 端到端后果链：无辜命令误泄真实张力 ═══
+
+注入：3 连 python train.py 失败（真实张力）＋ 1 条 `grep -rn "test" src/` 成功（无辜）。
+峰值 S ≈ 0.590（T≈0.445）
+grep 前 S ≈ 0.578 → grep 后 S ≈ 0.344
+RESOLVE 发射次数：1  ⚠️ 假解脱：无辜的 grep 触发了"和弦解决"音并乘法泄掉真实张力
+派生时刻： SESSION_START, RESOLVE, DONE
+
+═══ 结论 ═══
+`/\btest\b/` 命中任何把 "test" 作独立词的命令；`/git\s+commit/` 命中任何含该子串的命令（含 echo/注释）。
+叠加"tagged RUN-OK 且 S>0.3 → RESOLVE+泄能"，无辜命令即可伪造解脱、抹平真实张力弧——直接损害仪器诚实条款。

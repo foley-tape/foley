@@ -134,7 +134,7 @@ export function runScan(): void {
 
   const now = new Date();
   const ts = now.toISOString().replace(/[:.]/g, '-');
-  const outDir = join(process.cwd(), 'runs', ts);
+  const outDir = join(process.cwd(), 'runs', `scan-all-${ts}`);
   mkdirSync(outDir, { recursive: true });
 
   const parseReport = buildParseReport({

@@ -179,3 +179,39 @@ replay 与 live 现在共用一个**因果驱动核**（`cli/driver.ts`）——
 - 真 foley 采样、LUFS 实测校准、Tone.js 选型：冰箱照旧，勿抢跑。
 
 （Track-FIX M1.9 完：v1-live 三件＋中继两修＋狩猎 v2 记缺＋声音相全文落地）
+
+---
+---
+
+# FEEDBACK-FIX · M2.0 §1（Track-FIX → 架构师）
+
+> 依据施工令 `TAPE0_ORDER_M20 §0/§1`。声音相不在本令内，耳朵回路另册续转（§4.4 台账，EAR-1/EAR-2 已修待复听）。
+> 结论：**仓库收摄四件全交：docs/ 归位（66 件）+ runs 规约与 prune + README 落地 + 悬账两行。三哈希照旧纹丝不动。**
+
+## 1. §1.1 docs/ 归位（项目记忆唯一的家）
+
+- `docs/canon/`：SPEC、感官白皮书、**琥珀宪法抽出成篇**（v1.1 逐字 + v1.2 载入记录 + M2.0 素材诚实条款追录）。
+- `docs/orders/`：M15→M2.0 全部施工令 + NIGHT1（历史文档名 TAPE0_* 保留不改）。
+- `docs/records/m15–m19/`：各轮交接/FEEDBACK/手记/verdict/sweep 快照；**点名晋升件全收**——m17 盲听包、m18 屏录静帧、m19 性格照×6+静帧×3（发布物料底片，63MB 主要在此）。
+- `docs/decisions/`：`naming.md`（M2.0 §0.4–0.5 决议收录）+ `priority-canon.md`（含 NIGHT-1 质疑席镜鉴脚注）。
+- **收摄口径（现实修正）**：曲线大 CSV（每卷数 MB）**不收**——蒸馏带在仓、引擎有 tag，任意 sha 可再生，快照无信息增量；小件证据（sweep_results.csv 等）照收。
+- **留痕**：命名轮全文纪要未见于船长桌面手令堆，`naming.md` 已注请架构师补投。
+
+## 2. §1.2 runs/ 清扫规约
+
+- 六命令默认产物统一 `<kind>-<tape|all>-<ts>/`（replay/probe 带卷名；ear/sweep/scan/hunt 用 all）。
+- 新命令 **`runs prune --keep 3 [--dry]`**：每 kind（replay/sweep/probe/ear/soak）留最近 N 份；**规约外目录一概不碰**（纯时间戳旧目录、五带常驻目录安全）。首跑实删 1 份旧 sweep。
+- runs/ 仍 gitignore；晋升规则写进命令帮助文本。
+
+## 3. §1.3 README 落地 + §0.5 迁名
+
+- `README.md` 以架构师底稿逐字落地；三图接入 `docs/assets/`（hero=deck-storm / loupe 微距 / asleep 静场，取自 m19 性格照静帧）；whitepaper 链接对齐 `docs/canon/TAPE0_WHITEPAPER_SENSES_v1.md`；`README.zh.md` 占位并互链；**隐私段一字未动**。
+- package.json：name → **foley** + bin 入口 + runs/ear/hunt 脚本（README 的 `npx foley` 口径；**发包工序不在本令，quickstart 目前为愿景**——记现实修正）。
+- **远端迁移状态**：本仓尚无 remote（纯本地）。org 建立后一条命令即迁：`git remote add origin git@github.com:foley-tape/foley.git && git push -u origin main --tags`。
+
+## 4. §1.4 悬账两行
+
+- **狩猎 v2**：两卷仍记缺（verdict `_huntV2`）——真卡碟带唯一候选与 storm 同源（一卷不两册）；释放带缺根因=施工 agent 管道包裹吞退出码（源可观测性遮蔽，非磁带荒）。`cli hunt` 常备续猎。
+- **声音相**：sound-params **9e2b3a06**；调音 **2 轮**（EAR-1 音色/电平退让 → EAR-2 修 wow 满幅调制与房间噪绕闸两个真 bug）；storm r=0.666 机器验收持续绿；**待船长复听**。
+
+（Track-FIX M2.0 §1 完）

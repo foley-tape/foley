@@ -439,7 +439,9 @@ export function runReplay(argv: string[]): void {
 
   const now = new Date();
   const ts = now.toISOString().replace(/[:.]/g, '-');
-  const outDir = outIdx >= 0 && argv[outIdx + 1] ? argv[outIdx + 1]! : join(process.cwd(), 'runs', ts);
+  // M2.0 §1.2 命名规约：<kind>-<tape>-<ts>/
+  const tapeBase = basename(tapePath).replace(/\.tape\.jsonl$/, '').replace(/\.jsonl$/, '');
+  const outDir = outIdx >= 0 && argv[outIdx + 1] ? argv[outIdx + 1]! : join(process.cwd(), 'runs', `replay-${tapeBase}-${ts}`);
   mkdirSync(outDir, { recursive: true });
   writeFileSync(join(outDir, 'curve.csv'), out.curveCsv, 'utf8');
   writeFileSync(join(outDir, 'moments.csv'), out.momentsCsv, 'utf8');

@@ -125,7 +125,8 @@ export function runProbe(argv: string[]): void {
 
   const html = buildProbeHtml(data, soundRaw);
   const ts = new Date().toISOString().replace(/[:.]/g, '-');
-  const outDir = outIdx >= 0 && argv[outIdx + 1] ? argv[outIdx + 1]! : join(process.cwd(), 'runs', `probe-${ts}`);
+  const tapeBase = basename(tapePath).replace(/\.tape\.jsonl$/, '').replace(/\.jsonl$/, ''); // M2.0 §1.2 命名规约
+  const outDir = outIdx >= 0 && argv[outIdx + 1] ? argv[outIdx + 1]! : join(process.cwd(), 'runs', `probe-${tapeBase}-${ts}`);
   mkdirSync(outDir, { recursive: true });
   const outFile = join(outDir, 'probe.html');
   writeFileSync(outFile, html, 'utf8');

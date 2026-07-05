@@ -1,8 +1,8 @@
 {
-  "name": "tape0",
+  "name": "foley",
   "version": "0.0.0",
   "private": true,
-  "description": "纯本地、零遥测。把一场 coding agent 会话翻译成一台仪器的实时状态。",
+  "description": "A lo-fi tape instrument for your coding agents. 纯本地、零遥测。First deck: TAPE·ZERO.",
   "type": "module",
   "license": "MIT",
   "engines": {
@@ -14,10 +14,22 @@
     "live": "node cli/index.ts live",
     "probe": "node cli/index.ts probe",
     "typecheck": "tsc --noEmit",
-    "test": "node --test \"golden/**/*.test.ts\""
+    "test": "node --test \"golden/**/*.test.ts\"",
+    "runs": "node cli/index.ts runs",
+    "ear": "node cli/index.ts ear",
+    "hunt": "node cli/index.ts hunt"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",
     "typescript": "^5.6.0"
+  },
+  "main": "index.js",
+  "dependencies": {
+    "undici-types": "^6.21.0"
+  },
+  "keywords": [],
+  "author": "",
+  "bin": {
+    "foley": "cli/index.ts"
   }
 }

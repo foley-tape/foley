@@ -1,0 +1,26 @@
+{
+  "finishedAt": "2026-07-04T22:56:54.686Z",
+  "wallSec": 21631.5,
+  "simHours": 6,
+  "speed": 1,
+  "seed": 42,
+  "events": 959,
+  "faults": 335,
+  "emits": 257,
+  "snapsTicked": 432071,
+  "driftMs": {
+    "n": 230,
+    "min": 0,
+    "median": 0,
+    "p95": 0,
+    "max": 0
+  },
+  "expiryAlignMs": {
+    "n": 27,
+    "meanAbsFirstHalf": 25.667,
+    "meanAbsSecondHalf": 26.111
+  },
+  "finalRssMB": 80.13,
+  "finalSigStates": 93,
+  "finalS": 0.0014
+}

@@ -1,0 +1,17 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "probe",
+      "runtimeExecutable": "python3",
+      "runtimeArgs": [
+        "-m",
+        "http.server",
+        "4198",
+        "--directory",
+        "/Users/shadow/tape0/runs/probe-m19-storm"
+      ],
+      "port": 4198
+    }
+  ]
+}

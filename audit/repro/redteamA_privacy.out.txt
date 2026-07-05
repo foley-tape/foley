@@ -1,0 +1,49 @@
+═══ 红队A · 隐私 —— 短密钥穿透 errClass 净化 ═══
+
+normErr 净化管线：抹 /~路径 → 0x-hex → ≥16位token → 数字→0 → 截断60
+
+[❌ 泄露] 10位口令(alnum)
+   密钥        : hunter2xy
+   errClass    : error: auth failed for password hunter0xy at db
+   泄露形态"hunter0xy"整体存活: true｜保留字母数: 8
+
+[✅ 抹净] 8位PIN(纯数字)
+   密钥        : 45781233
+   errClass    : error: invalid pin 0 rejected by gateway
+   泄露形态"0"整体存活: true｜保留字母数: 0
+
+[❌ 泄露] -pSECRET 内嵌参数
+   密钥        : MyS3cretPw
+   errClass    : mysql -pmys0cretpw connect refused to host
+   泄露形态"mys0cretpw"整体存活: true｜保留字母数: 9
+
+[❌ 泄露] 短API key
+   密钥        : sk-ab12cd
+   errClass    : error: api key sk-ab0cd rejected (0)
+   泄露形态"sk-ab0cd"整体存活: true｜保留字母数: 6
+
+[❌ 泄露] 12位hex(无0x)
+   密钥        : deadbeefcafe
+   errClass    : commit deadbeefcafe not found in tree
+   泄露形态"deadbeefcafe"整体存活: true｜保留字母数: 12
+
+[❌ 泄露] Windows反斜杠路径
+   密钥        : alice
+   errClass    : cannot open c:\users\alice\secret.pem denied
+   泄露形态"alice"整体存活: true｜保留字母数: 5
+
+[✅ 抹净] 对照:40位token(应被抹)
+   密钥        : sk-abcdefghijklmnopqrstuvwxyz0123456789
+   errClass    : error: bearer TOKEN bad
+   泄露形态"sk-abcdefghijklmnopqrstuvwxyz0"整体存活: false｜保留字母数: 28
+
+默认蒸馏带：5/7 条含字母的密钥可恢复地存活于明文 errClass（仅纯数字/≥16位被真正抹净）。
+
+═══ redact 后仍不安全：sig 保留 + FNV-1a(32位) 可字典反演 ═══
+
+--redact 输出样本记录：
+  errClass(已哈希): e28e0031e
+  sig(保留!)      : 392c2d2d   ← 金测试⑬ 明确断言 redact 不改 sig
+  t/useT/resolveT : 1783159200100 1783159200000 1783159200100  ← 绝对 epoch，泄露墙钟/时区/节奏
+
+攻击演示：攻击者拿到 redact 带的 sig，用"候选错误模板"字典暴力反演 →

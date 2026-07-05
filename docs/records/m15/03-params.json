@@ -1,0 +1,55 @@
+{
+  "_source": "TAPE0 施工令 M1.5。较 v0.1 变更：verbWeights 重定、amplitude.failDefault 新增、decay 加倍、stuck 边沿化、adapter 增蒸馏与分段。",
+  "stress": {
+    "S0": 1.0,
+    "verbWeights": { "READ": 0.12, "WRITE": 0.30, "RUN": 0.50, "SAVE": 0.60, "ASK": 0.0, "SPAWN": 0.30, "OTHER": 0.20 },
+    "repWindowMs": 600000,
+    "repBase": 1.5,
+    "repCap": 4,
+    "stuckLoopK": 2
+  },
+  "amplitude": {
+    "writeDiffCap": 500,
+    "runSecCap": 120,
+    "readKbCap": 100,
+    "default": 0.3,
+    "failDefault": 0.3
+  },
+  "release": {
+    "testResolveMinS": 0.3,
+    "testResolveFactor": 0.6,
+    "saveFactor": 0.5
+  },
+  "decay": {
+    "tauActiveSec": 120,
+    "tauIdleSec": 300,
+    "idleThresholdSec": 60,
+    "pendingRunDripAfterSec": 30,
+    "pendingRunDripPerMin": 0.02
+  },
+  "weather": {
+    "up": { "OVERCAST": 0.25, "RAIN": 0.5, "STORM": 0.75 },
+    "hysteresis": 0.1,
+    "stormExit": 0.6
+  },
+  "companions": {
+    "activityRateScale": 6,
+    "wowWindow": 12,
+    "wowSmoothingSec": 30,
+    "idlePhaseSec": 120,
+    "activityEmaSec": 30
+  },
+  "spring": {
+    "up": { "zeta": 0.6, "omegaN": 33 },
+    "down": { "zeta": 1.0, "omegaN": 8 }
+  },
+  "adapter": {
+    "askTimeoutSec": 15,
+    "doneSilenceSec": 600,
+    "episodeGapMin": 30,
+    "tagTestRegex": "test|jest|vitest|pytest|cargo test|go test",
+    "tagBuildRegex": "build|tsc|webpack|vite build",
+    "saveRegex": "git\\s+commit",
+    "verbMapExtra": { "AskUserQuestion": "ASK", "ToolSearch": "READ" }
+  }
+}

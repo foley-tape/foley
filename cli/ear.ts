@@ -79,7 +79,7 @@ A 驱动的 S2 是白皮书明令的第二驱动（律动密度 ∝ A），故 A
 `;
 
   const ts = new Date().toISOString().replace(/[:.]/g, '-');
-  const outDir = join(process.cwd(), 'runs', `ear-${ts}`);
+  const outDir = join(process.cwd(), 'runs', `ear-all-${ts}`);
   mkdirSync(outDir, { recursive: true });
   writeFileSync(join(outDir, 'EAR_ACCEPT.md'), report, 'utf8');
   process.stdout.write(report);

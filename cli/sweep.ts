@@ -58,7 +58,7 @@ export function runSweep(_argv: string[]): void {
   const champion = ranked[0]!;
 
   const ts = new Date().toISOString().replace(/[:.]/g, '-');
-  const outDir = join(process.cwd(), 'runs', `sweep-${ts}`);
+  const outDir = join(process.cwd(), 'runs', `sweep-all-${ts}`);
   mkdirSync(outDir, { recursive: true });
   writeFileSync(join(outDir, 'sweep_results.csv'), csv, 'utf8');
 

@@ -9,6 +9,7 @@ import { runSweep } from './sweep.ts';
 import { runLive } from './live.ts';
 import { runHunt } from './hunt.ts';
 import { runEar } from './ear.ts';
+import { runRuns } from './runs.ts';
 
 const cmd = process.argv[2];
 
@@ -36,6 +37,9 @@ switch (cmd) {
     break;
   case 'ear':
     runEar(process.argv.slice(3));
+    break;
+  case 'runs':
+    runRuns(process.argv.slice(3));
     break;
   default:
     console.error('用法: node cli/index.ts <distill|scan|replay|live|hunt|probe>');

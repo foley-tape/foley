@@ -1,0 +1,46 @@
+{
+  "_source": "TAPE0 verdict/2（M1.7）。判据生命周期 status 三态（informational 记分不拦｜active 拦路｜retired 跳过计分仍记实测）。修订需提交信息架构师签核行。",
+  "verdictVersion": "verdict/2",
+  "_batteryCoverage": "三条泄能通路真实数据覆盖：破卡碟 ✅(jam 真×2)；test 转绿 / SAVE 仅金测试覆盖——留缺口，待出现高张力处 test 转绿或提交收尾的磁带时补一卷。",
+  "_priorityCanon": "安全硬禁 > 协议冻结 > 判据 > 施工令实现细则 > 库偏好（M1.7 §5，写入 SPEC 附注待架构师落笔）",
+  "rain": { "floor": 0.50, "unit": "T·min", "provisional": true, "_note": "R=∫max(0,T−floor)dt，活跃时间积分；双尺并行观察中" },
+  "bands": {
+    "silence": {
+      "_role": "零输入守恒：零就该是零",
+      "peakT": { "max": 0.02, "status": "active" },
+      "stuckEdges": { "eq": 0, "status": "active" }
+    },
+    "smooth": {
+      "_role": "克制：有小噪声仍安分（灵敏度反向卡尺）",
+      "_v2": "M1.7 §1.2：99%→98.5%（原阈把判断量化到荒谬精度，差 3.5s）；新增 peakT<0.50——平静之日永不见雨（真正的感知主张）。那次 0.405 尖峰源于约两分钟才失败的命令，引擎算对了。",
+      "dutyTlt30": { "min": 0.985, "status": "active" },
+      "peakT": { "max": 0.50, "status": "active" },
+      "rainR": { "max": 0.05, "status": "active" },
+      "stuckEdges": { "eq": 0, "status": "active" }
+    },
+    "busy": {
+      "_role": "特异度：高产忙碌日不得误报为风暴",
+      "peakT": { "max": 0.55, "status": "active" },
+      "dutyRainStorm": { "max": 0.05, "status": "active" },
+      "rainR": { "max": 0.3, "status": "active" }
+    },
+    "jam": {
+      "_role": "卡碟叙事完整性",
+      "peakT": { "min": 0.50, "max": 0.90, "status": "active" },
+      "stuckEdges": { "min": 1, "max": 3, "status": "active" },
+      "jamMonotone": { "status": "active" }
+    },
+    "storm": {
+      "_role": "灵敏度：真风暴要像风暴",
+      "peakT": { "min": 0.65, "max": 0.92, "status": "active" },
+      "stuckEdges": { "min": 3, "max": 12, "status": "active" },
+      "rainOrDuty": { "dutyMin": 0.15, "dutyMax": 0.45, "rMin": 2.0, "status": "active", "_note": "占空∈[15%,45%] 或 雨量R≥2.0" },
+      "resolveOnOpportunity": { "status": "retired", "reason": "范畴错误：把磁带内容属性当引擎属性。迷路型风暴的解脱不是离散事件；泄能机制正确性已由金测试＋jam 带（真破卡碟×2）覆盖。消散的表达属 v1 连续层（张力回落/保真恢复/天空放晴），非第四音——现实中雨停无人奏和弦。" }
+    }
+  },
+  "landmarks": [
+    { "id": "L1", "tape": "storm", "desc": "读失败爆发窗内 T 触及 ≥0.50", "kind": "peakInWindow", "status": "informational", "fromUtc": "2026-06-10T07:33:30Z", "toUtc": "2026-06-10T07:37:00Z", "minPeakT": 0.50 },
+    { "id": "L2", "tape": "storm", "desc": "末次破卡碟后首个≥120s无充能区间内 T 非增且相对下降≥25%（自定位）", "kind": "decayAfterClear", "status": "informational", "windowSec": 120, "minRelDrop": 0.25, "_note": "M1.7 §1.2 重写：自定位窗口不随物理漂移，只随磁带冻结；前置(存在 STUCK_CLEARED)不满足→N/A 不算 FAIL" },
+    { "id": "L3", "tape": "storm", "desc": "全局峰值 T 落在 episode 0", "kind": "peakEpisode", "status": "informational", "episode": 0 }
+  ]
+}

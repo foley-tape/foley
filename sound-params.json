@@ -4,25 +4,27 @@
   "gridDiv": 8,
   "bed": {
     "_stems": "S1 基底常驻｜S2 律动 A 门控｜S3 张力 T 门控｜S4 磁带总线挂整体输出",
-    "s1Gain": 0.1,
-    "s1IdleGain": 0.03,
-    "s2Gain": 0.09,
+    "s1Gain": 0.055,
+    "s1IdleGain": 0.018,
+    "s2Gain": 0.06,
     "s2GateA": 0.3,
     "s2DensityLo": 0.2,
     "s2DensityHi": 0.9,
-    "s3Gain": 0.17,
+    "s3Gain": 0.1,
     "s3GateT": 0.35,
     "filterHzHi": 8000,
     "filterHzLo": 1800,
-    "hissDbLo": -60,
-    "hissDbHi": -38,
+    "hissDbLo": -64,
+    "hissDbHi": -46,
     "wowCentsLo": 3,
     "wowCentsHi": 22,
     "hfShelfDbLo": 0,
     "hfShelfDbHi": -6,
     "slewMsFast": 250,
     "slewMsSlow": 800,
-    "doneSilenceSec": 4
+    "doneSilenceSec": 4,
+    "trimDb": -4,
+    "_trim": "床总闸（dB）：EAR-1 证词后新增；一颗旋钮管床整体响度，不动各 stem 配比"
   },
   "foreground": {
     "peakGain": 0.26,
@@ -52,7 +54,13 @@
   },
   "scale": {
     "_": "每仓库一调：repoKey→主音；五声音阶。replay 侧以磁带 sourceHash 代 repoKey（蒸馏带无 repo 身份，见现实修正）。",
-    "pentatonic": [0, 2, 4, 7, 9],
+    "pentatonic": [
+      0,
+      2,
+      4,
+      7,
+      9
+    ],
     "rootMidiBase": 45,
     "rootMidiSpan": 12
   }

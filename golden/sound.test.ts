@@ -38,7 +38,9 @@ test('㉚ 床映射律：能量随 T 单调；IDLE 唯余基底；DONE 真静默
   }
   const idle = bedTargets(st({ phase: 'IDLE', A: 0.9, T: 0 }), sp);
   assert.equal(idle.s2, 0, 'IDLE 无律动');
-  assert.equal(idle.s1, sp.bed.s1IdleGain, 'IDLE 基底最弱态');
+  // EAR-1 后 targets 含床总闸（trimDb）——验收能量模型与渲染器同一数字
+  const trim = Math.pow(10, sp.bed.trimDb / 20);
+  assert.ok(Math.abs(idle.s1 - trim * sp.bed.s1IdleGain) < 1e-12, 'IDLE 基底最弱态（含总闸）');
   const done = bedTargets(st({ phase: 'DONE', T: 0.5, A: 0.5 }), sp);
   assert.ok(done.silence && done.s1 === 0 && done.s3 === 0 && done.hissLin === 0, 'DONE 真静默');
   assert.ok(bedTargets(st({ pendingAsk: true }), sp).hover, 'WAITING（pendingAsk）床悬停');

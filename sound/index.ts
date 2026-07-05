@@ -19,6 +19,7 @@ export interface SoundParams {
     hfShelfDbLo: number; hfShelfDbHi: number;
     slewMsFast: number; slewMsSlow: number;
     doneSilenceSec: number;
+    trimDb: number; // 床总闸（dB）：EAR-1 证词后新增——一颗旋钮管床整体响度，不动 stem 配比
   };
   foreground: {
     peakGain: number; failGain: number; pageGain: number; bellGain: number;
@@ -73,12 +74,13 @@ export function bedTargets(s: BedState, sp: SoundParams): BedTargets {
   const T = clamp01(s.T), A = clamp01(s.A), wow = clamp01(s.wow);
   const idle = s.phase === 'IDLE';
   const silence = s.phase === 'DONE';
-  const s1 = silence ? 0 : idle ? b.s1IdleGain : b.s1Gain;
+  const trim = dbToLin(b.trimDb); // 床总闸进 targets：验收能量模型与渲染器同一数字
+  const s1 = trim * (silence ? 0 : idle ? b.s1IdleGain : b.s1Gain);
   const s2gate = clamp01((A - b.s2GateA) / (1 - b.s2GateA));
-  const s2 = silence || idle ? 0 : b.s2Gain * s2gate;
+  const s2 = trim * (silence || idle ? 0 : b.s2Gain * s2gate);
   const s3gate = clamp01((T - b.s3GateT) / (1 - b.s3GateT));
-  const s3 = silence ? 0 : b.s3Gain * s3gate;
-  const hissLin = silence ? 0 : dbToLin(b.hissDbLo + (b.hissDbHi - b.hissDbLo) * T);
+  const s3 = trim * (silence ? 0 : b.s3Gain * s3gate);
+  const hissLin = trim * (silence ? 0 : dbToLin(b.hissDbLo + (b.hissDbHi - b.hissDbLo) * T));
   return {
     s1, s2, s3, hissLin,
     filterHz: b.filterHzHi + (b.filterHzLo - b.filterHzHi) * T,

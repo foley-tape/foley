@@ -211,10 +211,11 @@ const clamp01=x=>x<0?0:x>1?1:x, dbLin=db=>Math.pow(10,db/20);
 function bedTargets(T,A,wow,ph,ask){ const b=SP.bed;
   T=clamp01(T);A=clamp01(A);wow=clamp01(wow);
   const idle=ph===0, silence=ph===3;
+  const trim=dbLin(b.trimDb); // 床总闸（EAR-1）：与 sound/ 纯核同律
   const s2gate=clamp01((A-b.s2GateA)/(1-b.s2GateA)), s3gate=clamp01((T-b.s3GateT)/(1-b.s3GateT));
-  return { s1: silence?0:(idle?b.s1IdleGain:b.s1Gain),
-    s2: (silence||idle)?0:b.s2Gain*s2gate, s3: silence?0:b.s3Gain*s3gate,
-    hiss: silence?0:dbLin(b.hissDbLo+(b.hissDbHi-b.hissDbLo)*T),
+  return { s1: trim*(silence?0:(idle?b.s1IdleGain:b.s1Gain)),
+    s2: trim*((silence||idle)?0:b.s2Gain*s2gate), s3: trim*(silence?0:b.s3Gain*s3gate),
+    hiss: trim*(silence?0:dbLin(b.hissDbLo+(b.hissDbHi-b.hissDbLo)*T)),
     fHz: b.filterHzHi+(b.filterHzLo-b.filterHzHi)*T,
     shelfDb: b.hfShelfDbLo+(b.hfShelfDbHi-b.hfShelfDbLo)*T,
     wowCents: b.wowCentsLo+(b.wowCentsHi-b.wowCentsLo)*wow,
@@ -258,13 +259,14 @@ function ensureAudio(){ if(ac) { if(ac.state==='suspended') ac.resume(); return;
   G.bedBus.connect(G.wowDelay); G.wowDelay.connect(G.lp);
   G.fgBus.connect(G.lp);         // 前景同过磁带总线（同一台机器出的声）
   G.lp.connect(G.shelf); G.shelf.connect(G.master); G.master.connect(ac.destination);
-  // S1 基底：双失谐振荡 pad + 互质呼吸 LFO + 房间噪
+  // S1 基底：暖 pad（EAR-1 修：sine 沉底 + triangle 在主音区——移出 55Hz 嗡鸣带；失谐放缓防"电机搏动"）
   G.s1=ac.createGain(); G.s1.gain.value=0; G.s1.connect(G.bedBus);
-  const padF=ac.createBiquadFilter(); padF.type='lowpass'; padF.frequency.value=900; padF.connect(G.s1);
-  const o1=ac.createOscillator(),o2=ac.createOscillator();
-  o1.type='triangle'; o2.type='sine';
-  o1.frequency.value=midiHz(ROOT-12); o2.frequency.value=midiHz(ROOT-12)*1.005;
-  o1.connect(padF); o2.connect(padF); o1.start(); o2.start();
+  const padF=ac.createBiquadFilter(); padF.type='lowpass'; padF.frequency.value=700; padF.connect(G.s1);
+  const o1=ac.createOscillator(),o2=ac.createOscillator(),o1g=ac.createGain(),o2g=ac.createGain();
+  o1.type='sine'; o2.type='triangle';
+  o1.frequency.value=midiHz(ROOT-12); o2.frequency.value=midiHz(ROOT)*1.002;
+  o1g.gain.value=0.5; o2g.gain.value=0.8;
+  o1.connect(o1g); o1g.connect(padF); o2.connect(o2g); o2g.connect(padF); o1.start(); o2.start();
   const b1=ac.createOscillator(),bg1=ac.createGain(),b2=ac.createOscillator(),bg2=ac.createGain();
   b1.frequency.value=1/7.3; b2.frequency.value=1/11.9;                 // Eno 互质
   bg1.gain.value=0.15; bg2.gain.value=0.1;
@@ -273,18 +275,21 @@ function ensureAudio(){ if(ac) { if(ac.state==='suspended') ac.resume(); return;
   G.room=noiseSrc(); G.roomG=ac.createGain(); G.roomG.gain.value=0.004;
   const roomF=ac.createBiquadFilter(); roomF.type='lowpass'; roomF.frequency.value=400;
   G.room.connect(roomF); roomF.connect(G.roomG); G.roomG.connect(G.bedBus);
-  // S3 张力弦：根音+五度（悬挂音按 susProb 换）经暗滤波
+  // S3 张力弦（EAR-1 修：裸锯齿=工业蜂鸣 → 双 triangle 主体 + 一丝 saw 织体，滤波压到 800Hz）
   G.s3=ac.createGain(); G.s3.gain.value=0; G.s3.connect(G.bedBus);
-  G.s3F=ac.createBiquadFilter(); G.s3F.type='lowpass'; G.s3F.frequency.value=1200; G.s3F.connect(G.s3);
-  G.v1=ac.createOscillator(); G.v1.type='sawtooth'; G.v1g=ac.createGain(); G.v1g.gain.value=0.5;
-  G.v2=ac.createOscillator(); G.v2.type='sawtooth'; G.v2g=ac.createGain(); G.v2g.gain.value=0.35;
-  G.v1.frequency.value=midiHz(ROOT); G.v2.frequency.value=midiHz(ROOT+7);
+  G.s3F=ac.createBiquadFilter(); G.s3F.type='lowpass'; G.s3F.frequency.value=800; G.s3F.Q.value=0.3; G.s3F.connect(G.s3);
+  G.v1=ac.createOscillator(); G.v1.type='triangle'; G.v1g=ac.createGain(); G.v1g.gain.value=0.6;
+  G.v2=ac.createOscillator(); G.v2.type='triangle'; G.v2g=ac.createGain(); G.v2g.gain.value=0.42;
+  const vSaw=ac.createOscillator(); vSaw.type='sawtooth'; const vSawG=ac.createGain(); vSawG.gain.value=0.10;
+  G.v1.frequency.value=midiHz(ROOT); G.v2.frequency.value=midiHz(ROOT+7); vSaw.frequency.value=midiHz(ROOT)*0.999;
   G.v1.connect(G.v1g); G.v1g.connect(G.s3F); G.v2.connect(G.v2g); G.v2g.connect(G.s3F);
-  G.v1.start(); G.v2.start();
-  // S4 hiss：白噪→高架
+  vSaw.connect(vSawG); vSawG.connect(G.s3F);
+  G.v1.start(); G.v2.start(); vSaw.start();
+  // S4 hiss（EAR-1 修：裸白噪高通=排气声 → 带限 2.2k–7.5k + 缓 Q，磁带底噪的柔和高频滚降）
   G.hiss=noiseSrc(); G.hissG=ac.createGain(); G.hissG.gain.value=0;
-  const hf=ac.createBiquadFilter(); hf.type='highpass'; hf.frequency.value=2500;
-  G.hiss.connect(hf); hf.connect(G.hissG); G.hissG.connect(G.bedBus);
+  const hf=ac.createBiquadFilter(); hf.type='highpass'; hf.frequency.value=2200; hf.Q.value=0.5;
+  const hlp=ac.createBiquadFilter(); hlp.type='lowpass'; hlp.frequency.value=7500; hlp.Q.value=0.4;
+  G.hiss.connect(hf); hf.connect(hlp); hlp.connect(G.hissG); G.hissG.connect(G.bedBus);
   // S2 律动增益（事件由调度器触发）
   G.s2=ac.createGain(); G.s2.gain.value=0; G.s2.connect(G.bedBus);
 }
@@ -389,7 +394,7 @@ function schedule(){ if(!playing) return;
       const strong=(gi%4===0), r=Math.abs(Math.sin(gi*127.1))%1;   // 确定性伪随机（可复听）
       if(r<bt.density*(strong?0.9:0.35)){
         if(strong){ const k=ac.createOscillator(); k.frequency.setValueAtTime(85,at); k.frequency.exponentialRampToValueAtTime(42,at+0.09);
-          const kg=ac.createGain(); kg.connect(G.s2); kg.gain.setValueAtTime(0.9,at); kg.gain.exponentialRampToValueAtTime(0.001,at+0.18);
+          const kg=ac.createGain(); kg.connect(G.s2); kg.gain.setValueAtTime(0.7,at); kg.gain.exponentialRampToValueAtTime(0.001,at+0.18);
           k.connect(kg); k.start(at); k.stop(at+0.2); }
         else { const h=noiseBurst(at,0.03); const hf2=ac.createBiquadFilter(); hf2.type='highpass'; hf2.frequency.value=6500;
           const hg=ac.createGain(); hg.connect(G.s2); hg.gain.setValueAtTime(0.25,at); hg.gain.exponentialRampToValueAtTime(0.001,at+0.04);
@@ -464,6 +469,7 @@ if(new URLSearchParams(location.search).get('tuner')==='1'){
   document.getElementById('tunerHead').style.display='block';
   const panel=document.getElementById('tuner'); panel.style.display='block';
   const fields=[
+    ['bed','trimDb',-24,6],
     ['bed','s1Gain',0,0.3],['bed','s1IdleGain',0,0.1],['bed','s2Gain',0,0.3],['bed','s2GateA',0,1],
     ['bed','s3Gain',0,0.4],['bed','s3GateT',0,1],['bed','filterHzLo',300,4000],['bed','filterHzHi',2000,12000],
     ['bed','hissDbLo',-80,-40],['bed','hissDbHi',-60,-20],['bed','wowCentsLo',0,10],['bed','wowCentsHi',5,50],

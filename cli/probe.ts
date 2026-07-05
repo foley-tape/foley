@@ -1,4 +1,6 @@
-// cli probe <tape.tape.jsonl> [--out dir] [--kind ...] [--anon 标签] —— 声音相探针页（SOUND-R1 薄壳化）。
+// cli probe <tape.tape.jsonl> [--out dir] [--kind ...] [--anon 标签] [--sp 键=值 ...] —— 声音相探针页（SOUND-R1 薄壳化）。
+// --sp（EAR-5 起，试听诊断口）：点号路径覆写 sound-params 生成**试听变体**（如 --sp bed.hissDbLo=-120）。
+//   变体不覆盖 probe-latest 固定入口（肌肉记忆只认正典参数）；页头哈希如实显示改后值。
 // 回放蒸馏带 → 自包含 probe.html：针 + 曲线 + 床 + 前景。
 // 薄壳纪律（SOUND-R1 §2 重构执照）：本文件只做①数据准备②页面 UI 壳。**声音一律不在此处**——
 // 页内 <script> 逐字内嵌 sound/core.js（纯映射律）与 sound/graph.js（注册表音频图），
@@ -65,7 +67,22 @@ export function runProbe(argv: string[]): void {
 
   const paramsRaw = JSON.parse(readFileSync(new URL('../params.json', import.meta.url), 'utf8'));
   const params = resolveParams(paramsRaw);
-  const soundRaw = JSON.parse(readFileSync(new URL('../sound-params.json', import.meta.url), 'utf8'));
+  const soundRaw = JSON.parse(readFileSync(new URL('../sound-params.json', import.meta.url), 'utf8')) as Record<string, unknown>;
+  // --sp 试听覆写（可重复）：bed.hissDbLo=-120 → soundRaw.bed.hissDbLo = -120
+  const spOverrides: string[] = [];
+  for (let i = 0; i < argv.length; i++) {
+    if (argv[i] !== '--sp' || !argv[i + 1]) continue;
+    const [path, valStr] = argv[i + 1]!.split('=');
+    const val = Number(valStr);
+    if (!path || valStr === undefined || Number.isNaN(val)) {
+      console.error(`--sp 需要 点号路径=数值（收到 "${argv[i + 1]}"）`); process.exit(2);
+    }
+    const keys = path.split('.');
+    let node = soundRaw as Record<string, unknown>;
+    for (const k of keys.slice(0, -1)) node = node[k] as Record<string, unknown>;
+    node[keys[keys.length - 1]!] = val;
+    spOverrides.push(`${path}=${val}`);
+  }
   const sp = resolveSoundParams(soundRaw);
   const soundHash = hashJson(soundRaw);
   const { verdict, hash: verdictHash } = loadVerdict();
@@ -123,10 +140,15 @@ export function runProbe(argv: string[]): void {
   mkdirSync(outDir, { recursive: true });
   const outFile = join(outDir, 'probe.html');
   writeFileSync(outFile, html, 'utf8');
-  // EAR-3：固定路径镜像——船长永远只开这一个地址，旧时间戳目录不再进 open 肌肉记忆
-  const latestDir = join(process.cwd(), 'runs', 'probe-latest');
-  mkdirSync(latestDir, { recursive: true });
-  writeFileSync(join(latestDir, 'probe.html'), html, 'utf8');
+  // EAR-3：固定路径镜像——船长永远只开这一个地址，旧时间戳目录不再进 open 肌肉记忆。
+  // --sp 试听变体不入镜像：固定入口只认正典参数
+  if (spOverrides.length === 0) {
+    const latestDir = join(process.cwd(), 'runs', 'probe-latest');
+    mkdirSync(latestDir, { recursive: true });
+    writeFileSync(join(latestDir, 'probe.html'), html, 'utf8');
+  } else {
+    process.stderr.write(`  ⚠ 试听变体（--sp ${spOverrides.join(' ')}）：不覆盖 probe-latest\n`);
+  }
   const cnt = (c: number): number => sounds.filter((s) => s[1] === c).length;
   process.stderr.write(
     `探针 声音相(SOUND-R1) ${basename(tapePath)}${kind ? `（${kind}）` : ''} → ${relative(process.cwd(), outFile)}\n` +

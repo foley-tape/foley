@@ -16,7 +16,7 @@
 | §1 深睡改真实时间 | ✔ 一行改毕：睡意走真实钟——回放倍速下机器不陪着快进打盹 |
 | §2 卫生法 | ✔ **自首：§2.1 的案主是我**——M2.1 为借拍摄依赖在 worktree 拉了指向本会话 /tmp 的 node_modules 软链（未提交但已害邻轨）。整改：软链拔除，`stage/tools/package.json` 声明式安装（playwright/ffmpeg-static，运行时零依赖不受影响）。§2.3：向 tape0/.claude/launch.json **添加** stage 条目、未动 probe 条目（本行即 §2.2 的申报） |
 | §4 live 定妆照 | ✔ 已拍（素材诚实：live 实录本会话工作日）：30s 实况 ＋ 静帧。定妆的气质取"陪伴的平静"（F4：常态沉入背景）——全天的戏剧性交给 `?tape=yesterday` 回放，不摆拍 |
-| §3 remote 首推 | 候船长执行；推毕补核对行 |
+| §3 remote 首推 | ✔ **核对行**：`origin = git@github.com:foley-tape/foley.git`，main 已跟踪 origin/main 且同点（首推时 @ 8559b4a，全史入库，私有直至发布轮）。船长执行，舞台核对 |
 
 ## 待命姿态
 

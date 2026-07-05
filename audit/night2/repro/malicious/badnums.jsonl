@@ -1,0 +1,2 @@
+{"type":"assistant","timestamp":"not-a-date","message":{"role":"assistant","content":[{"type":"tool_use","id":"n","name":"Read","input":{"file_path":"/x"}}]}}
+{"type":"user","timestamp":"2026-01-01T00:00:00Z","toolUseResult":{"durationMs":-5000,"bytes":-99},"message":{"role":"user","content":[{"type":"tool_result","tool_use_id":"n","is_error":false,"content":"x"}]}}

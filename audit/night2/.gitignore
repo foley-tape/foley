@@ -1,0 +1,4 @@
+soak/synth-raw.jsonl
+soak/*.png
+repro/malicious/hugeline.jsonl
+repro/malicious/*.tape.jsonl

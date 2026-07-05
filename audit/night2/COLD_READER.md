@@ -26,6 +26,7 @@
 | 14 | CLI 与 README 语言断层 | **✗ 国际读者劝退** | 英文 README 引来的读者，`--help` 起全中文（含"蒸馏/收束点/卡碟"术语）。要么双语 help，要么 README 说明这是双语项目 |
 | 15 | Status 段 "🚧 Live mode wiring" | 与 help 矛盾感 | help 里 `live` 已是正式命令（"尾随生长中的原始 JSONL，20Hz 广播"）；哪个是真话？ |
 | 16 | scan 教的下一步命令 | **✗ 新 checkout 直接崩** | scan 尾注亲口教 `distill <原始> tapes/<名>.tape.jsonl`，但 `tapes/` 不存在且 distill 不建目录 → **裸 ENOENT 堆栈**。用户第一次照说明书操作就挨打 |
+| 17 | 克隆后第一件事就弄脏仓库 | **✗** | `npm ci` 会给 bin 目标 `cli/index.ts` 自动 chmod +x（因为它被声明为 bin 却没带执行位入库）→ fresh clone 装完依赖 `git status` 即脏（mode 100644→100755）。洁癖读者的第一印象分没了 |
 
 **核对表总评**：产品本体（引擎、蒸馏、探针页）是真的、且比 README 说的更多；**但 Quickstart 的每一行都是假的**。这是最危险的一种 README——里子是真的，门脸是空头支票。发布日撞上的第一批用户全部死在第 14 行（`npx foley`）之前。
 
@@ -40,9 +41,12 @@
 - **t=3.5s** 找到 `▶ 播放` 点下（用户手势解锁音频）——控件语义清楚，无迷路。
 - **t=58s** **未捕获 PAGEERROR：`coreDegreeHz is not defined`**——播放途中 JS 引用错误原样上抛（`coldread-console.log` 在案）。对用户静默，但控制台开着的 HN 读者会当场截图发帖。
 - **t=122s**（`ride-120s.png`）针活了：T 0.06、绿区亮起、床分层电平实时跳动（L1 0.066/L2 0.032/S3 0.000/磨损 0.0050）；**失望**——进度 `122s / 11753s`：这卷带全长 **3.3 小时**，默认 1×，速度滑杆躲在角落。冷用户不会想到要拖它，会以为"这就是全部了"然后关页。
-- **t≈6min** `?tuner=1` 调音抽屉：{见 ride-tuner*.png，附录}
+- **t≈6min** `?tuner=1` 调音抽屉（`ride-tuner.png`）：**惊喜**——一整面 36 杆参数混音台（bed/foreground/call 三族），带**实时参数哈希对表**（`efbb571d (=出厂)`）和"复制 JSON"。工程款诚意最足的一屏。小瑕疵：`foreground.habituatio…` 三条标签截断无提示。标着 `(dev)`，普通用户不会撞见。
+- **t≈6.9min** 第二趟播放同点复发 `coreDegreeHz is not defined`（两趟各一次，均在播放 ~55–58s 处）→ **确定性炸点**，非偶发。
 - **t=10min** 终帧 `ride-final.png`；console/pageerror 全程：`audit/night2/shots/coldread-console.log`
 - **全程网络监听：非 file:// 请求 = 0**（探针页"零网络"主张本次实测成立）。
+
+**附录·证据**：`audit/night2/shots/`（载入/播放/曲线四帧/调音抽屉/deck 尸检各 png ＋ coldread-console.log）；fresh-clone 测试全量日志见会话 scratchpad `npmtest-fresh.log`（68/63/5/exit1）。
 
 **平行支线：双击那台 README 主视觉（stage/index.html，`deck-doubleclick.png`）**
 - 香槟金面板、VU 表、ASK 灯窗、计数器暗缝——README 照片里的机器一比一渲染出来了，**静止如尸**：ES module 被 `file://` CORS 政策拦死（仅控制台可见），页面无任何提示。

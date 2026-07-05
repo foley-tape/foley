@@ -44,8 +44,9 @@ export class VuMeter {
       p.setAttribute('fill', 'none'); p.setAttribute('stroke', stroke); p.setAttribute('stroke-width', wdt);
       g.appendChild(p);
     };
-    arc(-47, 47, rOut, '#3B3225', 1.4);        // 主弧
-    arc(23.5, 47, rOut + 3.5, '#6E3A28', 3);   // 高张力区段
+    // 红区并弧（M1.9 打磨②）：同一条弧上印刷，不浮置
+    arc(-47, 23.5, rOut, '#3B3225', 2);
+    arc(23.5, 47, rOut, '#6E3A28', 2.6);
     for (let i = 0; i <= 24; i++) {
       const major = i % 6 === 0;
       const a = (-47 + (SWEEP * i) / 24) * (Math.PI / 180);
@@ -142,13 +143,13 @@ export class ChartRecorder {
     const xOf = (pos) => this.penX - (posNow - pos);
 
     // 网格（无数字）：横 5 道、纵每 5 舞台秒一道，随纸走
-    ctx.strokeStyle = 'rgba(140,47,27,0.13)'; ctx.lineWidth = 1;
+    ctx.strokeStyle = 'rgba(140,47,27,0.18)'; ctx.lineWidth = 1;
     for (let i = 0; i <= 4; i++) {
       const y = this._yOf(i / 4);
       ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(w, y); ctx.stroke();
     }
     const gridPx = PAPER_SPEED * 5;
-    ctx.strokeStyle = 'rgba(140,47,27,0.08)';
+    ctx.strokeStyle = 'rgba(140,47,27,0.11)';
     for (let x = this.penX - Math.ceil((posNow % gridPx)); x > -gridPx; x -= gridPx) {
       ctx.beginPath(); ctx.moveTo(x + gridPx, 14); ctx.lineTo(x + gridPx, h - 14); ctx.stroke();
     }
@@ -229,12 +230,14 @@ export class Lamps {
     const breath = 0.56 + 0.44 * Math.sin((now % BREATH_MS) / BREATH_MS * Math.PI * 2);
     this.tube.style.setProperty('--lit', (this.askEnv * breath).toFixed(4));
 
-    // 绿宝石：DONE 常亮；RESOLVE 一闪（快起、钨丝式冷却）
+    // 绿宝石只说一个词——成了（宪法 v1.2 修正案 B）：
+    // 常亮＝这一场成了（DONE）；一闪＝这一件成了（RESOLVE）
     this.doneEnv = this.phase === 'DONE' ? rise(this.doneEnv, 90) : fall(this.doneEnv, 220);
     this.flash = fall(this.flash, 320);
     this.emerald.style.setProperty('--lit', Math.min(1, this.doneEnv + this.flash).toFixed(4));
 
-    // 待机粒：压暗钨丝奶油，机器在暗处呼吸的那一粒
-    this.pilot.style.setProperty('--lit', '0.5');
+    // MAIN＝待机粒（M1.9 打磨③，正式绑定）：通电即暗暖常亮，钨丝奶油。
+    // 它是 IDLE 时整机唯一的灯——机器睡在暗处，这一粒说"我在"。
+    this.pilot.style.setProperty('--lit', '0.55');
   }
 }

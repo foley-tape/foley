@@ -15,7 +15,9 @@ node stage/serve.mjs        # → http://localhost:4173/?tape=storm
 
 ## 布局
 
-- `js/replay.js` —— 回放核心：舞台时间轴（空洞折叠＋接带痕）、20Hz 包广播、moments 直通
-- `js/instruments.js` —— 三器件＋灯组；渲染端只做两包线性重建，禁缓动
+- `js/replay.js` —— 回放核心：舞台时间轴（空洞折叠＋接带痕）、20Hz 包广播（间隔钟，不惧藏页）、moments 直通
+- `js/instruments.js` —— VU 针／走纸／灯组；渲染端只做两包线性重建，禁缓动
+- `js/deck.js` —— 走带甲板（M-S2）：双带轴（转速=A、抖=wow、角动量、STUCK 卡拍）＋机械计数轮（悬停微距，数字唯一的活处）
+- `js/lens.js` —— 镜头法（M-S2）：WebGL 颗粒/暗角呼吸/防色带一张 shader；相机 <2px/s 慢漂移
 - `js/main.js` / `js/hud.js` —— 点火与 dev 抽屉
-- `fixtures/` —— 五带副本（tapes/ 原件永不触碰）
+- `fixtures/` —— 五带副本，封版（v0.1.0）后产物（tapes/ 原件永不触碰）

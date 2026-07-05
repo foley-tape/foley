@@ -9,6 +9,20 @@
 <body>
 <div id="room">
   <div id="machine">
+    <!-- 走带甲板：带轴上缘出画——机器延伸出画外即尺度暗示 -->
+    <div id="deck">
+      <div class="reel" id="reel-l"></div>
+      <div class="reel" id="reel-r"></div>
+      <div id="tapeband"></div>
+      <i class="guide" style="left: calc(59vw - 64px)"></i>
+      <i class="guide" style="left: calc(59vw + 58px)"></i>
+      <div id="counter-housing" title=""><i class="slot"></i></div>
+      <div id="loupe">
+        <div class="loupe-glass">
+          <div class="wheel"></div><div class="wheel"></div><div class="wheel"></div><div class="wheel"></div>
+        </div>
+      </div>
+    </div>
     <div id="panel">
       <!-- 面板固定螺丝：沿边排布，整机延伸出画外 -->
       <i class="screw" style="left:6%;  top:14px; --slot:23deg"></i>
@@ -30,10 +44,15 @@
                   <stop offset="100%" stop-color="#DECDA6"/>
                 </radialGradient>
                 <linearGradient id="vu-glass" x1="0" y1="0" x2="1" y2="1">
-                  <stop offset="0"   stop-color="#FFF8E8" stop-opacity="0.14"/>
-                  <stop offset="0.3" stop-color="#FFF8E8" stop-opacity="0.02"/>
-                  <stop offset="0.7" stop-color="#140D06" stop-opacity="0.10"/>
-                  <stop offset="1"   stop-color="#140D06" stop-opacity="0.26"/>
+                  <stop offset="0"   stop-color="#FFF6E0" stop-opacity="0.10"/>
+                  <stop offset="0.28" stop-color="#FFF6E0" stop-opacity="0.02"/>
+                  <stop offset="0.6" stop-color="#140D06" stop-opacity="0.16"/>
+                  <stop offset="1"   stop-color="#140D06" stop-opacity="0.34"/>
+                </linearGradient>
+                <linearGradient id="vu-streak" x1="0" y1="0" x2="1" y2="1">
+                  <stop offset="0.32" stop-color="#FFF6E0" stop-opacity="0"/>
+                  <stop offset="0.44" stop-color="#FFF6E0" stop-opacity="0.07"/>
+                  <stop offset="0.52" stop-color="#FFF6E0" stop-opacity="0"/>
                 </linearGradient>
               </defs>
               <rect x="6" y="6" width="288" height="188" rx="7" fill="url(#backlight)"/>
@@ -45,6 +64,7 @@
                 <circle cx="150" cy="168" r="2.6" fill="#5A4A34"/>
               </g>
               <rect x="6" y="6" width="288" height="188" rx="7" fill="url(#vu-glass)"/>
+              <rect x="6" y="6" width="288" height="188" rx="7" fill="url(#vu-streak)"/>
             </svg>
           </div>
           <div class="silk">Tension</div>
@@ -89,6 +109,7 @@
   <div id="keylight"></div>
   <div id="vignette"></div>
   <div id="grain"></div>
+  <canvas id="lens"></canvas>
 </div>
 <script type="module" src="js/main.js"></script>
 </body>

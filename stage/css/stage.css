@@ -25,12 +25,93 @@ body {
 
 #room { position: fixed; inset: 0; background: #060402; }
 
-/* —— 整机：延伸出画外即尺度暗示，永不露整机 —— */
+/* —— 整机：延伸出画外即尺度暗示，永不露整机；带轴上缘出画 ——
+   注：transform 让给镜头漂移（lens.js），定位走 top 计算 */
 #machine {
   position: absolute;
   left: -9vw; width: 118vw;
-  top: 50%; transform: translateY(-53%);
+  top: calc(50vh - 560px);
   filter: drop-shadow(0 46px 60px rgba(0, 0, 0, 0.85));
+}
+
+/* —— 走带甲板：哑光暗金属，反光极克制 —— */
+#deck {
+  position: relative;
+  height: 300px;
+  background:
+    linear-gradient(180deg, #171208 0%, #100B06 55%, #0B0704 100%);
+  box-shadow: inset 0 -4px 10px rgba(0, 0, 0, 0.7), inset 0 1px 0 rgba(255, 235, 200, 0.05);
+}
+.reel {
+  position: absolute; width: 300px; height: 300px; top: -12px;
+  will-change: transform;
+}
+.reel svg { display: block; width: 100%; height: 100%; }
+#reel-l { left: calc(59vw - 340px); }
+#reel-r { left: calc(59vw + 40px); }
+#tapeband {
+  position: absolute; left: calc(59vw - 210px); width: 420px; top: 268px; height: 3px;
+  background: linear-gradient(180deg, #241812, #0F0A06);
+  box-shadow: 0 1px 0 rgba(255, 230, 190, 0.06);
+}
+.guide {
+  position: absolute; top: 258px; width: 11px; height: 22px; border-radius: 3px;
+  background: linear-gradient(90deg, #6B5C41, #2E2517 70%);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.7), inset 0 1px 0 rgba(255, 240, 210, 0.2);
+}
+
+/* —— 机械计数轮：面板上只是一道暗窗，数字在里面但读不见 —— */
+#counter-housing {
+  position: absolute; left: calc(59vw - 33px); top: 236px;
+  width: 66px; height: 24px; border-radius: 4px;
+  background: linear-gradient(175deg, #241D12, #0E0A05 70%);
+  box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.9), 0 1px 0 rgba(255, 235, 200, 0.07);
+  cursor: none;
+}
+#counter-housing .slot {
+  position: absolute; inset: 6px 9px; border-radius: 2px; display: block;
+  background: #060402;
+  box-shadow: inset 0 1px 3px #000;
+  /* 微缝里的一点滚轮反光：暗示有轮，不给数字 */
+  background-image: repeating-linear-gradient(90deg,
+    transparent 0 9px, rgba(242, 230, 204, 0.07) 9px 11px, transparent 11px 12px);
+}
+
+/* —— 微距 loupe：悬停才入画，数字唯一的活处 —— */
+#loupe {
+  position: absolute; left: calc(59vw - 110px); top: 278px;
+  width: 220px; height: 150px; z-index: 80;
+  opacity: 0; transform: translateY(-6px) scale(0.98);
+  transition: opacity 0.22s ease-out, transform 0.26s cubic-bezier(0.2, 0.7, 0.3, 1);
+  pointer-events: none;
+}
+#loupe.on { opacity: 1; transform: none; }
+.loupe-glass {
+  position: relative; height: 100%;
+  display: flex; align-items: center; justify-content: center; gap: 10px;
+  border-radius: 16px;
+  background: linear-gradient(170deg, #1B1409 0%, #0E0A05 70%);
+  border: 1px solid rgba(235, 223, 194, 0.16);
+  box-shadow:
+    0 14px 40px rgba(0, 0, 0, 0.8),
+    inset 0 1px 0 rgba(255, 245, 225, 0.12),
+    inset 0 0 34px rgba(0, 0, 0, 0.6);
+}
+.loupe-glass::after { /* 浅景深的边缘：微距镜的呼吸感 */
+  content: ""; position: absolute; inset: 0; border-radius: 16px; pointer-events: none;
+  box-shadow: inset 0 0 18px 6px rgba(6, 4, 2, 0.55);
+}
+.wheel {
+  width: 34px; height: 44px; overflow: hidden; border-radius: 4px;
+  background: linear-gradient(180deg, #0A0703, #1C150C 30%, #1C150C 70%, #0A0703);
+  box-shadow: inset 0 2px 5px rgba(0, 0, 0, 0.85), inset 0 -2px 5px rgba(0, 0, 0, 0.85);
+}
+.wheel-strip { will-change: transform; }
+.wheel-strip span {
+  display: block; height: 44px; line-height: 44px; text-align: center;
+  font-size: 24px; color: var(--porcelain);
+  text-shadow: 0 0 6px rgba(242, 230, 204, 0.18);
+  font-variant-numeric: tabular-nums;
 }
 
 /* —— 香槟拉丝铝面板：发丝纹永远水平 —— */
@@ -122,13 +203,15 @@ body {
 /* —— 走纸记录仪 —— */
 .chart-bezel { width: 584px; }
 #chart-canvas { display: block; width: 560px; height: 252px; border-radius: 6px; }
+/* 烟色玻璃（M1.9 打磨①）：整体压一层烟，纸不再与 VU 抢亮度 */
 .chart-bezel .glass {
   position: absolute; inset: 11px; border-radius: 6px; pointer-events: none;
   background:
     linear-gradient(112deg,
-      rgba(255, 246, 226, 0.13) 0%, rgba(255, 246, 226, 0.03) 22%,
-      transparent 42%, rgba(12, 8, 4, 0.10) 78%, rgba(12, 8, 4, 0.22) 100%);
-  box-shadow: inset 0 0 24px rgba(10, 6, 2, 0.35);
+      rgba(255, 246, 226, 0.09) 0%, rgba(255, 246, 226, 0.02) 22%,
+      transparent 42%, rgba(12, 8, 4, 0.14) 78%, rgba(12, 8, 4, 0.30) 100%),
+    linear-gradient(180deg, rgba(14, 9, 4, 0.16), rgba(14, 9, 4, 0.10));
+  box-shadow: inset 0 0 28px rgba(10, 6, 2, 0.42);
 }
 
 /* —— 灯组 —— */
@@ -145,6 +228,12 @@ body {
   background: linear-gradient(105deg, rgba(48, 34, 20, 0.92), rgba(24, 16, 9, 0.96) 60%);
   box-shadow: inset 2px 0 3px rgba(255, 240, 210, 0.10), inset -2px -2px 5px rgba(0, 0, 0, 0.7);
   overflow: visible;
+}
+#amber-tube::before { /* 玻璃柱暗示（M1.9 打磨④）：一道立缝高光＋顶端口盖微光 */
+  content: ""; position: absolute; inset: 0; border-radius: 15px; z-index: 2; pointer-events: none;
+  background:
+    linear-gradient(90deg, transparent 22%, rgba(255, 246, 226, 0.13) 27%, transparent 34%),
+    radial-gradient(60% 14% at 50% 4%, rgba(255, 246, 226, 0.12), transparent 70%);
 }
 #amber-tube .filament {
   position: absolute; inset: 6px 7px; border-radius: 10px;
@@ -180,7 +269,7 @@ body {
 .gem.emerald::before { background: radial-gradient(circle at 42% 34%, #A8DFA0, var(--emerald) 55%, #2E5A2C 100%); }
 .gem.emerald::after { background: radial-gradient(circle, rgba(79, 140, 74, 0.5), transparent 70%); }
 .gem.pilot::before { background: radial-gradient(circle at 42% 34%, #FFF7E2, var(--porcelain) 55%, #B89F6E 100%); }
-.gem.pilot::after { background: radial-gradient(circle, rgba(242, 230, 204, 0.28), transparent 70%); }
+.gem.pilot::after { background: radial-gradient(circle, rgba(242, 230, 204, 0.46), transparent 70%); }
 
 /* —— 面板铭牌 —— */
 #brand { position: absolute; top: 20px; left: 50%; transform: translateX(-50%); opacity: 0.75; }
@@ -192,6 +281,16 @@ body {
     radial-gradient(105vw 85vh at 6% -10%,
       rgba(255, 200, 124, 0.22) 0%, rgba(255, 176, 90, 0.07) 36%, transparent 62%);
   mix-blend-mode: screen;
+  transition: opacity 3s ease;
+}
+/* 睡在暗处：IDLE 时那盏灯压低一档（同一盏灯调暗，非换灯） */
+#room[data-phase="IDLE"] #keylight { opacity: 0.55; }
+
+/* —— 镜头（WebGL：颗粒/暗角/抖动一张 shader）—— */
+#lens {
+  position: absolute; inset: 0; pointer-events: none;
+  mix-blend-mode: overlay;
+  z-index: 60;
 }
 
 /* —— 暗角 —— */
@@ -210,7 +309,7 @@ body {
 
 /* —— dev 抽屉（?hud=1）：数字只许活在这里 —— */
 #hud {
-  position: fixed; left: 12px; right: 12px; bottom: 10px; z-index: 99;
+  position: fixed; left: 12px; right: 12px; bottom: 10px; z-index: 999;
   display: flex; gap: 10px; align-items: center;
   padding: 7px 10px; border-radius: 6px;
   background: rgba(12, 10, 8, 0.82); color: #B9A98C;

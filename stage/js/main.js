@@ -1,6 +1,8 @@
 // 舞台点火：读 fixtures → 建三件器件 → 20Hz 广播 → rAF 渲染。
 import { loadTape, Replayer } from './replay.js';
 import { VuMeter, ChartRecorder, Lamps } from './instruments.js';
+import { ReelDeck, Counter } from './deck.js';
+import { mountLens } from './lens.js';
 
 const params = new URLSearchParams(location.search);
 const tapeName = params.get('tape') || 'storm';
@@ -20,8 +22,28 @@ async function boot() {
     document.getElementById('emerald'),
     document.getElementById('pilot'),
   );
+  const deck = new ReelDeck(
+    document.getElementById('reel-l'),
+    document.getElementById('reel-r'),
+    document.getElementById('tapeband'),
+  );
+  const counter = new Counter(
+    document.getElementById('counter-housing'),
+    document.getElementById('loupe'),
+    deck,
+  );
 
-  const instruments = [vu, chart, lamps];
+  const instruments = [vu, chart, lamps, deck, counter];
+
+  // 镜头法：WebGL 颗粒/暗角/漂移上岗则撤下 CSS 静态替身
+  if (mountLens(document.getElementById('lens'), document.getElementById('machine'))) {
+    document.getElementById('grain').style.display = 'none';
+    document.getElementById('vignette').style.display = 'none';
+  }
+
+  // 睡在暗处：IDLE 时画外灯压低一档（room 按 phase 着装）
+  const room = document.getElementById('room');
+  replayer.onPacket.push(pkt => { room.dataset.phase = pkt.phase; });
   replayer.onPacket.push((pkt, isSeek) => instruments.forEach(i => i.onPacket(pkt, isSeek)));
   replayer.onMoment.push(m => instruments.forEach(i => i.onMoment && i.onMoment(m)));
 
@@ -45,7 +67,7 @@ async function boot() {
   if (params.get('paused') !== '1') replayer.play();
   else replayer.seek(replayer.stageT); // 停机取景也要先上一包
 
-  window.__stage = { replayer, tape }; // 调试把手（dev）
+  window.__stage = { replayer, tape, deck, counter, chart, lamps }; // 调试把手（dev）
 }
 
 boot().catch(err => {

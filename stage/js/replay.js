@@ -131,11 +131,11 @@ export class Replayer {
     this.onPacket = [];   // (packet) => void
     this.onMoment = [];   // (moment) => void
     this._lastReal = null;
-    this._raf = null;
+    this._timer = null;
   }
 
   play() { this.playing = true; this._lastReal = null; this._loop(); }
-  pause() { this.playing = false; }
+  pause() { this.playing = false; if (this._timer) { clearInterval(this._timer); this._timer = null; } }
 
   seek(tau) {
     this.stageT = Math.max(0, Math.min(tau, this.tape.duration));
@@ -147,17 +147,19 @@ export class Replayer {
 
   _emit(pkt, isSeek = false) { for (const fn of this.onPacket) fn(pkt, isSeek); }
 
+  // 广播走间隔钟而非 rAF：20Hz 是包网格的节拍，且藏起的标签页里 rAF 会整个冻住
+  // （渲染归 rAF，看不见时不画是对的；但钟不能跟着睡）
   _loop() {
-    if (this._raf) return;
-    const step = (now) => {
-      this._raf = null;
+    if (this._timer) return;
+    this._timer = setInterval(() => {
       if (!this.playing) return;
+      const now = performance.now();
       if (this._lastReal === null) this._lastReal = now;
-      const realDt = Math.min(now - this._lastReal, 200); // 掉帧不追爆
+      const realDt = Math.min(now - this._lastReal, 500); // 节流醒来不追爆
       this._lastReal = now;
       this.stageT = Math.min(this.stageT + realDt * this.speed, this.tape.duration);
 
-      // 20Hz 广播：补齐所有已越过的网格点（限流，seek 后不洪泛）
+      // 补齐所有已越过的网格点（限流，seek 后不洪泛）
       let emitted = 0;
       while (this.nextPacketT <= this.stageT && emitted < 64) {
         this._emit(sampleAt(this.tape, this.nextPacketT));
@@ -173,9 +175,7 @@ export class Replayer {
         this.momentIdx++;
       }
 
-      if (this.stageT >= this.tape.duration) this.playing = false;
-      this._raf = requestAnimationFrame(step);
-    };
-    this._raf = requestAnimationFrame(step);
+      if (this.stageT >= this.tape.duration) this.pause();
+    }, PACKET_MS);
   }
 }

@@ -250,7 +250,10 @@ function ensureAudio(){ if(ac) { if(ac.state==='suspended') ac.resume(); return;
   G.wowDelay=ac.createDelay(0.1); G.wowDelay.delayTime.value=0.03;
   G.wowLfo1=ac.createOscillator(); G.wowLfo1.frequency.value=0.9;   // 互质双 LFO：走带不稳不精确重复
   G.wowLfo2=ac.createOscillator(); G.wowLfo2.frequency.value=1.31;
-  G.wowAmt1=ac.createGain(); G.wowAmt2=ac.createGain();
+  // EAR-2 修：GainNode 默认增益=1.0——LFO 曾以满幅(±1s!)疯狂调制延迟线，
+  // 整个床被搅成"机器故障声"。调制深度必须从 0 起，由 applyBed 按 wowCents 给。
+  G.wowAmt1=ac.createGain(); G.wowAmt1.gain.value=0;
+  G.wowAmt2=ac.createGain(); G.wowAmt2.gain.value=0;
   G.wowLfo1.connect(G.wowAmt1); G.wowAmt1.connect(G.wowDelay.delayTime);
   G.wowLfo2.connect(G.wowAmt2); G.wowAmt2.connect(G.wowDelay.delayTime);
   G.wowLfo1.start(); G.wowLfo2.start();
@@ -272,7 +275,8 @@ function ensureAudio(){ if(ac) { if(ac.state==='suspended') ac.resume(); return;
   bg1.gain.value=0.15; bg2.gain.value=0.1;
   b1.connect(bg1); bg1.connect(G.s1.gain); b2.connect(bg2); bg2.connect(G.s1.gain);
   b1.start(); b2.start();
-  G.room=noiseSrc(); G.roomG=ac.createGain(); G.roomG.gain.value=0.004;
+  // EAR-2 修：房间噪从 0 起、进 applyBed 统一管（曾绕过 trimDb 总闸——船长拖总闸无效的元凶之一）
+  G.room=noiseSrc(); G.roomG=ac.createGain(); G.roomG.gain.value=0;
   const roomF=ac.createBiquadFilter(); roomF.type='lowpass'; roomF.frequency.value=400;
   G.room.connect(roomF); roomF.connect(G.roomG); G.roomG.connect(G.bedBus);
   // S3 张力弦（EAR-1 修：裸锯齿=工业蜂鸣 → 双 triangle 主体 + 一丝 saw 织体，滤波压到 800Hz）
@@ -298,20 +302,25 @@ function noiseSrc(){ const n=ac.sampleRate*2, b=ac.createBuffer(1,n,ac.sampleRat
   const s=ac.createBufferSource(); s.buffer=b; s.loop=true; s.start(); return s; }
 
 // ---- 床参数施加（slew：setTargetAtTime；调用对齐 1/8 网格） ----
-let lastPh=-1, doneSilentUntil=-1;
-function applyBed(bt,at){ const fast=SP.bed.slewMsFast/1000, slow=SP.bed.slewMsSlow/1000;
-  G.s1.gain.setTargetAtTime(bt.s1,at,slow);
-  G.s2.gain.setTargetAtTime(bt.s2,at,fast);
-  G.s3.gain.setTargetAtTime(bt.s3,at,fast);
-  G.hissG.gain.setTargetAtTime(bt.hiss,at,slow);
-  G.lp.frequency.setTargetAtTime(bt.fHz,at,slow);
-  G.shelf.gain.setTargetAtTime(bt.shelfDb,at,slow);
+let lastPh=-1, doneSilentUntil=-1, wxLatch=0;
+function applyBed(bt,at,imm){ const fast=SP.bed.slewMsFast/1000, slow=SP.bed.slewMsSlow/1000;
+  // imm=true（起播首拍）：立即就位，不从上一次残留态滑过来（EAR-2）
+  const set=(param,v,tc)=>{ if(imm){ param.cancelScheduledValues(at); param.setValueAtTime(v,at); } else param.setTargetAtTime(v,at,tc); };
+  set(G.s1.gain,bt.s1,slow);
+  set(G.s2.gain,bt.s2,fast);
+  set(G.s3.gain,bt.s3,fast);
+  set(G.hissG.gain,bt.hiss,slow);
+  // 房间噪归队（EAR-2）：吃 trim、吃 DONE 静默、随天气档微调——与 stem 同一纪律
+  const room=(0.002+0.0015*wxLatch)*dbLin(SP.bed.trimDb)*(bt.silence?0:1);
+  set(G.roomG.gain,room,slow);
+  set(G.lp.frequency,bt.fHz,slow);
+  set(G.shelf.gain,bt.shelfDb,slow);
   const wowAmt=0.03*(Math.pow(2,bt.wowCents/1200)-1);
-  G.wowAmt1.gain.setTargetAtTime(wowAmt*0.7,at,slow);
-  G.wowAmt2.gain.setTargetAtTime(wowAmt*0.4,at,slow);
+  set(G.wowAmt1.gain,wowAmt*0.7,slow);
+  set(G.wowAmt2.gain,wowAmt*0.4,slow);
   // WAITING 悬停：属方向延音（半终止；整张床替琥珀管呼吸）
   const f1=bt.hover?midiHz(ROOT+7):midiHz(ROOT), f2=bt.hover?midiHz(ROOT+14):midiHz(ROOT+7);
-  G.v1.frequency.setTargetAtTime(f1,at,fast); G.v2.frequency.setTargetAtTime(f2,at,fast);
+  set(G.v1.frequency,f1,fast); set(G.v2.frequency,f2,fast);
 }
 
 // ---- 前景合成（力度/亮度 ∝ vel=当刻 T，F1） ----
@@ -368,7 +377,7 @@ function habFor(cls,at){ if(cls>=6) return 1;
   arr.push(at); habLog.set(cls,arr); return habGain(arr.length); }
 
 // ===== 双时钟播放（针走墙钟；声音走音频钟；乐音量化宁迟勿早） =====
-let playing=false, perf0=0, audio0=0, speed=12, si=0, raf=0, lastGridAt=0, lastBarAt=0, wxLatch=0, lastAskRepeat=-1;
+let playing=false, perf0=0, audio0=0, speed=12, si=0, raf=0, lastGridAt=0, lastBarAt=0, lastAskRepeat=-1;
 function playMs(){ return (performance.now()-perf0)*speed; }
 document.getElementById('speed').oninput=e=>{ speed=+e.target.value; document.getElementById('speedV').textContent=speed+'×'; };
 function quantizeUp(at){ const g=grid(), rel=at-audio0; return audio0+Math.ceil(rel/g-1e-9)*g; }
@@ -384,8 +393,7 @@ function schedule(){ if(!playing) return;
     const bt=bedTargets(s[2],s[3],s[6],s[5],s[7]);
     if(at>doneSilentUntil) applyBed(bt,at); else if(bt.silence===false && at<=doneSilentUntil){/* 静默期不复活 */}
     // 小节边界：weather 档位切换（既有教义）+ 悬挂音选声（比例 ∝ T，确定性伪随机可复听）
-    if(at>=lastBarAt+bar()-1e-6){ lastBarAt=at; wxLatch=s[4];
-      G.roomG.gain.setTargetAtTime(0.004+0.003*wxLatch,at,1.0);
+    if(at>=lastBarAt+bar()-1e-6){ lastBarAt=at; wxLatch=s[4]; // 房间噪的天气档由 applyBed 统一施加（EAR-2）
       if(!bt.hover){ const bi=Math.round((at-audio0)/bar());
         const sus=(Math.abs(Math.sin(bi*311.7))%1)<bt.susProb;
         G.v2.frequency.setTargetAtTime(midiHz(ROOT+(sus?5:7)),at,SP.bed.slewMsSlow/1000); } }
@@ -452,11 +460,14 @@ function frame(){ const pm=Math.min(playMs(),dur); const s=sampleAt(pm);
   document.getElementById('bed').textContent=(bt.silence?'静默':bt.hover?'悬停':'S1 '+bt.s1.toFixed(2)+' S2 '+bt.s2.toFixed(2)+' S3 '+bt.s3.toFixed(2));
   if(playing && pm<dur) raf=requestAnimationFrame(frame); else if(pm>=dur) stop(); }
 function start(){ if(playing) return; ensureAudio(); playing=true; perf0=performance.now(); audio0=ac.currentTime+0.05; si=0;
-  habLog.clear(); doneSilentUntil=-1; lastGridAt=audio0; lastBarAt=audio0; lastAskRepeat=-1e9;
-  G.bedBus.gain.setValueAtTime(1,ac.currentTime);
+  habLog.clear(); doneSilentUntil=-1; lastGridAt=audio0; lastBarAt=audio0; lastAskRepeat=-1e9; wxLatch=0;
+  G.bedBus.gain.cancelScheduledValues(ac.currentTime); G.bedBus.gain.setValueAtTime(1,ac.currentTime);
+  // 起播首拍：床参数按 t=0 状态立即就位（EAR-2：不从残留/默认态滑过来）
+  const s0=track.length?sampleAt(0):[0,0,0,0,0,0,0,0];
+  applyBed(bedTargets(s0[2],s0[3],s0[6],s0[5],s0[7]),ac.currentTime,true);
   schedule(); raf=requestAnimationFrame(frame); }
 function stop(){ playing=false; cancelAnimationFrame(raf);
-  if(ac){ const at=ac.currentTime; ['s1','s2','s3','hissG'].forEach(k=>G[k].gain.setTargetAtTime(0,at,0.2)); } }
+  if(ac){ const at=ac.currentTime; ['s1','s2','s3','hissG','roomG'].forEach(k=>G[k].gain.setTargetAtTime(0,at,0.2)); } }
 document.getElementById('play').onclick=start;
 document.getElementById('stop').onclick=stop;
 (function(){ const s=track.length?sampleAt(0):[0,0,0,0,0,0,0,0]; drawNeedle(s[1],s[4]); drawCurve(0); })();

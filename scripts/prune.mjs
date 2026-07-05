@@ -20,25 +20,29 @@ let entries;
 try { entries = readdirSync(runsDir); }
 catch { console.log('runs/ 不存在，无可清扫'); process.exit(0); }
 
+const DAY_KEEP = 7; // 日带保留 7 日（M2.2 §0.6：预告片高光选段的原料仓）
+const isDayRoll = n => /^live-\d{4}-\d{2}-\d{2}$/.test(n);
+
 const groups = new Map();
 for (const name of entries) {
   const p = join(runsDir, name);
   let st;
   try { st = statSync(p); } catch { continue; }
   if (!st.isDirectory()) continue;
-  const kind = name.split('-')[0] || name;
+  const kind = isDayRoll(name) ? 'live-day' : (name.split('-')[0] || name);
   if (!groups.has(kind)) groups.set(kind, []);
   groups.get(kind).push({ name, p, mtime: st.mtimeMs });
 }
 
 let kept = 0, dropped = 0;
 for (const [kind, list] of groups) {
+  const keep = kind === 'live-day' ? DAY_KEEP : KEEP;
   list.sort((a, b) => b.mtime - a.mtime);
   for (let i = 0; i < list.length; i++) {
-    if (i < KEEP) { kept++; continue; }
+    if (i < keep) { kept++; continue; }
     dropped++;
     console.log(`${DRY ? '[dry] ' : ''}删 ${kind}: runs/${list[i].name}`);
     if (!DRY) rmSync(list[i].p, { recursive: true, force: true });
   }
 }
-console.log(`完成：留 ${kept}，${DRY ? '拟' : ''}删 ${dropped}（每 kind 上限 ${KEEP}）`);
+console.log(`完成：留 ${kept}，${DRY ? '拟' : ''}删 ${dropped}（每 kind 上限 ${KEEP}；日带 ${DAY_KEEP} 日）`);

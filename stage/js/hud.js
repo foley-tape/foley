@@ -4,7 +4,7 @@ export function mountHud(replayer, tapeName) {
   el.id = 'hud';
   el.innerHTML = `
     <select id="hud-tape">
-      ${['storm', 'smooth', 'busy', 'jam', 'silence'].map(t =>
+      ${['storm', 'smooth', 'busy', 'jam', 'silence', 'yesterday'].map(t =>
         `<option ${t === tapeName ? 'selected' : ''}>${t}</option>`).join('')}
     </select>
     <button id="hud-play">⏯</button>

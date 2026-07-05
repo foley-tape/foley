@@ -1,0 +1,9 @@
+{
+  "name": "foley-stage-tools",
+  "private": true,
+  "description": "拍摄期工具依赖（性格照/影子指标）。运行时零依赖不受此影响。安装：cd stage/tools && npm i && npx playwright install chromium",
+  "devDependencies": {
+    "playwright": "^1.49.0",
+    "ffmpeg-static": "^5.2.0"
+  }
+}

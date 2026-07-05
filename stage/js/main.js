@@ -45,15 +45,17 @@ async function boot() {
     document.getElementById('vignette').style.display = 'none';
   }
 
-  // room 按 phase/weather 着装；IDLE 连续 5min 入深睡（v1.3 §1.5），唤醒钨丝速
+  // room 按 phase/weather 着装；IDLE 连续 5min 入深睡，唤醒钨丝速。
+  // 深睡归灯族，走真实时间（M2.2 §1）：睡意是机器对房间的陈述，不是带子的内容——
+  // 回放倍速下机器不陪着快进打盹。
   const room = document.getElementById('room');
   let idleSince = null;
   const feedPacket = (pkt, isFirst) => {
     room.dataset.phase = pkt.phase;
     room.dataset.weather = pkt.weather;
     if (pkt.phase === 'IDLE') {
-      if (idleSince === null) idleSince = pkt.stageT;
-      const deep = pkt.stageT - idleSince >= 300000;
+      if (idleSince === null) idleSince = performance.now();
+      const deep = performance.now() - idleSince >= 300000;
       if (deep !== (room.dataset.sleep === 'deep')) {
         if (deep) room.dataset.sleep = 'deep'; else delete room.dataset.sleep;
         if (lens) lens.setDeep(deep);

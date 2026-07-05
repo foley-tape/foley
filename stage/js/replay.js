@@ -72,9 +72,15 @@ function stageTimeOf(rawT, curve, st) {
 }
 
 export async function loadTape(name) {
+  // 日带（yesterday / YYYY-MM-DD）走 /dayroll 原料仓；其余走 fixtures 副本
+  const isDay = /^(yesterday|\d{4}-\d{2}-\d{2})$/.test(name);
+  const urlOf = kind => (isDay ? `/dayroll/${name}/${kind}.csv` : `fixtures/${name}.${kind}.csv`);
   const [curveText, momentsText] = await Promise.all([
-    fetch(`fixtures/${name}.curve.csv`).then(r => { if (!r.ok) throw new Error(name); return r.text(); }),
-    fetch(`fixtures/${name}.moments.csv`).then(r => (r.ok ? r.text() : 't\n')),
+    fetch(urlOf('curve')).then(r => {
+      if (!r.ok) throw new Error(isDay ? `${name} 无卷（该日无 live 产物）` : `找不到带子：${name}`);
+      return r.text();
+    }),
+    fetch(urlOf('moments')).then(r => (r.ok ? r.text() : 't\n')),
   ]);
   const curve = parseCurve(curveText);
   const { st, splices } = buildStageAxis(curve);

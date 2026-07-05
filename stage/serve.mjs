@@ -40,9 +40,16 @@ function broadcast(line) {
   for (const res of clients) res.write(`data: ${line}\n\n`);
 }
 
+// 本地日界的 YYYY-MM-DD（日带轮转命名，M2.2 §0.6 定死）
+function localDate(t = Date.now()) {
+  const d = new Date(t);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
 function startLive() {
-  const ts = new Date().toISOString().slice(0, 19).replace(/[:T]/g, '-');
-  liveOutDir = join(repoRoot, 'runs', `live-stage-${ts}`);
+  liveOutDir = join(repoRoot, 'runs', `live-${localDate()}`);
+  // 注：cli live --out 为截断写（'w'）——同日重启 serve 时靠追赶全史重建当日卷；
+  // 多会话拼一日的追加/混流语义归 Track-FIX，已在 FEEDBACK 记案候预告片轮。
   const liveArgs = ['cli/index.ts', 'live', ...(rawPath ? [rawPath] : ['--latest']), '--out', liveOutDir];
   liveChild = spawn('node', liveArgs, { cwd: repoRoot, stdio: ['ignore', 'pipe', 'pipe'] });
   liveChild.stderr.on('data', d => process.stderr.write(`[live] ${d}`));
@@ -75,6 +82,19 @@ createServer(async (req, res) => {
       res.end(body);
     } catch { res.writeHead(404); res.end(); }
     return;
+  }
+  // 昨日的卷（M2.2 §0.6）：/dayroll/<yesterday|YYYY-MM-DD>/{curve,moments}.csv
+  {
+    const m = url.pathname.match(/^\/dayroll\/(yesterday|\d{4}-\d{2}-\d{2})\/(curve|moments)\.csv$/);
+    if (m) {
+      const date = m[1] === 'yesterday' ? localDate(Date.now() - 86400000) : m[1];
+      try {
+        const body = await readFile(join(repoRoot, 'runs', `live-${date}`, `${m[2]}.csv`));
+        res.writeHead(200, { 'content-type': 'text/csv; charset=utf-8', 'cache-control': 'no-store' });
+        res.end(body);
+      } catch { res.writeHead(404); res.end(`${date} 无卷`); }
+      return;
+    }
   }
   if (url.pathname === '/live') {
     if (replayOnly || !liveChild) { res.writeHead(503); res.end('live 未开'); return; }

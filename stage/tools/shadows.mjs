@@ -1,4 +1,5 @@
-// 影子指标三条（M2.1 §2，informational 首轮）
+// 影子指标三条（M2.1 §2 立；M2.2 §0.3 裁：恒迟＝active——恒等式直转，
+// "对恒等式做统计观察是对数学的不敬"；针速比/体温 informational 候两轮）
 //
 //   node stage/tools/shadows.mjs [--base http://localhost:4173]
 //

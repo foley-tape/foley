@@ -139,8 +139,37 @@ replay 与 live 现在共用一个**因果驱动核**（`cli/driver.ts`）——
 - **无换带、无判据翻红 → 不触发重扫**；冠军 `aac8e0db` 与 baseline 不动。
 - 协议 schema：**零改动**。params：零改动。verdict：仅 `_huntV2` 注释键（哈希验证 20af9b64 不变）。
 
-## 4. 顺延（§1.4）
+## 4. 声音相（§1.4，白皮书全文落地；同轮顺延交付）
 
-v1-live 三件＋中继两修＋狩猎记缺交齐 → 下一相：**声音相**（读白皮书全文，`?tuner=1` 调音抽屉与 sound-params.json 治理同级）。释放带/卡碟带缺口留给猎场持续观察（`cli hunt` 常备）。
+### 4.1 架构（与 driver 同一哲学：纯核共享，机器可验）
+- **`sound-params.json`**（根目录）：§2.2/§3.2/§7 全部起手值，与 params.json **同级治理**——hashJson 上报（`_` 键不入哈希），出厂哈希 **ae29c2c9**。
+- **`sound/index.ts` 纯映射核**：床四 stem 映射律（bedTargets）、床能量模型（bedEnergyDb）、习惯化曲线、量化律（宁迟勿早）、五声选音（slot→动机=文件的主题曲）、askMotifHz（夹进 2–4kHz 频谱专区）、Pearson。**probe 渲染器与 ear 验收判官读同一段律**——"床的能量包络诚实追随 T"（F5）是设计定理，不是渲染巧合。
+- **`cli ear`**：§6.1 机器验收 → EAR_ACCEPT.md；**`cli probe` v2**：床（S1 基底 Eno 互质呼吸＋S2 律动 72BPM A 门控＋S3 张力弦 T 门控＋S4 磁带总线 filter/hiss/wow/shelf）＋前景词汇表（乐音 5＋呼唤 3＋DONE-静默 ≥4s）＋习惯化 ×0.85^(n−1) 沉床不消失（呼唤豁免）＋WAITING 半终止悬停＋weather 小节边界切档＋呼唤前置微静默 duck＋`?tuner=1` 调音抽屉（27 参数实时拧、哈希实时重算、复制 JSON）。
 
-（Track-FIX M1.9 完）
+### 4.2 验收现状（§6 逐条）
+| 条 | 判 | 结果 |
+|---|---|---|
+| §6.1 床包络×T Pearson（storm 必测 ≥0.6） | 机器 | **✅ storm r=0.631**（smooth 0.06/busy 0.05/jam 0.14——T 低于 S3 门控时床本就安分，A 是白皮书明令的第二驱动，informational；silence NA 方差零） |
+| §6.2 盲听 v2（≥4/5） | 人耳 | **待船长**（`probe --anon` 出匿名卷照旧可用） |
+| §6.3 F3 突变警觉复现 | 人耳 | **待船长** |
+| §6.4 呼唤三音床最响可辨 | 双 | 频谱专区 2–4kHz 已由纯核夹带（金测试㉞）；实听复核待船长 |
+| §6.5 阻断级听感=0 | 人耳 | **待船长** |
+
+金测试 ㉚–㉟ 六条新增（映射律单调/IDLE/DONE/悬停、storm r、习惯化、量化、频谱专区+主题曲+每仓一调、治理哈希）。**全套 53/53 绿。**
+页面实测（无头浏览器）：零控制台错误；AudioContext running、12× 走带对时正确；抽屉拧 s1Gain → 哈希 ae29c2c9→a0b43b7a（已改）实时重算。
+
+### 4.3 声音相现实修正
+| # | 说 | 现实 | 做 |
+|---|---|---|---|
+| 1 | §2.2 每仓库一调 repoKey=hash(repo) | 蒸馏带**无 repo 身份**（隐私膜抹 cwd） | replay 侧以磁带 sourceHash 代 repoKey；live 侧可用项目目录名，接线留 live-probe 相 |
+| 2 | §3.2 习惯化滚动 60s 窗 | replay 有回放倍速，"60s"对耳朵才有意义 | 窗按**听者时间**（音频钟）计，非磁带时间 |
+| 3 | §7 床 −26 LUFS 等响度值 | 无离线 LUFS 表；n=1 语料 | 静态增益分级近似＋值全进 sound-params；实测校准入冰箱（开箱调音） |
+| 4 | §3.1 RUN-OK 打字机铃 | test 触发 RESOLVE 时同刻两声打架 | 令文自带解法：让位给和弦（同刻 test-RESOLVE 存在 → 铃不发） |
+| 5 | v0 探针 BPM=120 | 白皮书 §2.2 定 72 恒定 | 72 BPM 入 sound-params，金测试㉝钉死"节拍是地基" |
+
+### 4.4 顺延
+- 猎场常备（`cli hunt`）：释放带/卡碟带缺口持续观察。
+- live-probe 接线（live NDJSON → 探针页实时床）：v1 下一相候选，等架构师排。
+- 真 foley 采样、LUFS 实测校准、Tone.js 选型：冰箱照旧，勿抢跑。
+
+（Track-FIX M1.9 完：v1-live 三件＋中继两修＋狩猎 v2 记缺＋声音相全文落地）

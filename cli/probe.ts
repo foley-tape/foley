@@ -1,33 +1,49 @@
-// cli probe <tape.tape.jsonl> [--out dir] [--kind ...] —— M2 素面探针页。
-// 回放蒸馏带 → 自包含 probe.html：一根针 + 曲线 + 三音（拨弦/和弦/跳针）。
-// M1.6 §7 语义：乐音（拨弦、和弦解决）量化到节拍网格、~0.1s lookahead『宁迟勿早』；
-//   跳针音走直通道不量化；针按 20Hz 驱动、不走音频钟；声音对齐的视觉走 rAF（Tone.Draw 等效）。
-// 现实修正：§7 指名 Tone.js，但 v0 硬禁『无网络请求』+ 引擎零运行时依赖；CDN 加载即网络请求、
-//   擅自 vendor 300KB 库不妥 → 以原生 Web Audio 实现同语义，库替换待架构师裁（见 FEEDBACK）。
-// 禁令照旧：无美学样式、无第四种声音、无导出/分享、不触配置、无网络。
+// cli probe <tape.tape.jsonl> [--out dir] [--kind ...] [--anon 标签] —— v1 声音相探针页（M1.9 §1.4）。
+// 回放蒸馏带 → 自包含 probe.html：针 + 曲线 + **床（连续层）** + **前景（离散层）**。
+// 白皮书落点：
+//   床 = 四 stem（S1 基底 / S2 律动 A 门控 / S3 张力 T 门控 / S4 磁带总线 filter+hiss+wow+shelf）；
+//   前景 = §3.1 词汇表（乐音 5 + 呼唤 3 + DONE-静默）；习惯化 ×0.85^(n−1) 沉床不消失（呼唤豁免）；
+//   乐音量化 1/8 @72BPM 宁迟勿早；呼唤直通；参数更新对齐 1/8 拍网格；一切连续参数过 slew。
+//   映射律唯一事实源 = sound/ 纯核 + sound-params.json（与 cli/ear.ts 验收同源；页内嵌其 JSON 与哈希）。
+//   ?tuner=1 调音抽屉（仅 dev）：边听边拧，哈希实时重算（治理锚）。
+// 禁令照旧：无网络、自包含、无导出分享；视觉保持素面（美学归 Track-STAGE 琥珀舞台）。
+// 现实修正（记 FEEDBACK）：repoKey=hash(repo) 在蒸馏带不可得（隐私膜抹 cwd）→ replay 侧以 sourceHash 代；
+//   live 侧可用项目目录名（接线待 live-probe 相）。
 
 import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 import { execSync } from 'node:child_process';
 import { join, basename, relative } from 'node:path';
-import { resolveParams, hashParams } from '../engine/params.ts';
+import { resolveParams, hashParams, hashJson } from '../engine/params.ts';
 import { replayCore, loadVerdict, type TapeKind } from './replay.ts';
+import { resolveSoundParams, degreeOf } from '../sound/index.ts';
+import type { DerivedMoment } from '../engine/index.ts';
 
-/** 事件 → 声音类别。三音：pluck（活动）/ chord（解决）/ skip（跳针）。expiry 清除=沉默（§3.5）。 */
-function soundClass(ev: { special?: string; verb: string; outcome: string }): string | null {
-  if (ev.special === 'STUCK_LOOP') return 'skip';       // 跳针，直通道不量化
-  if (ev.special === 'RESOLVE') return 'chord';         // 和弦解决，量化
-  if (ev.special === 'STUCK_CLEARED') return null;      // ok型已由 RESOLVE 发声；expiry 设计性沉默
-  if (ev.special) return null;                          // SESSION_START/DONE/ASK_CLEARED 无声
-  if (ev.verb === 'ASK') return null;                   // ASK 动机=未来（不设第四音）
-  if (ev.outcome === 'NA') return null;
-  return 'pluck';                                       // OK/FAIL 拨弦，量化（音高由 outcome/m 定）
+// 前景类别（页内以索引编码）：0 pluckOk / 1 pluckFail / 2 page / 3 bell / 4 save / 5 spawn
+//                              / 6 resolve / 7 stuck / 8 ask / 9 done。呼唤级 = 6/7/8；9 走床终止式。
+function soundClass(ev: DerivedMoment, resolveTimes: Set<number>, emitT: number): number | null {
+  if (ev.special === 'STUCK_LOOP') return 7;
+  if (ev.special === 'RESOLVE') return 6;
+  if (ev.special === 'DONE') return 9;
+  if (ev.special) return null;                 // SESSION_START/ASK_CLEARED/STUCK_CLEARED(expiry 沉默；ok 型由 RESOLVE 发声)
+  if (ev.verb === 'ASK') return 8;             // askOpen（outcome NA）——半终止动机
+  if (ev.outcome === 'FAIL') return 1;         // 低音区闷拨弦（音区分裂承载信息，盲听证明）
+  if (ev.outcome !== 'OK') return null;
+  switch (ev.verb) {
+    case 'WRITE': return 0;                    // 拨弦：targetHash 选音（文件的主题曲）
+    case 'READ': return 2;                     // 纸页翻动（最先被习惯化沉床）
+    case 'RUN':                                // 打字机回车铃；test 触发 RESOLVE 时让位给和弦
+      return ev.tags.includes('test') && resolveTimes.has(emitT) ? null : 3;
+    case 'SAVE': return 4;                     // 卡座咔哒＋低音锚（和弦另由 RESOLVE 发）
+    case 'SPAWN': return 5;                    // 新声部淡入一小节
+    default: return null;                      // OTHER：词汇预算外，无声
+  }
 }
 
 export function runProbe(argv: string[]): void {
   const tapePath = argv.filter((a) => !a.startsWith('--'))[0];
   if (!tapePath) {
-    console.error('用法: node cli/index.ts probe <tape.tape.jsonl> [--out runs/probe-<ts>/] [--kind ...]');
-    console.error('  回放磁带 → 自包含 probe.html（针+曲线+三音）。M1.6-A §5：provisional 参数下照常进 M2。');
+    console.error('用法: node cli/index.ts probe <tape.tape.jsonl> [--out runs/probe-<ts>/] [--kind ...] [--anon 标签]');
+    console.error('  回放磁带 → 自包含 probe.html（针+曲线+床+前景）。?tuner=1 开调音抽屉。');
     process.exit(2);
     return;
   }
@@ -39,6 +55,9 @@ export function runProbe(argv: string[]): void {
 
   const paramsRaw = JSON.parse(readFileSync(new URL('../params.json', import.meta.url), 'utf8'));
   const params = resolveParams(paramsRaw);
+  const soundRaw = JSON.parse(readFileSync(new URL('../sound-params.json', import.meta.url), 'utf8'));
+  const sp = resolveSoundParams(soundRaw);
+  const soundHash = hashJson(soundRaw);
   const { verdict, hash: verdictHash } = loadVerdict();
   const core = replayCore(readFileSync(tapePath, 'utf8'), params, verdict.rain.floor);
 
@@ -47,8 +66,7 @@ export function runProbe(argv: string[]): void {
   const WEATHER = ['CLEAR', 'OVERCAST', 'RAIN', 'STORM'];
   const PHASE = ['IDLE', 'WORKING', 'WAITING', 'DONE'];
 
-  // 压缩时间轴：把大空档（含跨 episode 的多日跳变、长静默）压到 ≤GAP_CAP，
-  // 否则探针会播大段死寂。origRel→comp 单调映射，声音按同映射对齐。
+  // 压缩时间轴：大空档压到 ≤GAP_CAP（探针不播死寂）；声音与状态同映射对齐
   const GAP_CAP = 1500;
   const origRel: number[] = new Array(snaps.length);
   const comp: number[] = new Array(snaps.length);
@@ -68,60 +86,66 @@ export function runProbe(argv: string[]): void {
     return comp[i - 1]! + f * (comp[i]! - comp[i - 1]!);
   };
 
-  // 针轨迹（压缩轴；抽稀 ≤12000 点）
+  // 状态轨迹（压缩轴；抽稀 ≤12000 点）：[comp, needle, T, A, wx, ph, wow, ask]
   const stride = Math.max(1, Math.ceil(snaps.length / 12000));
-  const track: [number, number, number, number, number, number][] = [];
+  const track: number[][] = [];
   const pushSnap = (i: number): void => {
     const s = snaps[i]!;
-    track.push([Math.round(comp[i]!), r3(s.needle), r3(s.T), r3(s.A), WEATHER.indexOf(s.weather), PHASE.indexOf(s.phase)]);
+    track.push([Math.round(comp[i]!), r3(s.needle), r3(s.T), r3(s.A),
+      WEATHER.indexOf(s.weather), PHASE.indexOf(s.phase), r3(s.wow), s.pendingAsk ? 1 : 0]);
   };
   for (let i = 0; i < snaps.length; i += stride) pushSnap(i);
   if (snaps.length && (snaps.length - 1) % stride !== 0) pushSnap(snaps.length - 1);
 
-  // 声音事件（发射时刻映射到压缩轴）
-  const sounds: [number, string, number][] = [];
+  const Tat = (t: number): number => {
+    let lo = 0, hi = snaps.length - 1, best = 0;
+    while (lo <= hi) { const md = (lo + hi) >> 1; if (snaps[md]!.t <= t) { best = md; lo = md + 1; } else hi = md - 1; }
+    return snaps.length ? snaps[best]!.T : 0;
+  };
+
+  // 声音事件：[comp, cls, degree, vel]。degree=slot 选音；vel=当刻 T（力度/亮度 ∝ T，F1）
+  const resolveTimes = new Set(core.emitted.filter((e) => e.ev.special === 'RESOLVE').map((e) => e.emitT));
+  const sounds: number[][] = [];
   for (const e of core.emitted) {
-    const cls = soundClass(e.ev);
-    if (!cls) continue;
-    const pitch = e.ev.outcome === 'FAIL' ? 0 : 1; // 0=低(失败) 1=高(顺)
-    sounds.push([Math.round(interp(e.emitT - t0)), cls, e.ev.special === 'RESOLVE' ? 2 : pitch]);
+    const cls = soundClass(e.ev, resolveTimes, e.emitT);
+    if (cls === null) continue;
+    sounds.push([Math.round(interp(e.emitT - t0)), cls, degreeOf(e.ev.slot, sp), r3(Tat(e.emitT))]);
   }
-  sounds.sort((a, b) => a[0] - b[0]);
+  sounds.sort((a, b) => a[0]! - b[0]!);
 
-  const durationMs = track.length ? track[track.length - 1]![0] : 0;
+  const durationMs = track.length ? track[track.length - 1]![0]! : 0;
   const anon = !!anonLabel;
+  const repoKey = anon ? anonLabel! : core.d.meta.sourceHash; // 每仓库一调的 replay 近似（见文件头现实修正）
   const data = anon
-    ? { // 匿名：只留 label，抹带名/卷号/日期/engine/params/verdict/统计（防推断）
-        tape: anonLabel, kind: '', engineSha: '—', paramsHash: '—', verdictHash: '—',
-        provisional: false, anon: true, durationMs, peakT: 0, stuck: 0, resolves: 0, track, sounds,
-      }
-    : {
-        tape: basename(tapePath), kind: kind ?? '',
-        engineSha: gitSha(), paramsHash: hashParams(paramsRaw), verdictHash,
-        provisional: false, anon: false, durationMs, peakT: core.metrics.peakT,
-        stuck: core.metrics.stuckEdges, resolves: core.metrics.resolves, track, sounds,
-      };
+    ? { tape: anonLabel, kind: '', engineSha: '—', paramsHash: '—', verdictHash: '—', soundHash,
+        anon: true, durationMs, peakT: 0, stuck: 0, resolves: 0, repoKey, track, sounds }
+    : { tape: basename(tapePath), kind: kind ?? '', engineSha: gitSha(), paramsHash: hashParams(paramsRaw),
+        verdictHash, soundHash, anon: false, durationMs, peakT: core.metrics.peakT,
+        stuck: core.metrics.stuckEdges, resolves: core.metrics.resolves, repoKey, track, sounds };
 
-  const html = buildProbeHtml(data);
+  const html = buildProbeHtml(data, soundRaw);
   const ts = new Date().toISOString().replace(/[:.]/g, '-');
   const outDir = outIdx >= 0 && argv[outIdx + 1] ? argv[outIdx + 1]! : join(process.cwd(), 'runs', `probe-${ts}`);
   mkdirSync(outDir, { recursive: true });
   const outFile = join(outDir, 'probe.html');
   writeFileSync(outFile, html, 'utf8');
+  const cnt = (c: number): number => sounds.filter((s) => s[1] === c).length;
   process.stderr.write(
-    `探针 ${basename(tapePath)}${kind ? `（${kind}）` : ''} → ${relative(process.cwd(), outFile)}\n` +
-    `  针轨迹 ${track.length} 点｜声音事件 ${sounds.length}（跳针${sounds.filter((s) => s[1] === 'skip').length}/和弦${sounds.filter((s) => s[1] === 'chord').length}/拨弦${sounds.filter((s) => s[1] === 'pluck').length}）｜时长 ${(durationMs / 1000).toFixed(0)}s\n` +
-    `  浏览器打开 probe.html，点『▶ 播放』（需用户手势解锁音频）。自包含、无网络、无外部依赖。\n`,
+    `探针 v1声音相 ${basename(tapePath)}${kind ? `（${kind}）` : ''} → ${relative(process.cwd(), outFile)}\n` +
+    `  sound-params ${soundHash}｜轨迹 ${track.length} 点｜前景 ${sounds.length}` +
+    `（拨弦${cnt(0)}/闷弦${cnt(1)}/纸页${cnt(2)}/铃${cnt(3)}/卡座${cnt(4)}/声部${cnt(5)}｜和弦${cnt(6)}/跳针${cnt(7)}/ASK${cnt(8)}｜DONE${cnt(9)}）\n` +
+    `  浏览器打开 probe.html 点『▶』（用户手势解锁音频）。?tuner=1 开调音抽屉。自包含、零网络。\n`,
   );
 }
 
 function r3(n: number): number { return Math.round(n * 1000) / 1000; }
 function gitSha(): string { try { return execSync('git rev-parse --short HEAD', { encoding: 'utf8' }).trim(); } catch { return 'nogit'; } }
 
-// ---------- probe.html（自包含：内联 CSS/JS + 内嵌数据；无外部 URL） ----------
+// ---------- probe.html（自包含：内联 CSS/JS + 内嵌数据/声参；无外部 URL） ----------
 
-function buildProbeHtml(data: unknown): string {
+function buildProbeHtml(data: unknown, soundRaw: unknown): string {
   const json = JSON.stringify(data);
+  const spJson = JSON.stringify(soundRaw);
   return `<!doctype html>
 <html lang="zh"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>TAPE-0 探针 · ${(data as { tape: string }).tape}</title>
@@ -135,16 +159,19 @@ function buildProbeHtml(data: unknown): string {
   .ctl{display:flex;gap:10px;align-items:center;padding:0 16px 16px;flex-wrap:wrap}
   button{font:inherit;background:#1a1b1e;color:#d6d6d9;border:1px solid #333;border-radius:4px;padding:6px 12px;cursor:pointer}
   button:hover{border-color:#555} input[type=range]{width:140px}
-  .badge{padding:1px 7px;border:1px solid #333;border-radius:10px}
-  .prov{color:#e0b050;border-color:#5a4a1a}
+  #tuner{display:none;border-top:1px solid #222;padding:12px 16px;columns:3;column-gap:24px}
+  #tuner label{display:flex;gap:8px;align-items:center;break-inside:avoid;margin:2px 0}
+  #tuner label span.k{width:150px;color:#9a9aa0} #tuner input[type=range]{width:110px}
+  #tuner .v{width:56px;text-align:right;color:#e8e8ea}
+  #tunerHead{padding:8px 16px;border-top:1px solid #222;color:#e0b050;display:none}
 </style></head><body>
 <header>
-  <b>TAPE-0 探针</b>
+  <b>TAPE-0 探针 · v1 声音相</b>
   <span class="muted">tape</span> <span id="mTape"></span>
   <span class="muted">engine</span> <span id="mEng"></span>
   <span class="muted">params</span> <span id="mPar"></span>
   <span class="muted">verdict</span> <span id="mVer"></span>
-  <span class="badge prov" id="mProv">provisional 参数（M1.6-A §5）</span>
+  <span class="muted">sound</span> <span id="mSnd"></span>
 </header>
 <div class="wrap">
   <canvas id="needle" width="260" height="260"></canvas>
@@ -156,69 +183,244 @@ function buildProbeHtml(data: unknown): string {
   <span class="muted">速度</span><input id="speed" type="range" min="1" max="60" value="12"><span id="speedV">12×</span>
   <span class="muted">｜进度</span><span id="prog">0s</span>
   <span class="muted">｜天气</span><span id="wx">CLEAR</span>
-  <span class="muted">｜三音</span><span class="muted">拨弦=活动 · 和弦=解决(量化) · 跳针=卡碟(直通)</span>
+  <span class="muted">｜床</span><span id="bed">—</span>
+  <span class="muted">｜词汇：拨弦=改动(槽选音) 闷弦=失败 纸页=读 铃=跑 卡座=存 ｜呼唤：和弦=解决 跳针=卡碟 动机=ASK ｜DONE=静默</span>
 </div>
+<div id="tunerHead">调音抽屉（dev）—— sound-params 实时哈希：<span id="tHash"></span> <button id="tCopy">复制 JSON</button></div>
+<div id="tuner"></div>
 <script id="d" type="application/json">${json}</script>
+<script id="sp" type="application/json">${spJson}</script>
 <script>
 "use strict";
 const D = JSON.parse(document.getElementById('d').textContent);
+let SP = JSON.parse(document.getElementById('sp').textContent);
 document.getElementById('mTape').textContent = D.tape + (D.kind?(' ('+D.kind+')'):'');
 document.getElementById('mEng').textContent = D.engineSha;
 document.getElementById('mPar').textContent = D.paramsHash;
 document.getElementById('mVer').textContent = D.verdictHash;
-if(!D.provisional) document.getElementById('mProv').style.display='none';
+document.getElementById('mSnd').textContent = D.soundHash;
 
 const WX=['CLEAR','OVERCAST','RAIN','STORM'];
-const WXC=['#2a6','#7a3','#59c','#c53']; // 晴/多云/雨/暴雨 —— 仅功能色，非美学
+const WXC=['#2a6','#7a3','#59c','#c53'];
 const nc=document.getElementById('needle'), ncx=nc.getContext('2d');
 const cc=document.getElementById('curve'), ccx=cc.getContext('2d');
 const track=D.track, sounds=D.sounds, dur=D.durationMs;
 
-// ---------- 音频：三音 + 节拍量化调度（§7 宁迟勿早） ----------
-let ac=null; const BPM=120, GRID=60/BPM/2; // 8分音网格 0.25s
-const LOOKAHEAD=0.1;                        // §7 默认 lookAhead ~0.1s
-function ensureAudio(){ if(!ac) ac=new (window.AudioContext||window.webkitAudioContext)(); if(ac.state==='suspended') ac.resume(); }
-function quantizeUp(at){ return Math.ceil(at/GRID)*GRID; }        // 对齐到下一网格线：永不提前
-function pluck(at,hi){ const o=ac.createOscillator(),g=ac.createGain(); o.type='triangle';
-  o.frequency.value=hi?440:220; o.connect(g); g.connect(ac.destination);
-  g.gain.setValueAtTime(0.0001,at); g.gain.exponentialRampToValueAtTime(hi?0.22:0.3,at+0.005);
-  g.gain.exponentialRampToValueAtTime(0.0001,at+0.18); o.start(at); o.stop(at+0.2); }
-function chord(at){ [523.25,659.25,783.99].forEach((f,i)=>{ const o=ac.createOscillator(),g=ac.createGain();
-  o.type='sine'; o.frequency.value=f; o.connect(g); g.connect(ac.destination);
-  g.gain.setValueAtTime(0.0001,at); g.gain.exponentialRampToValueAtTime(0.16,at+0.02+i*0.01);
-  g.gain.exponentialRampToValueAtTime(0.0001,at+0.9); o.start(at); o.stop(at+0.95); }); }
-function skip(at){ // 跳针：短促噪声脉冲（直通道，不量化）
-  const n=ac.sampleRate*0.08, b=ac.createBuffer(1,n,ac.sampleRate), d=b.getChannelData(0);
+// ===== 纯核同源律（与 sound/index.ts 一致；tuner 拧 SP 即拧此处） =====
+const clamp01=x=>x<0?0:x>1?1:x, dbLin=db=>Math.pow(10,db/20);
+function bedTargets(T,A,wow,ph,ask){ const b=SP.bed;
+  T=clamp01(T);A=clamp01(A);wow=clamp01(wow);
+  const idle=ph===0, silence=ph===3;
+  const s2gate=clamp01((A-b.s2GateA)/(1-b.s2GateA)), s3gate=clamp01((T-b.s3GateT)/(1-b.s3GateT));
+  return { s1: silence?0:(idle?b.s1IdleGain:b.s1Gain),
+    s2: (silence||idle)?0:b.s2Gain*s2gate, s3: silence?0:b.s3Gain*s3gate,
+    hiss: silence?0:dbLin(b.hissDbLo+(b.hissDbHi-b.hissDbLo)*T),
+    fHz: b.filterHzHi+(b.filterHzLo-b.filterHzHi)*T,
+    shelfDb: b.hfShelfDbLo+(b.hfShelfDbHi-b.hfShelfDbLo)*T,
+    wowCents: b.wowCentsLo+(b.wowCentsHi-b.wowCentsLo)*wow,
+    susProb: T, density: b.s2DensityLo+(b.s2DensityHi-b.s2DensityLo)*A,
+    hover: !!ask, silence };
+}
+function habGain(n){ if(n<=1)return 1; return Math.max(SP.foreground.habituationFloorRatio, Math.pow(SP.foreground.habituationFactor,n-1)); }
+function rootMidiOf(key){ let h=0; for(let i=0;i<key.length;i++) h=((h<<5)-h+key.charCodeAt(i))|0; return SP.scale.rootMidiBase+(Math.abs(h)%SP.scale.rootMidiSpan); }
+const midiHz=m=>440*Math.pow(2,(m-69)/12);
+function degHz(deg,oct){ return midiHz(ROOT+SP.scale.pentatonic[deg%SP.scale.pentatonic.length]+12*oct); }
+function askHz(){ let hz=degHz(4,3); while(hz<SP.call.askBandHzLo)hz*=2; while(hz>SP.call.askBandHzHi)hz/=2; return Math.max(hz,SP.call.askBandHzLo); }
+const ROOT=rootMidiOf(D.repoKey);
+const beat=()=>60/SP.bpm, grid=()=>beat()/2, bar=()=>beat()*4;
+
+// hashJson 同源（stableStringify 排序、_ 键剔除 + FNV-1a）——治理锚
+function stableStr(v){ if(v===null||typeof v!=='object')return JSON.stringify(v);
+  if(Array.isArray(v))return '['+v.map(stableStr).join(',')+']';
+  const ks=Object.keys(v).filter(k=>!k.startsWith('_')).sort();
+  return '{'+ks.map(k=>JSON.stringify(k)+':'+stableStr(v[k])).join(',')+'}'; }
+function hashJson(o){ const s=stableStr(o); let h=0x811c9dc5;
+  for(let i=0;i<s.length;i++){ h^=s.charCodeAt(i); h=(h+((h<<1)+(h<<4)+(h<<7)+(h<<8)+(h<<24)))>>>0; }
+  return h.toString(16).padStart(8,'0'); }
+
+// ===== 音频图 =====
+let ac=null, G={};
+function ensureAudio(){ if(ac) { if(ac.state==='suspended') ac.resume(); return; }
+  ac=new (window.AudioContext||window.webkitAudioContext)();
+  // S4 磁带总线：wow(调制延迟) → 低通 → 高频搁架 → 总闸 → 出
+  G.master=ac.createGain(); G.master.gain.value=0.9;
+  G.shelf=ac.createBiquadFilter(); G.shelf.type='highshelf'; G.shelf.frequency.value=4500;
+  G.lp=ac.createBiquadFilter(); G.lp.type='lowpass'; G.lp.frequency.value=SP.bed.filterHzHi; G.lp.Q.value=0.4;
+  G.wowDelay=ac.createDelay(0.1); G.wowDelay.delayTime.value=0.03;
+  G.wowLfo1=ac.createOscillator(); G.wowLfo1.frequency.value=0.9;   // 互质双 LFO：走带不稳不精确重复
+  G.wowLfo2=ac.createOscillator(); G.wowLfo2.frequency.value=1.31;
+  G.wowAmt1=ac.createGain(); G.wowAmt2=ac.createGain();
+  G.wowLfo1.connect(G.wowAmt1); G.wowAmt1.connect(G.wowDelay.delayTime);
+  G.wowLfo2.connect(G.wowAmt2); G.wowAmt2.connect(G.wowDelay.delayTime);
+  G.wowLfo1.start(); G.wowLfo2.start();
+  G.bedBus=ac.createGain();      // 床（受呼唤前置微静默 duck）
+  G.fgBus=ac.createGain();       // 前景
+  G.bedBus.connect(G.wowDelay); G.wowDelay.connect(G.lp);
+  G.fgBus.connect(G.lp);         // 前景同过磁带总线（同一台机器出的声）
+  G.lp.connect(G.shelf); G.shelf.connect(G.master); G.master.connect(ac.destination);
+  // S1 基底：双失谐振荡 pad + 互质呼吸 LFO + 房间噪
+  G.s1=ac.createGain(); G.s1.gain.value=0; G.s1.connect(G.bedBus);
+  const padF=ac.createBiquadFilter(); padF.type='lowpass'; padF.frequency.value=900; padF.connect(G.s1);
+  const o1=ac.createOscillator(),o2=ac.createOscillator();
+  o1.type='triangle'; o2.type='sine';
+  o1.frequency.value=midiHz(ROOT-12); o2.frequency.value=midiHz(ROOT-12)*1.005;
+  o1.connect(padF); o2.connect(padF); o1.start(); o2.start();
+  const b1=ac.createOscillator(),bg1=ac.createGain(),b2=ac.createOscillator(),bg2=ac.createGain();
+  b1.frequency.value=1/7.3; b2.frequency.value=1/11.9;                 // Eno 互质
+  bg1.gain.value=0.15; bg2.gain.value=0.1;
+  b1.connect(bg1); bg1.connect(G.s1.gain); b2.connect(bg2); bg2.connect(G.s1.gain);
+  b1.start(); b2.start();
+  G.room=noiseSrc(); G.roomG=ac.createGain(); G.roomG.gain.value=0.004;
+  const roomF=ac.createBiquadFilter(); roomF.type='lowpass'; roomF.frequency.value=400;
+  G.room.connect(roomF); roomF.connect(G.roomG); G.roomG.connect(G.bedBus);
+  // S3 张力弦：根音+五度（悬挂音按 susProb 换）经暗滤波
+  G.s3=ac.createGain(); G.s3.gain.value=0; G.s3.connect(G.bedBus);
+  G.s3F=ac.createBiquadFilter(); G.s3F.type='lowpass'; G.s3F.frequency.value=1200; G.s3F.connect(G.s3);
+  G.v1=ac.createOscillator(); G.v1.type='sawtooth'; G.v1g=ac.createGain(); G.v1g.gain.value=0.5;
+  G.v2=ac.createOscillator(); G.v2.type='sawtooth'; G.v2g=ac.createGain(); G.v2g.gain.value=0.35;
+  G.v1.frequency.value=midiHz(ROOT); G.v2.frequency.value=midiHz(ROOT+7);
+  G.v1.connect(G.v1g); G.v1g.connect(G.s3F); G.v2.connect(G.v2g); G.v2g.connect(G.s3F);
+  G.v1.start(); G.v2.start();
+  // S4 hiss：白噪→高架
+  G.hiss=noiseSrc(); G.hissG=ac.createGain(); G.hissG.gain.value=0;
+  const hf=ac.createBiquadFilter(); hf.type='highpass'; hf.frequency.value=2500;
+  G.hiss.connect(hf); hf.connect(G.hissG); G.hissG.connect(G.bedBus);
+  // S2 律动增益（事件由调度器触发）
+  G.s2=ac.createGain(); G.s2.gain.value=0; G.s2.connect(G.bedBus);
+}
+function noiseSrc(){ const n=ac.sampleRate*2, b=ac.createBuffer(1,n,ac.sampleRate), d=b.getChannelData(0);
+  for(let i=0;i<n;i++) d[i]=Math.random()*2-1;
+  const s=ac.createBufferSource(); s.buffer=b; s.loop=true; s.start(); return s; }
+
+// ---- 床参数施加（slew：setTargetAtTime；调用对齐 1/8 网格） ----
+let lastPh=-1, doneSilentUntil=-1;
+function applyBed(bt,at){ const fast=SP.bed.slewMsFast/1000, slow=SP.bed.slewMsSlow/1000;
+  G.s1.gain.setTargetAtTime(bt.s1,at,slow);
+  G.s2.gain.setTargetAtTime(bt.s2,at,fast);
+  G.s3.gain.setTargetAtTime(bt.s3,at,fast);
+  G.hissG.gain.setTargetAtTime(bt.hiss,at,slow);
+  G.lp.frequency.setTargetAtTime(bt.fHz,at,slow);
+  G.shelf.gain.setTargetAtTime(bt.shelfDb,at,slow);
+  const wowAmt=0.03*(Math.pow(2,bt.wowCents/1200)-1);
+  G.wowAmt1.gain.setTargetAtTime(wowAmt*0.7,at,slow);
+  G.wowAmt2.gain.setTargetAtTime(wowAmt*0.4,at,slow);
+  // WAITING 悬停：属方向延音（半终止；整张床替琥珀管呼吸）
+  const f1=bt.hover?midiHz(ROOT+7):midiHz(ROOT), f2=bt.hover?midiHz(ROOT+14):midiHz(ROOT+7);
+  G.v1.frequency.setTargetAtTime(f1,at,fast); G.v2.frequency.setTargetAtTime(f2,at,fast);
+}
+
+// ---- 前景合成（力度/亮度 ∝ vel=当刻 T，F1） ----
+function envG(at,peak,att,dec){ const g=ac.createGain(); g.connect(G.fgBus);
+  g.gain.setValueAtTime(0.0001,at); g.gain.exponentialRampToValueAtTime(Math.max(peak,0.0012),at+att);
+  g.gain.exponentialRampToValueAtTime(0.0001,at+att+dec); return g; }
+function pluck(at,deg,vel,fail,hab){ const o=ac.createOscillator(); o.type='triangle';
+  o.frequency.value=degHz(deg, fail?0:2);
+  const f=ac.createBiquadFilter(); f.type='lowpass'; f.frequency.value=fail?700:(900+3600*vel);
+  const peak=(fail?SP.foreground.failGain:SP.foreground.peakGain*(0.55+0.45*vel))*hab;
+  const g=envG(at,peak,0.006,fail?0.22:0.16); o.connect(f); f.connect(g); o.start(at); o.stop(at+0.4); }
+function page(at,hab){ const n=noiseBurst(at,0.07); const f=ac.createBiquadFilter(); f.type='bandpass'; f.frequency.value=650; f.Q.value=0.8;
+  n.connect(f); f.connect(envG(at,SP.foreground.pageGain*hab,0.01,0.06)); }
+function bell(at,vel,hab){ [1240,1860].forEach((fr,i)=>{ const o=ac.createOscillator(); o.type='sine'; o.frequency.value=fr;
+  o.connect(envG(at,SP.foreground.bellGain*(0.6+0.4*vel)*hab*(i?0.5:1),0.004,0.35)); o.start(at); o.stop(at+0.4); }); }
+function saveClick(at,hab){ noiseBurst(at,0.02).connect(envG(at,SP.foreground.saveGain*hab,0.002,0.03));
+  const o=ac.createOscillator(); o.type='sine'; o.frequency.value=midiHz(ROOT-12);
+  o.connect(envG(at,SP.foreground.saveGain*0.8*hab,0.01,0.3)); o.start(at); o.stop(at+0.35); }
+function spawnVoice(at,deg,hab){ const o=ac.createOscillator(); o.type='sine'; o.frequency.value=degHz(deg,1);
+  const g=ac.createGain(); g.connect(G.fgBus); g.gain.setValueAtTime(0.0001,at);
+  g.gain.linearRampToValueAtTime(SP.foreground.spawnGain*hab,at+bar()); g.gain.linearRampToValueAtTime(0.0001,at+bar()*2);
+  o.connect(g); o.start(at); o.stop(at+bar()*2+0.1); }
+function noiseBurst(at,len){ const n=Math.ceil(ac.sampleRate*len), b=ac.createBuffer(1,n,ac.sampleRate), d=b.getChannelData(0);
   for(let i=0;i<n;i++) d[i]=(Math.random()*2-1)*(1-i/n);
-  const s=ac.createBufferSource(),g=ac.createGain(),f=ac.createBiquadFilter();
-  f.type='bandpass'; f.frequency.value=1600; s.buffer=b; s.connect(f); f.connect(g); g.connect(ac.destination);
-  g.gain.setValueAtTime(0.35,at); g.gain.exponentialRampToValueAtTime(0.0001,at+0.09); s.start(at); }
+  const s=ac.createBufferSource(); s.buffer=b; s.start(at); return s; }
+// 呼唤级（豁免习惯化；前置微静默 duck 床）
+function duck(at){ G.bedBus.gain.cancelScheduledValues(at); G.bedBus.gain.setTargetAtTime(0.55,at-0.12<ac.currentTime?at:at-0.12,0.03);
+  G.bedBus.gain.setTargetAtTime(1.0,at+0.25,0.2); }
+function chordResolve(at){ duck(at); const g=SP.call.gain;
+  [[0,0],[4,0.015],[7,0.03]].forEach(([semi,dt])=>{ const o=ac.createOscillator(); o.type='sine';
+    o.frequency.value=midiHz(ROOT+semi+12);
+    o.connect(envG(at+dt,g*0.5,0.02,0.9)); o.start(at+dt); o.stop(at+dt+1); });
+  const o5=ac.createOscillator(); o5.type='sine'; o5.frequency.value=midiHz(ROOT+7); // 正格：属→主的属残响
+  o5.connect(envG(Math.max(ac.currentTime,at-0.18),g*0.25,0.01,0.15)); o5.start(Math.max(ac.currentTime,at-0.18)); o5.stop(at+0.2);
+}
+function skip(at){ duck(at); const n=noiseBurst(at,0.08); const f=ac.createBiquadFilter(); f.type='bandpass'; f.frequency.value=1600;
+  n.connect(f); f.connect(envG(at,SP.call.gain,0.003,0.09)); }
+function askMotif(at){ duck(at); const hz=askHz();
+  [[hz,0,0.28],[hz*9/8,0.22,0.6]].forEach(([fr,dt,len])=>{ const o=ac.createOscillator(); o.type='sine'; o.frequency.value=fr;
+    o.connect(envG(at+dt,SP.call.gain*0.7,0.02,len)); o.start(at+dt); o.stop(at+dt+len+0.1); });
+}
+function doneCadence(at){ // 正格终止 → 真静默 ≥4s（洗碗机时刻）
+  const o1=ac.createOscillator(),o2=ac.createOscillator();
+  o1.type='sine'; o2.type='sine'; o1.frequency.value=midiHz(ROOT+7); o2.frequency.value=midiHz(ROOT);
+  o1.connect(envG(at,0.2,0.02,0.3)); o2.connect(envG(at+0.35,0.24,0.02,0.8));
+  o1.start(at); o1.stop(at+0.4); o2.start(at+0.35); o2.stop(at+1.3);
+  doneSilentUntil=at+0.35+SP.bed.doneSilenceSec;
+}
 
-// ---------- 双时钟：针走 20Hz 墙钟；声音走音频钟 ----------
-let playing=false, perf0=0, audio0=0, speed=12, si=0, needleTimer=null, raf=0;
-function playMs(){ return (performance.now()-perf0)*speed; }              // 针用（不走音频钟）
+// ---- 习惯化（滚动 60s 听者时间窗；呼唤/DONE 豁免） ----
+const habLog=new Map();
+function habFor(cls,at){ if(cls>=6) return 1;
+  const w=SP.foreground.habituationWindowSec, arr=(habLog.get(cls)||[]).filter(t=>at-t<=w);
+  arr.push(at); habLog.set(cls,arr); return habGain(arr.length); }
+
+// ===== 双时钟播放（针走墙钟；声音走音频钟；乐音量化宁迟勿早） =====
+let playing=false, perf0=0, audio0=0, speed=12, si=0, raf=0, lastGridAt=0, lastBarAt=0, wxLatch=0, lastAskRepeat=-1;
+function playMs(){ return (performance.now()-perf0)*speed; }
 document.getElementById('speed').oninput=e=>{ speed=+e.target.value; document.getElementById('speedV').textContent=speed+'×'; };
+function quantizeUp(at){ const g=grid(), rel=at-audio0; return audio0+Math.ceil(rel/g-1e-9)*g; }
+function sampleAt(pm){ let lo=0,hi=track.length-1,best=0;
+  while(lo<=hi){ const md=(lo+hi)>>1; if(track[md][0]<=pm){best=md;lo=md+1;} else hi=md-1; } return track[best]; }
 
-function schedule(){ // 每 25ms 前瞻 100ms：把落入窗口的乐音量化排程；跳针直通
-  if(!playing) return;
-  const pm=playMs(), horizon=pm+LOOKAHEAD*1000*speed;
+function schedule(){ if(!playing) return;
+  const pm=playMs(), horizon=pm+140*speed;             // ~140ms 前瞻
+  // 1/8 网格：床参数更新 + 律动触发（S2）
+  while(lastGridAt<=ac.currentTime+0.14){
+    const at=lastGridAt, gpm=(at-audio0)*1000*speed;
+    const s=sampleAt(Math.min(gpm,dur));
+    const bt=bedTargets(s[2],s[3],s[6],s[5],s[7]);
+    if(at>doneSilentUntil) applyBed(bt,at); else if(bt.silence===false && at<=doneSilentUntil){/* 静默期不复活 */}
+    // 小节边界：weather 档位切换（既有教义）+ 悬挂音选声（比例 ∝ T，确定性伪随机可复听）
+    if(at>=lastBarAt+bar()-1e-6){ lastBarAt=at; wxLatch=s[4];
+      G.roomG.gain.setTargetAtTime(0.004+0.003*wxLatch,at,1.0);
+      if(!bt.hover){ const bi=Math.round((at-audio0)/bar());
+        const sus=(Math.abs(Math.sin(bi*311.7))%1)<bt.susProb;
+        G.v2.frequency.setTargetAtTime(midiHz(ROOT+(sus?5:7)),at,SP.bed.slewMsSlow/1000); } }
+    // S2 boom-bap：概率 ∝ density，力度轻
+    if(bt.s2>0 && at>doneSilentUntil){ const gi=Math.round((at-audio0)/grid());
+      const strong=(gi%4===0), r=Math.abs(Math.sin(gi*127.1))%1;   // 确定性伪随机（可复听）
+      if(r<bt.density*(strong?0.9:0.35)){
+        if(strong){ const k=ac.createOscillator(); k.frequency.setValueAtTime(85,at); k.frequency.exponentialRampToValueAtTime(42,at+0.09);
+          const kg=ac.createGain(); kg.connect(G.s2); kg.gain.setValueAtTime(0.9,at); kg.gain.exponentialRampToValueAtTime(0.001,at+0.18);
+          k.connect(kg); k.start(at); k.stop(at+0.2); }
+        else { const h=noiseBurst(at,0.03); const hf2=ac.createBiquadFilter(); hf2.type='highpass'; hf2.frequency.value=6500;
+          const hg=ac.createGain(); hg.connect(G.s2); hg.gain.setValueAtTime(0.25,at); hg.gain.exponentialRampToValueAtTime(0.001,at+0.04);
+          h.connect(hf2); hf2.connect(hg); h.start(at); } } }
+    // ASK 礼貌性重复（90s 一次，音量不升级）
+    const sNow=sampleAt(Math.min(gpm,dur));
+    if(sNow[7]===1 && (at-lastAskRepeat)>=SP.call.askRepeatSec){ lastAskRepeat=at; if(at>audio0+1) askMotif(at); }
+    lastGridAt+=grid();
+  }
+  // 前景事件
   while(si<sounds.length && sounds[si][0]<=horizon){
-    const [rel,cls]=sounds[si];
-    const at=audio0+(rel-pm)/1000/speed;                                  // 该事件的音频时刻
-    const when=Math.max(ac.currentTime, at);
-    if(cls==='skip') skip(when);                                          // 直通道
-    else if(cls==='chord') chord(quantizeUp(when));                       // 量化
-    else pluck(quantizeUp(when), sounds[si][2]===1);                      // 量化
+    const [rel,cls,deg,vel]=sounds[si];
+    const atE=Math.max(ac.currentTime, audio0+rel/1000/speed);
+    const hab=habFor(cls,atE);
+    if(cls===6) chordResolve(atE);
+    else if(cls===7) skip(atE);
+    else if(cls===8){ lastAskRepeat=atE; askMotif(atE); }
+    else if(cls===9) doneCadence(atE);
+    else { const q=quantizeUp(atE);
+      if(cls===0) pluck(q,deg,vel,false,hab);
+      else if(cls===1) pluck(q,deg,vel,true,hab);
+      else if(cls===2) page(q,hab);
+      else if(cls===3) bell(q,vel,hab);
+      else if(cls===4) saveClick(q,hab);
+      else if(cls===5) spawnVoice(q,deg,hab); }
     si++;
   }
   if(playing) setTimeout(schedule,25);
 }
 
-function sampleAt(pm){ // 二分找 ≤pm 的针值
-  let lo=0,hi=track.length-1,best=0;
-  while(lo<=hi){ const md=(lo+hi)>>1; if(track[md][0]<=pm){best=md;lo=md+1;} else hi=md-1; }
-  return track[best];
-}
+// ---- 画（素面照旧） ----
 function drawNeedle(v,wx){ const w=nc.width,h=nc.height,cx=w/2,cy=h*0.62,R=100;
   ncx.clearRect(0,0,w,h);
   ncx.strokeStyle='#333'; ncx.lineWidth=10; ncx.beginPath(); ncx.arc(cx,cy,R,Math.PI,2*Math.PI); ncx.stroke();
@@ -241,14 +443,50 @@ function frame(){ const pm=Math.min(playMs(),dur); const s=sampleAt(pm);
   drawNeedle(s[1],s[4]); drawCurve(pm);
   document.getElementById('prog').textContent=(pm/1000).toFixed(0)+'s / '+(dur/1000).toFixed(0)+'s';
   document.getElementById('wx').textContent=WX[s[4]];
+  const bt=bedTargets(s[2],s[3],s[6],s[5],s[7]);
+  document.getElementById('bed').textContent=(bt.silence?'静默':bt.hover?'悬停':'S1 '+bt.s1.toFixed(2)+' S2 '+bt.s2.toFixed(2)+' S3 '+bt.s3.toFixed(2));
   if(playing && pm<dur) raf=requestAnimationFrame(frame); else if(pm>=dur) stop(); }
-function start(){ if(playing) return; ensureAudio(); playing=true; perf0=performance.now(); audio0=ac.currentTime; si=0;
+function start(){ if(playing) return; ensureAudio(); playing=true; perf0=performance.now(); audio0=ac.currentTime+0.05; si=0;
+  habLog.clear(); doneSilentUntil=-1; lastGridAt=audio0; lastBarAt=audio0; lastAskRepeat=-1e9;
+  G.bedBus.gain.setValueAtTime(1,ac.currentTime);
   schedule(); raf=requestAnimationFrame(frame); }
-function stop(){ playing=false; cancelAnimationFrame(raf); }
+function stop(){ playing=false; cancelAnimationFrame(raf);
+  if(ac){ const at=ac.currentTime; ['s1','s2','s3','hissG'].forEach(k=>G[k].gain.setTargetAtTime(0,at,0.2)); } }
 document.getElementById('play').onclick=start;
 document.getElementById('stop').onclick=stop;
-// 初绘（静止）
-(function(){ const s=track.length?sampleAt(0):[0,0,0,0,0,0]; drawNeedle(s[1],s[4]); drawCurve(0); })();
+(function(){ const s=track.length?sampleAt(0):[0,0,0,0,0,0,0,0]; drawNeedle(s[1],s[4]); drawCurve(0); })();
+// dev 诊断口（自动化验证用；后台标签 rAF 被掐时以此读真状态）
+window.__probe={ isPlaying:()=>playing, acState:()=>ac?ac.state:'none', acTime:()=>ac?ac.currentTime:-1,
+  playMs:()=>playing?playMs():-1, scheduled:()=>si, gridAt:()=>lastGridAt };
+
+// ===== 调音抽屉（?tuner=1，仅 dev；拧 SP → 实时生效 + 哈希重算） =====
+if(new URLSearchParams(location.search).get('tuner')==='1'){
+  document.getElementById('tunerHead').style.display='block';
+  const panel=document.getElementById('tuner'); panel.style.display='block';
+  const fields=[
+    ['bed','s1Gain',0,0.3],['bed','s1IdleGain',0,0.1],['bed','s2Gain',0,0.3],['bed','s2GateA',0,1],
+    ['bed','s3Gain',0,0.4],['bed','s3GateT',0,1],['bed','filterHzLo',300,4000],['bed','filterHzHi',2000,12000],
+    ['bed','hissDbLo',-80,-40],['bed','hissDbHi',-60,-20],['bed','wowCentsLo',0,10],['bed','wowCentsHi',5,50],
+    ['bed','hfShelfDbHi',-12,0],['bed','slewMsFast',50,1000],['bed','slewMsSlow',200,2000],['bed','doneSilenceSec',1,10],
+    ['foreground','peakGain',0,0.6],['foreground','failGain',0,0.6],['foreground','pageGain',0,0.3],
+    ['foreground','bellGain',0,0.4],['foreground','saveGain',0,0.5],['foreground','spawnGain',0,0.4],
+    ['foreground','habituationFactor',0.5,1],['foreground','habituationWindowSec',10,180],['foreground','habituationFloorRatio',0,0.6],
+    ['call','gain',0,0.8],['call','askRepeatSec',30,300],
+  ];
+  const hEl=document.getElementById('tHash');
+  const refreshHash=()=>{ hEl.textContent=hashJson(SP)+(hashJson(SP)===D.soundHash?'（=出厂）':'（已改）'); };
+  for(const [sec,key,lo,hi] of fields){
+    const lab=document.createElement('label');
+    const k=document.createElement('span'); k.className='k'; k.textContent=sec+'.'+key;
+    const inp=document.createElement('input'); inp.type='range'; inp.min=lo; inp.max=hi; inp.step=(hi-lo)/200;
+    inp.value=SP[sec][key];
+    const v=document.createElement('span'); v.className='v'; v.textContent=(+SP[sec][key]).toFixed(3).replace(/\\.?0+$/,'');
+    inp.oninput=()=>{ SP[sec][key]=+inp.value; v.textContent=(+inp.value).toFixed(3).replace(/\\.?0+$/,''); refreshHash(); };
+    lab.append(k,inp,v); panel.append(lab);
+  }
+  refreshHash();
+  document.getElementById('tCopy').onclick=()=>{ navigator.clipboard.writeText(JSON.stringify(SP,null,2)); };
+}
 </script>
 </body></html>
 `;

@@ -410,7 +410,9 @@ if(new URLSearchParams(location.search).get('tuner')==='1'){
   const fields=[
     ['bed','trimDb',-24,6],
     ['bed','breathDepth',0.05,0.20],
-    ['bed','s1Gain',0,0.3],['bed','s1IdleGain',0,0.1],['bed','s2Gain',0,0.3],['bed','s2GateA',0,1],
+    ['bed','l1Gain',0,0.2],['bed','l1IdleGain',0,0.1],['bed','l1AirRatio',0,1],
+    ['bed','l2Gain',0,0.15],['bed','crackleDbLo',-70,-30],['bed','crackleDbHi',-50,-15],
+    ['bed','s2Gain',0,0.4],['bed','s2GateA',0,1],
     ['bed','s3Gain',0,0.4],['bed','s3GateT',0,1],['bed','filterHzLo',300,4000],['bed','filterHzHi',2000,12000],
     ['bed','hissDbLo',-80,-40],['bed','hissDbHi',-60,-20],['bed','wowCentsLo',0,10],['bed','wowCentsHi',5,50],
     ['bed','hfShelfDbHi',-12,0],['bed','slewMsFast',50,1000],['bed','slewMsSlow',200,2000],['bed','doneSilenceSec',1,10],

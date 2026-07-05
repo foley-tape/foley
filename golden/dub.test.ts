@@ -64,8 +64,8 @@ test('51 文法不变量：弧的骨相', () => {
     // PEAK：有且仅有一段，原速，成片 8–15s——高潮必须原速
     const peaks = segments.filter(s => s.role === 'PEAK');
     assert.equal(peaks.length, 1, `${name}：PEAK 应有且仅有一段`);
-    assert.equal(peaks[0].speed, 1, `${name}：高潮必须原速`);
-    const peakViewer = (peaks[0].t1 - peaks[0].t0) / 1000;
+    assert.equal(peaks[0]!.speed, 1, `${name}：高潮必须原速`);
+    const peakViewer = (peaks[0]!.t1 - peaks[0]!.t0) / 1000;
     assert.ok(peakViewer >= params.grammar.peak.minS && peakViewer <= params.grammar.peak.maxS,
       `${name}：PEAK 成片 ${peakViewer}s 出 8–15s 窗`);
 

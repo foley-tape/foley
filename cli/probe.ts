@@ -195,6 +195,7 @@ function buildProbeHtml(data: unknown, soundRaw: unknown): string {
   <span class="muted">sound</span> <span id="mSnd"></span>
   <span class="muted">build</span> <span id="mBuild"></span>
   <span class="badge" id="mState">■ 未播放</span>
+  <span class="muted" id="mHealth" title="实时音频线程健康（EAR-8）：欠载=爆音串的机器证据">载荷 —</span>
 </header>
 <div class="wrap">
   <canvas id="needle" width="260" height="260"></canvas>
@@ -247,11 +248,25 @@ function hashJsonUi(o){ const s=stableStr(o); let h=0x811c9dc5;
 
 // ===== 音频：引擎只建一次（EAR-3 单实例语义在页内同样成立），transport 每次起播复位 =====
 let ac=null, engine=null;
+let capInfo={load:0,peak:0,underruns:0,updates:0};
 function ensureAudio(){
   if(ac){ if(ac.state==='suspended') ac.resume(); return; }
-  ac=new (window.AudioContext||window.webkitAudioContext)();
+  // EAR-8：latencyHint 'playback'——这是收听仪器不是演奏乐器，大缓冲换实时线程欠载免疫
+  // （欠载爆音"滋滋啦啦"骑在当刻最响的层上、且与磁带版本无关——正是历轮"噪声一模一样"的候选机理）
+  ac=new (window.AudioContext||window.webkitAudioContext)({ latencyHint:'playback' });
   engine=buildEngine(ac, SP, { repoKey: D.repoKey, seed: D.repoKey });
   for(const k of isoMutes) engine.setMute(k,true); // 起播前勾掉的层，建图即施加
+  // 欠载记录仪（Chrome AudioRenderCapacity；不支持则显示 n/a）——船长页头可见，机器证据入 __probe
+  try{
+    const cap=ac.renderCapacity;
+    if(cap&&cap.start){ cap.start({updateInterval:1});
+      cap.addEventListener('update',ev=>{ capInfo.load=ev.averageLoad; capInfo.peak=ev.peakLoad;
+        if(ev.underrunRatio>0) capInfo.underruns++; capInfo.updates++;
+        document.getElementById('mHealth').textContent=
+          '载荷 '+Math.round(ev.averageLoad*100)+'%｜欠载 '+capInfo.underruns+(capInfo.underruns>0?' ⚠':'');
+      }); }
+    else document.getElementById('mHealth').textContent='载荷 n/a';
+  }catch(_e){ document.getElementById('mHealth').textContent='载荷 n/a'; }
 }
 
 // ===== 双时钟播放（针走墙钟；声音走音频钟；调度与量化全在 graph.js）=====
@@ -351,7 +366,8 @@ try{ CHAN=new BroadcastChannel('foley-probe');
 // gains 为 .value 账本口径——仅 dev 展示，永不作验收依据（EAR-4 教训；验收=cli ear 渲染波形）
 window.__probe={ isPlaying:()=>playing, acState:()=>ac?ac.state:'none', acTime:()=>ac?ac.currentTime:-1,
   playMs:()=>playing?playMs():-1, scheduled:()=>si, gridAt:()=>engine?engine.lastGridAt:-1, takenOver:()=>takenOver,
-  gains:()=>engine?engine.debugGains():null, master:()=>engine?engine.nodes.master.gain.value:-1 };
+  gains:()=>engine?engine.debugGains():null, master:()=>engine?engine.nodes.master.gain.value:-1,
+  health:()=>({...capInfo, baseLatency:ac?ac.baseLatency:-1, sampleRate:ac?ac.sampleRate:-1}) };
 
 // ===== 调音抽屉（?tuner=1，仅 dev；拧 SP → 实时生效 + 哈希重算） =====
 if(new URLSearchParams(location.search).get('tuner')==='1'){

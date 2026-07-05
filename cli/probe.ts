@@ -295,7 +295,12 @@ function frame(){ const pm=Math.min(playMs(),dur); const s=sampleAt(track,pm);
   document.getElementById('bed').textContent=(bt.silence?'静默':bt.hover?'悬停':'S1 '+bt.s1.toFixed(2)+' S2 '+bt.s2.toFixed(2)+' S3 '+bt.s3.toFixed(2));
   if(playing && pm<dur) raf=requestAnimationFrame(frame); else if(pm>=dur) stopPlay(); }
 
-function start(){ if(playing||takenOver) return; ensureAudio(); playing=true; setState('▶ 播放中');
+function start(){ if(playing) return;
+  // EAR-6 修：接管语义从"后开的页永久独占"改为"谁按▶谁发声"——被接管页按播放即夺回
+  // （A/B 对照两页都开着时，旧语义把先开的页锁死：按▶无声、状态牌又不起眼——船长"什么声音都没有"的元凶）
+  if(takenOver){ takenOver=false; try{ CHAN&&CHAN.postMessage({type:'takeover',id:TABID}); }catch(_e){}
+    if(engine) engine.unmuteMaster(ac.currentTime); }
+  ensureAudio(); playing=true; setState('▶ 播放中');
   perf0=performance.now(); audio0=ac.currentTime+0.05; si=0;
   engine.startTransport(audio0, speed, track, dur);        // 复位：习惯化/静默闩/bedBus/首拍 imm 就位（EAR-2）
   schedule(); raf=requestAnimationFrame(frame); }
@@ -318,8 +323,7 @@ let takenOver=false;
 function setState(txt,warn){ const b=document.getElementById('mState'); b.textContent=txt; b.style.color=warn?'#e0b050':''; }
 function onTaken(){ if(takenOver) return; takenOver=true; stopPlay();
   if(engine) engine.muteMaster(ac.currentTime);
-  setState('⛔ 已被新探针接管（本页静音）',true);
-  document.getElementById('play').disabled=true; }
+  setState('⛔ 已被其他探针页接管（按 ▶ 夺回发声权）',true); }
 let CHAN=null;
 try{ CHAN=new BroadcastChannel('foley-probe');
   CHAN.onmessage=e=>{ if(e.data&&e.data.type==='takeover'&&e.data.id!==TABID) onTaken(); };
@@ -329,7 +333,7 @@ try{ CHAN=new BroadcastChannel('foley-probe');
 // gains 为 .value 账本口径——仅 dev 展示，永不作验收依据（EAR-4 教训；验收=cli ear 渲染波形）
 window.__probe={ isPlaying:()=>playing, acState:()=>ac?ac.state:'none', acTime:()=>ac?ac.currentTime:-1,
   playMs:()=>playing?playMs():-1, scheduled:()=>si, gridAt:()=>engine?engine.lastGridAt:-1, takenOver:()=>takenOver,
-  gains:()=>engine?engine.debugGains():null };
+  gains:()=>engine?engine.debugGains():null, master:()=>engine?engine.nodes.master.gain.value:-1 };
 
 // ===== 调音抽屉（?tuner=1，仅 dev；拧 SP → 实时生效 + 哈希重算） =====
 if(new URLSearchParams(location.search).get('tuner')==='1'){

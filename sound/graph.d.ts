@@ -57,6 +57,7 @@ export interface SoundEngine {
   stop(at: number): void;
   hardMute(): void;
   muteMaster(at: number): void;
+  unmuteMaster(at: number): void;
   debugGains(): Record<string, number>;
 }
 

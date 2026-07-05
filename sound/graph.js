@@ -461,6 +461,7 @@ export function buildEngine(ctx, SP, opts) {
     stop(at) { R.stopAll(at); bedBus.gain.setTargetAtTime(1, at, 0.05); },
     hardMute() { R.hardMute(); },
     muteMaster(at) { master.gain.setTargetAtTime(0, at, 0.05); },
+    unmuteMaster(at) { master.gain.cancelScheduledValues(at); master.gain.setTargetAtTime(0.9, at, 0.05); },
     debugGains() { return R.debugGains(); },
   };
 }

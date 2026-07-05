@@ -31,7 +31,8 @@
 
 ## 总务四件
 
-- **docs/ 归仓**：实况核对——M2.0 §1 **已由 Track-FIX 执行**（185a31a 在 main，docs/ 五目录＋README 俱在），与本令 §3"因声音事故未执行"的前提不符；改按查漏补缺：orders/ 补 `FOLEY_ORDER_SOUND_R1.md`＋`FOLEY_ORDER_M21.md`，records/ 补 `m20/stage/`（含舞台复盘），records/m21 随本轮交付归档。桌面原件未删（删除权留船长）。
+- **docs/ 归仓**：实况核对——M2.0 §1 **已由 Track-FIX 执行**（185a31a 在 main，docs/ 五目录＋README 俱在），与本令 §3"因声音事故未执行"的前提不符；改按查漏补缺：orders/ 补 `FOLEY_ORDER_SOUND_R1.md`＋`FOLEY_ORDER_M21.md`，records/ 补 `m20/stage/`（含舞台复盘），records/m21 随本轮交付归档。
+- **桌面清空（船长复核后补执行）**：逐项验证（单件 md5、交接夹 diff -rq）后删除桌面全部原件，桌面唯余 `.claude/` 工具配置。清空中晋升四件：storm 证据卷 1bb942f0 → `records/m15/`（旧引擎产物不可复现）、README_DRAFT → `records/m20/`、恢复-审计实录 → `records/night1/`、声音相 EAR 升级报告 → `records/sound-r1/`；m1.5–1.7 的 `曲线-*`/`探针` 跑批产物按晋升规则未入仓（可复现，随清空删除）。`records/README.md` 索引落地。Downloads 里的四份手令副本未动（非桌面堆，私人目录不伸手）。
 - **README**：已在（Track-FIX 落的），三图引用与 Privacy 段核对无恙，未动一字。
 - **runs/ 清扫**：`scripts/prune.mjs` 落地（每 kind 留 3，--dry-run 可验）；worktree runs/ 实测留 1 删 0。
 - **迁移核对**：本地无 git remote（`git remote` 空）——org `foley-tape/foley` 迁移**未动**，一行如实。

@@ -2,7 +2,7 @@
 
 > 轨道：**Track-FIX**（终端一，分支 `fix/p1-seal`）。依据施工令 `TAPE0_ORDER_M18_DUAL §Track-FIX`。
 > 结论：**四条 P1 全修 + F2 快修 + 隐私常驻闸门落地；重验三条齐 → 已按预授权打 `v0.1.0` 封版。**
-> 封版三哈希：**engine `<seal-sha>` / params `aac8e0db` / verdict `20af9b64`**（engine sha 见封版 commit）。
+> 封版三哈希：**engine `dd284b1` / params `aac8e0db` / verdict `20af9b64`**（engine sha = dd284b1）。
 
 ---
 

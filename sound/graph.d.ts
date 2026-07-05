@@ -54,6 +54,7 @@ export interface SoundEngine {
   scheduleGridUntil(untilSec: number): void;
   trigger(cls: number, atSec: number, deg: number, vel: number): void;
   applyBedNow(pm: number): void;
+  setMute(name: 's1' | 's2' | 's3' | 'hiss' | 'room' | 'fg', on: boolean): void;
   stop(at: number): void;
   hardMute(): void;
   muteMaster(at: number): void;

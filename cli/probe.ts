@@ -209,6 +209,9 @@ function buildProbeHtml(data: unknown, soundRaw: unknown): string {
   <span class="muted">｜床</span><span id="bed">—</span>
   <span class="muted">｜词汇：拨弦=改动(槽选音) 闷弦=失败 纸页=读 铃=跑 卡座=存 ｜呼唤：和弦=解决 跳针=卡碟 动机=ASK ｜DONE=静默</span>
 </div>
+<div class="ctl" id="isoBoard">
+  <span class="muted">隔离板（EAR-7 凶手排查｜勾=发声，全去勾=数字零——此时若仍有滋啦，噪声在你的声音链不在磁带里）：</span>
+</div>
 <div id="tunerHead">调音抽屉（dev）—— sound-params 实时哈希：<span id="tHash"></span> <button id="tCopy">复制 JSON</button></div>
 <div id="tuner"></div>
 <script id="d" type="application/json">${json}</script>
@@ -248,6 +251,7 @@ function ensureAudio(){
   if(ac){ if(ac.state==='suspended') ac.resume(); return; }
   ac=new (window.AudioContext||window.webkitAudioContext)();
   engine=buildEngine(ac, SP, { repoKey: D.repoKey, seed: D.repoKey });
+  for(const k of isoMutes) engine.setMute(k,true); // 起播前勾掉的层，建图即施加
 }
 
 // ===== 双时钟播放（针走墙钟；声音走音频钟；调度与量化全在 graph.js）=====
@@ -315,6 +319,20 @@ function stopPlay(){ playing=false; cancelAnimationFrame(raf);
 document.getElementById('play').onclick=start;
 document.getElementById('stop').onclick=stopPlay;
 (function(){ const s=track.length?sampleAt(track,0):[0,0,0,0,0,0,0,0]; drawNeedle(s[1],s[4]); drawCurve(0); })();
+
+// ===== 隔离板（EAR-7）：层禁声走引擎（engine.setMute），不动 SP/哈希；起播前的勾选先记账后施加 =====
+const isoMutes=new Set();
+(function(){ const board=document.getElementById('isoBoard');
+  const LAYERS=[['s1','S1 基底(pad)'],['s2','S2 律动'],['s3','S3 张力弦'],['hiss','S4 底噪hiss'],['room','房间感'],['fg','前景+呼唤']];
+  for(const [key,label] of LAYERS){
+    const lab=document.createElement('label'); lab.style.cssText='display:flex;gap:4px;align-items:center';
+    const cb=document.createElement('input'); cb.type='checkbox'; cb.checked=true;
+    cb.onchange=()=>{ if(cb.checked) isoMutes.delete(key); else isoMutes.add(key);
+      if(engine){ engine.setMute(key,!cb.checked);
+        if(playing) engine.applyBedNow(Math.min(playMs(),dur)); } };
+    lab.append(cb,document.createTextNode(label)); board.append(lab);
+  }
+})();
 
 // ===== 单实例接管（EAR-3）：新探针页广播接管，旧页收到即静音——多标签叠噪结构性根治 =====
 // file:// 下 BroadcastChannel 不保证跨页，故 try/catch 降级；http(localhost) 下全效。

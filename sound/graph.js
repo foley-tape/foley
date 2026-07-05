@@ -249,6 +249,7 @@ export function buildEngine(ctx, SP, opts) {
     transport: null, // {audio0, speed, track, durMs}
     lastGridAt: 0, lastBarAt: 0, lastAskRepeat: -1e9, doneSilentUntil: -1, wxLatch: 0,
     habLog: new Map(),
+    mutes: new Set(), // 隔离板（EAR-7 诊断）：'s1'|'s2'|'s3'|'hiss'|'room'|'fg'——凶手排查用，电平级归零
   };
 
   const beat = () => 60 / SP.bpm, grid = () => beat() / 2, bar = () => beat() * 4;
@@ -260,13 +261,14 @@ export function buildEngine(ctx, SP, opts) {
       if (imm) { param.cancelScheduledValues(at); param.setValueAtTime(v, at); }
       else param.setTargetAtTime(v, at, tc);
     };
-    set(s1Level.gain, bt.s1, slow);
-    set(s2Level.gain, bt.s2, fast);
-    set(s3Level.gain, bt.s3, fast);
-    set(hissLevel.gain, bt.hissLin, slow);
+    const mg = (n) => (E.mutes.has(n) ? 0 : 1); // 隔离板（EAR-7）：被点名的层电平归零，其余律照旧
+    set(s1Level.gain, bt.s1 * mg('s1'), slow);
+    set(s2Level.gain, bt.s2 * mg('s2'), fast);
+    set(s3Level.gain, bt.s3 * mg('s3'), fast);
+    set(hissLevel.gain, bt.hissLin * mg('hiss'), slow);
     // 房间噪与 stem 同纪律（EAR-2）：吃 trim、吃 DONE 静默、随天气档微调
     const roomV = (CALIB.roomBase + CALIB.roomWx * E.wxLatch) * dbToLin(SP.bed.trimDb) * (bt.silence ? 0 : 1);
-    set(roomLevel.gain, roomV, slow);
+    set(roomLevel.gain, roomV * mg('room'), slow);
     set(lp.frequency, bt.filterHz, slow);
     set(shelf.gain, bt.hfShelfDb, slow);
     const wowAmt = 0.03 * (Math.pow(2, bt.wowCents / 1200) - 1);
@@ -415,10 +417,10 @@ export function buildEngine(ctx, SP, opts) {
           }
         }
       }
-      // ASK 礼貌性重复（askRepeatSec 一次，音量不升级）
+      // ASK 礼貌性重复（askRepeatSec 一次，音量不升级）；隔离板 fg 禁声一体生效
       if (s[7] === 1 && (at - E.lastAskRepeat) >= SP.call.askRepeatSec) {
         E.lastAskRepeat = at;
-        if (at > audio0 + 1) askMotif(at);
+        if (at > audio0 + 1 && !E.mutes.has('fg')) askMotif(at);
       }
       E.lastGridAt += grid();
     }
@@ -426,6 +428,7 @@ export function buildEngine(ctx, SP, opts) {
 
   /** 前景触发（cls 编码同 probe：0拨弦/1闷弦/2纸页/3铃/4卡座/5声部/6和弦/7跳针/8ASK/9DONE）。 */
   function trigger(cls, atE, deg, vel) {
+    if (E.mutes.has('fg')) return; // 隔离板：前景（含呼唤）整层禁声
     const hab = habFor(cls, atE);
     if (cls === 6) chordResolve(atE);
     else if (cls === 7) skip(atE);
@@ -458,6 +461,8 @@ export function buildEngine(ctx, SP, opts) {
     get lastGridAt() { return E.lastGridAt; },
     get doneSilentUntil() { return E.doneSilentUntil; },
     applyBed, startTransport, scheduleGridUntil, trigger, applyBedNow,
+    /** 隔离板（EAR-7 诊断）：层禁声。播放中由调用方随后 applyBedNow 立即生效。 */
+    setMute(name, on) { if (on) E.mutes.add(name); else E.mutes.delete(name); },
     stop(at) { R.stopAll(at); bedBus.gain.setTargetAtTime(1, at, 0.05); },
     hardMute() { R.hardMute(); },
     muteMaster(at) { master.gain.setTargetAtTime(0, at, 0.05); },

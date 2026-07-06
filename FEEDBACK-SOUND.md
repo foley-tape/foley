@@ -34,9 +34,11 @@
 
 **复核庭入口（R3 §6/铁律 9）**：本轮属重大交付，候另开复核会话过庭（置件必正名）。复核起点：本段+白皮书 v2+`node cli/index.ts ear`（三哈希对表）+`npm test`（79）+`node scripts/verify-probe.mjs`（10/10）+runs/aesthetic-pack/。庭后方与船长实听衔接。
 
+**复核庭 @SOUND-R3 —— 通过（2026-07-06，独立复核会话，全档 `docs/records/sound-r3/复核庭@SOUND-R3.md`）**：15 分钟核验序 4/4 全绿（npm test 80/80——R3 的 79 案全绿＋1 案系 M2.3 dub 增案 git 对表核明；ear 三哈希逐字吻合、四 active 全绿 G7 −20.79；verify-probe 10/10；calibrate 四常数 ≤0.37dB）；必核清单 6/6 闭合（R3-1 物证链闭合判读成立、R3-3 判"完成意图"、G7 定标链同尺、全排程纪律干净、R3-7 注记如实、置件正名干净）；**本庭独立听证补勘针嗒真身**（静默唱片+全床静音：4 嗒等距 0.475s、峰间地板 −197dBFS——金测试 57 正弦盖不住的那半已验明；冰箱级建议：此探针法典化防回归）。未发现暗病。**放行实听**；请认可两项本庭背书，终裁点头随实听归船长。
+
 ---
 
-## 实听申请（SOUND-R3，候复核庭后发出；听感协议 v2 四件齐）
+## 实听申请（SOUND-R3，复核庭 2026-07-06 通过放行，正式发出；听感协议 v2 四件齐）
 
 - **一次一请**：本轮只请这一次耳朵。
 - **操作路径**：`node cli/index.ts probe tapes/storm.tape.jsonl --kind storm` → 开 `runs/probe-latest/probe.html` → 点 ▶（首次"…解码唱片"1–2s）→ 画布点 1/3 处起听 ≥90s（1× 原速）；试 ⏭ 换盘；另开 `runs/aesthetic-pack/` 四页盲选排序（协议在包内 README）。

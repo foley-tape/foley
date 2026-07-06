@@ -16,6 +16,13 @@ import { FilmPrinter } from './film.js';
 const FADE_AFTER_MS = 10000; // 提议搁置十秒，齿孔缓缓淡去
 const FADE_SLOW_MS = 2600;
 const FADE_QUICK_MS = 480;
+
+// 写盘令牌（NIGHT-2 §0.6.③）：serve 每次启动把本次令牌注入 <head>；写盘 POST 回带此头，
+// serve 校验匹配才落盘。同源页面可读、跨站 JS 取不到 → 跨站写盘被拒。
+const dubHeaders = (extra = {}) => ({
+  'x-dub-token': document.querySelector('meta[name="dub-token"]')?.content ?? '',
+  ...extra,
+});
 const TEAR_DONE = 0.55;      // 撕程过半即断
 const SOFT = 0.16;           // 软惯性（≈220ms 收敛，同 loupe 镜头语言）
 const MIN_MANUAL_PX = 26;    // 手动拖选下限（约 2s 纸）
@@ -520,7 +527,7 @@ export class DubController {
     const sched = new DubSchedule(src.tape, this.doc.segments);
     if (!this.printer) this.printer = new FilmPrinter();
     const g = await this.printer.printGif({ sched, srcTape: src.tape });
-    const r = await fetch(`/dub/save-bin?tape=${encodeURIComponent(this.doc.tape)}&kind=gif`, { method: 'POST', body: g.blob });
+    const r = await fetch(`/dub/save-bin?tape=${encodeURIComponent(this.doc.tape)}&kind=gif`, { method: 'POST', headers: dubHeaders(), body: g.blob });
     return r.ok ? await r.json() : null;
   }
 
@@ -565,7 +572,7 @@ export class DubController {
     let filmFiles = null;
     if (filmRes) {
       const up = async (blob, kind) => {
-        const r = await fetch(`/dub/save-bin?tape=${encodeURIComponent(this.doc.tape)}&kind=${kind}`, { method: 'POST', body: blob });
+        const r = await fetch(`/dub/save-bin?tape=${encodeURIComponent(this.doc.tape)}&kind=${kind}`, { method: 'POST', headers: dubHeaders(), body: blob });
         return r.ok ? (await r.json()).saved : null;
       };
       filmFiles = {
@@ -589,7 +596,7 @@ export class DubController {
     const png = c.toDataURL('image/png').split(',')[1];
     const res = await fetch('/dub/save', {
       method: 'POST',
-      headers: { 'content-type': 'application/json' },
+      headers: dubHeaders({ 'content-type': 'application/json' }),
       body: JSON.stringify({ tape: this.doc.tape, png, meta }),
     });
     if (!res.ok) throw new Error(`save ${res.status}`);

@@ -11,6 +11,7 @@ import { existsSync } from 'node:fs';
 import { join, extname, normalize, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { spawn } from 'node:child_process';
+import { randomBytes } from 'node:crypto';
 
 const root = fileURLToPath(new URL('.', import.meta.url));
 const repoRoot = dirname(root.replace(/\/$/, ''));
@@ -20,6 +21,26 @@ const port = Number(args.find(a => /^\d+$/.test(a)) ?? process.env.PORT ?? 4173)
 const replayOnly = args.includes('--replay-only');
 const rawIdx = args.indexOf('--raw');
 const rawPath = rawIdx >= 0 ? args[rawIdx + 1] : null;
+
+// ── 写盘鉴权（NIGHT-2 §0.6 安全组合拳）──
+// ③ 每次启动随机令牌：同源页面经注入的 <meta name="dub-token"> 取用；跨站 JS 读不到同源 DOM/HTML，
+//    故拿不到令牌 → 写盘端点拒。与 ② 绑 127.0.0.1（断局域网面）、① 落盘名白名单三闸叠加。
+const DUB_TOKEN = randomBytes(18).toString('base64url');
+const ORIGIN_OK = new Set([`http://localhost:${port}`, `http://127.0.0.1:${port}`]);
+
+// 同源 + 令牌双闸（W-1＋§0.6.③，一律缺省拒）：Origin 若在场必须白名单内；令牌必须逐启动匹配。
+function writeAuthed(req) {
+  const origin = req.headers['origin'];
+  if (origin && !ORIGIN_OK.has(origin)) return false;   // 跨站显式拒
+  return req.headers['x-dub-token'] === DUB_TOKEN;       // 令牌缺省拒（跨站取不到 → 空/错皆拒）
+}
+
+// 落盘名清洗（§0.6.①④，save 与 save-bin 同一把刀）：只留标识符字符，折叠 ..，不以 . - 起头（防隐藏文件/穿越）。
+function safeStem(s, fallback) {
+  const c = String(s ?? fallback).replace(/[^\w.-]/g, '_').replace(/\.{2,}/g, '_').replace(/^[.\-]+/, '');
+  return c || fallback;
+}
+const KIND_OK = new Set(['mp4', 'webm', 'gif', 'png', 'poster.png']); // save-bin 扩展名白名单
 
 const MIME = {
   '.html': 'text/html; charset=utf-8',
@@ -99,6 +120,7 @@ createServer(async (req, res) => {
   }
   // dub 落盘（M-T1）：撕下的纸条自动归档 runs/dubs/（runs 即弃即建，正片提拔走 records）
   if (req.method === 'POST' && url.pathname === '/dub/save') {
+    if (!writeAuthed(req)) { res.writeHead(403); res.end('forbidden'); return; }
     let body = '', size = 0, tooBig = false;
     req.on('data', d => {
       size += d.length;
@@ -111,7 +133,7 @@ createServer(async (req, res) => {
         const { tape, png, meta } = JSON.parse(body);
         const dir = join(repoRoot, 'runs', 'dubs');
         await mkdir(dir, { recursive: true });
-        const stem = `foley-dub-${String(tape).replace(/[^\w.-]/g, '_')}-${localDate()}`;
+        const stem = `foley-dub-${safeStem(tape, 'tape')}-${localDate()}`;
         let n = 1;
         while (existsSync(join(dir, `${stem}${n > 1 ? '-' + n : ''}.png`))) n++;
         const nm = `${stem}${n > 1 ? '-' + n : ''}`;
@@ -128,8 +150,10 @@ createServer(async (req, res) => {
   }
   // 胶片/海报/GIF 二进制落盘（M-T2）：POST /dub/save-bin?tape=<名>&kind=<mp4|webm|poster.png|gif>
   if (req.method === 'POST' && url.pathname === '/dub/save-bin') {
-    const tape = String(url.searchParams.get('tape') ?? 'tape').replace(/[^\w.-]/g, '_');
-    const kind = String(url.searchParams.get('kind') ?? 'bin').replace(/[^\w.]/g, '_');
+    if (!writeAuthed(req)) { res.writeHead(403); res.end('forbidden'); return; }
+    const tape = safeStem(url.searchParams.get('tape'), 'tape');
+    const rawKind = String(url.searchParams.get('kind') ?? 'bin');
+    const kind = KIND_OK.has(rawKind) ? rawKind : 'bin';  // 扩展名白名单，非白即 bin（§0.6.④）
     const chunks = [];
     let size = 0, tooBig = false;
     req.on('data', d => {
@@ -172,14 +196,18 @@ createServer(async (req, res) => {
   const file = join(root, path);
   if (!file.startsWith(root)) { res.writeHead(403); res.end(); return; }
   try {
-    const body = await readFile(file);
+    let body = await readFile(file);
+    if (extname(file) === '.html') {
+      // 本次启动令牌注入 <head>，供 dub.js 写盘回带（同源可读、跨站取不到）。仅 HTML，且只此一处替换。
+      body = Buffer.from(String(body).replace(/<head>/i, `<head><meta name="dub-token" content="${DUB_TOKEN}">`));
+    }
     res.writeHead(200, { 'content-type': MIME[extname(file)] ?? 'application/octet-stream' });
     res.end(body);
   } catch {
     res.writeHead(404); res.end('not found');
   }
-}).listen(port, () => {
-  console.log(`stage @ http://localhost:${port}/${replayOnly ? '?tape=storm（replay-only）' : '（live 默认；?tape=storm 走 replay）'}`);
+}).listen(port, '127.0.0.1', () => {  // §0.6.② 只绑回环：断局域网/DNS-rebinding 直写面
+  console.log(`stage @ http://127.0.0.1:${port}/${replayOnly ? '?tape=storm（replay-only）' : '（live 默认；?tape=storm 走 replay）'}`);
 });
 
 if (!replayOnly) startLive();

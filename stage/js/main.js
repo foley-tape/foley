@@ -8,7 +8,8 @@ import { DubController } from './dub.js';
 
 const params = new URLSearchParams(location.search);
 const mode = params.get('mode') || (params.get('tape') ? 'replay' : 'live');
-const tapeName = params.get('tape') || 'storm';
+// §0.6.① URL 参数白名单：tapeName 流入 fetch(`fixtures/${name}…`) 与错误串，只许标识符/日期字符（防路径穿越与注入源）
+const tapeName = ((params.get('tape') || 'storm').replace(/[^\w-]/g, '')) || 'storm';
 
 async function boot() {
   // 器件量尺寸前，样式必须已上身（录像上下文里曾出现先量后穿的四分之一画布）
@@ -128,6 +129,10 @@ async function boot() {
 }
 
 boot().catch(err => {
-  document.body.insertAdjacentHTML('beforeend',
-    `<pre style="position:fixed;inset:auto 12px 12px;color:#a66;font:12px monospace">${err}</pre>`);
+  // X-1（NIGHT-2）：错误经 textContent 落地，不再 insertAdjacentHTML 拼串——
+  // ?tape= 注入的 `<img src=x onerror=…>` 只作纯文本显示，不进 DOM 解析，XSS sink 根治。
+  const pre = document.createElement('pre');
+  pre.style.cssText = 'position:fixed;inset:auto 12px 12px;color:#a66;font:12px monospace;max-width:70ch;white-space:pre-wrap';
+  pre.textContent = String(err);
+  document.body.appendChild(pre);
 });

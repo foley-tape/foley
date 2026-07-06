@@ -96,7 +96,9 @@ export function fnv1a(s: string): string {
  *  M1.8-F④ 补刀（B-2）：内联凭据/短口令/相对·Windows 路径/疑似令牌 → SECRET。宁可过抹——errClass 只为聚类。
  *  NIGHT-2 A1 补刀：邮箱 → EMAIL（PII，errClass 是默认带唯一输出派生字段，「outputs never stored」以此兑现）。 */
 export function normErr(text: string): string {
-  const first = (text.split('\n')[0] ?? '').toLowerCase();
+  // C2 长度守卫（NIGHT-2）：先截断再入正则。超长首行会让下方 \S*/+ 量词灾难性回溯（O(n²)，一行 10MB
+  // 即 99%CPU 挂死蒸馏器与 live tail）。errClass 末尾只 slice(0,60) 供聚类，8KB 前缀远超所需。
+  const first = (text.slice(0, 8192).split('\n')[0] ?? '').toLowerCase();
   return first
     .replace(/[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}/g, 'EMAIL')           // 邮箱 PII（居首：防后续规则切碎漏抹）
     .replace(/-[pp]\S+/g, 'SECRET')                                       // -pSECRET 内联凭据（已小写）
@@ -115,6 +117,7 @@ export function normErr(text: string): string {
 
 /** 净化单个 token：含路径 → PATH，长 token（密钥/哈希）→ TOKEN。不落盘原文，仅供 targetHash 前净化。 */
 function sanitizeToken(t: string): string {
+  if (t.length > 256) return 'TOKEN';  // C2 守卫（NIGHT-2）：超长 token 必是 hash/blob，直接判定，不喂量词正则（audit 栈溢出锚点 parse.ts:117）
   if (t.includes('/') || t.startsWith('~') || t.startsWith('.')) return 'PATH';
   if (/[A-Za-z0-9_-]{16,}/.test(t)) return 'TOKEN';
   return t;

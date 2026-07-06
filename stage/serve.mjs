@@ -22,7 +22,7 @@ const replayOnly = args.includes('--replay-only');
 const rawIdx = args.indexOf('--raw');
 const rawPath = rawIdx >= 0 ? args[rawIdx + 1] : null;
 
-// ── 写盘鉴权（NIGHT-2 §0.6 安全组合拳）──
+// ── 写盘鉴权（NIGHT-2 §0.6 安全组合拳；原刀=Track-RELEASE 安全批，M2.4 §C 扩展至换声端点）──
 // ③ 每次启动随机令牌：同源页面经注入的 <meta name="dub-token"> 取用；跨站 JS 读不到同源 DOM/HTML，
 //    故拿不到令牌 → 写盘端点拒。与 ② 绑 127.0.0.1（断局域网面）、① 落盘名白名单三闸叠加。
 const DUB_TOKEN = randomBytes(18).toString('base64url');
@@ -152,6 +152,7 @@ createServer(async (req, res) => {
   // 消费 sound/ 的 renderCuts（cli render-cuts 子命令）；dub 授权卫生=默认无唱片。
   // 红线①：tape 走白名单（五带生带），segments 逐字段验数；日带/live 无生带诚实报缺。
   if (req.method === 'POST' && url.pathname === '/dub/render-audio') {
+    if (!writeAuthed(req)) { res.writeHead(403); res.end('forbidden'); return; } // 同刀扩展：换声=spawn+写盘同级
     const AUDIO_TAPES = new Set(['storm', 'smooth', 'busy', 'jam', 'silence']);
     let body = '', size = 0;
     req.on('data', d => { size += d.length; if (size > 1e6) req.destroy(); else body += d; });

@@ -17,8 +17,8 @@ const FADE_AFTER_MS = 10000; // 提议搁置十秒，齿孔缓缓淡去
 const FADE_SLOW_MS = 2600;
 const FADE_QUICK_MS = 480;
 
-// 写盘令牌（NIGHT-2 §0.6.③）：serve 每次启动把本次令牌注入 <head>；写盘 POST 回带此头，
-// serve 校验匹配才落盘。同源页面可读、跨站 JS 取不到 → 跨站写盘被拒。
+// 写盘令牌（NIGHT-2 §0.6.③）：serve 每次启动把本次令牌注入 <head>；写盘/换声 POST 回带此头，
+// serve 校验匹配才动手。同源页面可读、跨站 JS 取不到 → 跨站写盘被拒。
 const dubHeaders = (extra = {}) => ({
   'x-dub-token': document.querySelector('meta[name="dub-token"]')?.content ?? '',
   ...extra,
@@ -533,7 +533,7 @@ export class DubController {
   async _fetchAudio(sched) {
     if (this.mode !== 'replay') return null; // live 无生带：无声出片注明
     const res = await fetch('/dub/render-audio', {
-      method: 'POST', headers: { 'content-type': 'application/json' },
+      method: 'POST', headers: dubHeaders({ 'content-type': 'application/json' }),
       body: JSON.stringify({ tape: this.doc.tape, segments: sched.rawRelSegments() }),
     });
     if (!res.ok) throw new Error(`${res.status} ${(await res.text()).slice(0, 120)}`);

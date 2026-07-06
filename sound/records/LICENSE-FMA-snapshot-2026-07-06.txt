@@ -1,0 +1,37 @@
+# FMA 授权页快照（采集 2026-07-06，HoliznaCC0《Public Domain Lofi》三曲——落仓终裁名单）
+# 逐曲原文摘录（页面 JSON/可见文本中与授权、AI 属性、身份相关行）；CC0 法律全文见 LICENSE-CC0-snapshot-2026-07-06.txt（同一 Universal 文本）
+
+== https://freemusicarchive.org/music/holiznacc0/public-domain-lofi/saturation-lofi-calm-relaxed/ ==
+"artistName":"HoliznaCC0"
+<title>Saturation ( Lofi , Calm , Relaxed ) - Free Music Archive</title>
+CC0 1.0 Universal License
+publicdomain/zero/1.0/
+
+== https://freemusicarchive.org/music/holiznacc0/public-domain-lofi/still-life-lofi-chill-nostalgic/ ==
+"artistName":"HoliznaCC0"
+<title>Still Life ( Lofi , Chill , Nostalgic ) - Free Music Archive</title>
+CC0 1.0 Universal License
+publicdomain/zero/1.0/
+
+== https://freemusicarchive.org/music/holiznacc0/public-domain-lofi/warm-fuzz-lofi-retro/ ==
+"artistName":"HoliznaCC0"
+<title>HoliznaCC0 - Warm Fuzz ( LoFi , Retro ) - Free Music Archive</title>
+CC0 1.0 Universal License
+publicdomain/zero/1.0/
+
+
+== 平台 AI 属性字段（页面原文，三曲同式）==
+-- saturation-lofi-calm-relaxed:
+AI generated?
+</span>
+<span class="md:col-span-6">
+No
+-- still-life-lofi-chill-nostalgic:
+AI generated? No（换行标签平铺后原文）
+-- warm-fuzz-lofi-retro:
+AI generated? No（换行标签平铺后原文）
+
+== 存储直链（fileUrl，采集日）==
+saturation.mp3 ← https://files.freemusicarchive.org/storage-freemusicarchive-org/tracks/AzjU0CJxOfUq7297vkoAR1oh6oz2JHI3aOlzjVOV.mp3
+still-life.mp3 ← https://files.freemusicarchive.org/storage-freemusicarchive-org/tracks/X2xAunfMENT4KSm1XpnQC2qUUC4hcMVbDXBMw9GI.mp3
+warm-fuzz.mp3 ← https://files.freemusicarchive.org/storage-freemusicarchive-org/tracks/Qrd0JkjTC7XXJwtS6LvCHIJ9K1FLXewdrYOQHhc5.mp3

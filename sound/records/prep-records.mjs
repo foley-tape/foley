@@ -36,15 +36,27 @@ function decodePcm48k(path) {
   throw new Error(`WAV 无 data 块：${path}`);
 }
 
-// 元数据表（vendor 时人工核定；bpmMeasured=谱通量自相关实测，candlelit-at-70-bpm 真值校准 ±1）
+// 元数据表（vendor 时人工核定；bpmMeasured=谱通量自相关实测主峰，歧义者次峰括注——
+// SOUND-R4 落仓起船长实听为选曲终裁，BPM 窗降为参考代理；来源逐曲直链，PROVENANCE.md 三件套对应）
 const META = {
-  '2-am-debug-loop.mp3': { title: '2 AM Debug Loop', category: 'activities', bpmMeasured: 80 },
-  'cursor-after-midnight.mp3': { title: 'Cursor After Midnight', category: 'activities', bpmMeasured: 83 },
-  'dust-on-the-morning-keys.mp3': { title: 'Dust on the Morning Keys', category: 'chillhop', bpmMeasured: 76 },
-  'terminal-rain.mp3': { title: 'Terminal Rain', category: 'activities', bpmMeasured: 80 },
+  'saturation.mp3': {
+    title: 'Saturation', category: 'public-domain-lofi', bpmMeasured: 60,
+    bpmNote: '主峰 59.6/次峰 88.6（3:2 交叉节奏，真值歧义如实记）',
+    source: 'https://freemusicarchive.org/music/holiznacc0/public-domain-lofi/saturation-lofi-calm-relaxed/',
+  },
+  'still-life.mp3': {
+    title: 'Still Life', category: 'public-domain-lofi', bpmMeasured: 77,
+    bpmNote: '主峰 76.6/次峰 79.7 聚拢（窗内干净）',
+    source: 'https://freemusicarchive.org/music/holiznacc0/public-domain-lofi/still-life-lofi-chill-nostalgic/',
+  },
+  'warm-fuzz.mp3': {
+    title: 'Warm Fuzz', category: 'public-domain-lofi', bpmMeasured: 63,
+    bpmNote: '主峰 62.9/次峰 83.4（4:3 歧义如实记）',
+    source: 'https://freemusicarchive.org/music/holiznacc0/public-domain-lofi/warm-fuzz-lofi-retro/',
+  },
 };
-const SOURCE = 'https://github.com/btahir/open-lofi';
-const PROVENANCE = 'AI 生成（Suno v5，作者 btahir 以 premium 会员身份声明所有权后捐入公共领域）——见 LICENSES.md 风险判读';
+const AUTHOR = 'HoliznaCC0';
+const PROVENANCE = '人类制造（血统条款 §0.1；FMA 平台字段 AI generated?=No 三曲快照在案）——PROVENANCE.md 三件套逐曲对应';
 
 function durationSec(path) {
   const out = execFileSync('afinfo', [path], { encoding: 'utf8' });
@@ -65,24 +77,24 @@ for (const file of readdirSync(DIR).filter((f) => f.endsWith('.mp3')).sort()) {
     title: meta.title,
     category: meta.category,
     bpmMeasured: meta.bpmMeasured,
+    bpmNote: meta.bpmNote,
     seconds: durationSec(DIR + file),
     bytes: bytes.length,
     fnv: fnvBytes(bytes),
     lufs: Math.round(measureLufs(pcm, 48000) * 100) / 100, // 定标锚（K 加权门控积分，G3/G7 同尺）
-    source: SOURCE,
-    author: 'btahir',
+    source: meta.source,
+    author: AUTHOR,
     license: 'CC0-1.0',
   });
 }
 
 const catalog = {
   _source:
-    'SOUND-R3 §1 出厂唱片清单（open-lofi vendor）。fnv 内容哈希与 sound/assets manifest 同法（ear 双哈希原料）；' +
-    'bpmMeasured 为 vendor 日谱通量自相关实测；lufs 为响度定标锚（measureLufs 同尺，48k afconvert 解码）；' +
-    '播放语义 v1=顺播＋无缝循环。' +
+    'SOUND-R4 落仓出厂唱片清单（HoliznaCC0《Public Domain Lofi》FMA vendor，船长实听终裁名单 2026-07-06）。' +
+    'fnv 内容哈希与 sound/assets manifest 同法（ear 三哈希原料）；' +
+    'bpmMeasured 为谱通量自相关实测主峰（歧义者 bpmNote 记次峰，船长耳裁压过 BPM 窗代理）；' +
+    'lufs 为响度定标锚（measureLufs 同尺，48k afconvert 解码）；播放语义 v1=顺播＋无缝循环。' +
     `来源属性：${PROVENANCE}。`,
-  _weatherCatalogOnRecord:
-    'open-lofi seasonal-weather 类目 27 首（雨/风暴/四季）记录在案，天气选曲留 v1.x（R3 §1 裁定本轮不做）。',
   records,
 };
 writeFileSync(DIR + 'catalog.json', JSON.stringify(catalog, null, 2) + '\n');

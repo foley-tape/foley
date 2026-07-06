@@ -36,7 +36,7 @@ for (const [key, p] of Object.entries(PRESETS)) {
 
 writeFileSync(join(outRoot, 'README.md'), `# 美学对照包（SOUND-R3 §4.5）——盲选协议
 
-四页同带（storm）同唱片（2-am-debug-loop 起），只有机器处置不同。**别看参数，只用耳朵。**
+四页同带（storm）同唱片（catalog 首盘起），只有机器处置不同。**别看参数，只用耳朵。**
 
 ## 听法（蓝牙耳机=产品条件）
 1. 每页点 ▶，听 60–90 秒（建议画布点到 1/3 处起听——有事件有张力）；

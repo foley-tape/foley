@@ -29,6 +29,8 @@ HUD ⏭ 换盘。用户架三不：只读、不复制、不上传（磁带机吃
 | [open-lofi](https://github.com/btahir/open-lofi) | 150+ 首 lo-fi，全部 **AI 生成（Suno v5）**，作者 btahir 以 premium 会员身份声明所有权后捐入 CC0；类目含 activities/chillhop/seasonal-weather（天气选曲 27 首在案） | AI 生成（Suno v5）·CC0 |
 
 **沿革诚实注记**：R3 出厂四盘（2-am-debug-loop 等）即出自 open-lofi——当时授权判读与快照留痕
-见 `sound/records/LICENSES.md`（复核庭核明物证链闭合）。M2.4 血统条款入宪后按新法退厂：
-不再作内置唱片，候船长终裁名单换人类制造盘（委托首版唱片见 §0.4，另路并行）。
+见 `sound/records/LICENSES.md` 沿革段（复核庭核明物证链闭合；原登记全文在 git 97f558a）。
+M2.4 血统条款入宪后按新法退厂；**2026-07-06 船长终裁名单已落仓**：HoliznaCC0《Public Domain
+Lofi》三曲（Saturation／Still Life／Warm Fuzz，人类制造·CC0，家谱见 `sound/records/PROVENANCE.md`）。
+委托首版唱片（§0.4）另路并行。
 判读一句话：授权（CC0 可自由使用）与血统（厂机身份叙事）是两回事——前者过庭，后者入宪从严。

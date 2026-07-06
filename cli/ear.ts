@@ -357,7 +357,7 @@ export function runEar(argv: string[]): void {
   const rows = gates.map((g) => `| ${g.id} ${g.name} | ${g.crit} | ${g.measured} | ${mark(g)}${g.active ? '' : '（informational）'} |`);
   const bandRows = bands.map((b) => `| ${b.name} | ${b.designDb.toFixed(1)} | ${b.renderedDb.toFixed(1)} | ${(b.renderedDb - b.designDb).toFixed(1)} |`);
   const assetRows = manifest.map((m) => `| ${m.file} | ${m.seconds}s | ${m.fnv} | ${m.license} | ${m.author} |`);
-  const recordRows = catalog.records.map((r) => `| ${r.file} | ${r.seconds}s | ${r.bpmMeasured} | ${r.lufs} | ${r.fnv} | ${r.license} | ${r.author}（Suno v5 生成，捐入公共领域） |`);
+  const recordRows = catalog.records.map((r) => `| ${r.file} | ${r.seconds}s | ${r.bpmMeasured} | ${r.lufs} | ${r.fnv} | ${r.license} | ${r.author} |`); // 血统/来源属性单源在 LICENSES/PROVENANCE，报告不复写（R4 落仓修）
 
   const report = `# EAR_MACHINE v3 —— 机器耳朵（SOUND-R3 §3：唱机改造——改口径，不换庙）
 engine ${gitShaSafe()} / params ${hashParams(paramsRaw)} / verdict ${verdictHash} / **sound-params ${hashJson(soundRaw)}** / **assets ${aHash}** / **records ${rHash}**
@@ -381,7 +381,7 @@ ${bandRows.join('\n')}
 |---|---|---|---|---|
 ${assetRows.join('\n')}
 
-## 唱片清单（出厂唱片；CC0 逐条溯源＋AI 生成来源属性见 sound/records/LICENSES.md）
+## 唱片清单（出厂唱片；CC0 逐条溯源＋家谱三件套见 sound/records/{LICENSES,PROVENANCE}.md——血统条款 §0.1）
 | 文件 | 时长 | BPM | LUFS 锚 | 内容哈希 | 授权 | 作者 |
 |---|---|---|---|---|---|---|
 ${recordRows.join('\n')}

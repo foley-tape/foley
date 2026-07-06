@@ -24,8 +24,14 @@
 | R4-3 | —（平移副效应） | G6 顶带（5045–8000Hz）−52→−54dBFS，距 −55 线余量 1dB | 如实记案：磨损再淡一档将破线（织体占用度×淡化的结构张力），届时候裁 | 仅告知 |
 | R4-4 | 落仓=当日 | 名单未到（船长终裁+委托首版并行中） | 管道全径实测（status/fetch 空清单口径、装载器 4 张回归、pack 脚本待料报错口径）；名单一到当日落仓 | 候名单 |
 | R4-5 | —（工序事故自首） | 三轨并发下 `git add -A` 把他轨未提交四件（adapters/parse、stage/dub、stage/main、stage/serve）扫进交付提交 | 提交后自查即撤（未推送）：soft reset＋外科剔除，他轨工作树原样未动；**立规：多会话工作台提交一律显式路径，永不 `add -A`** | 仅告知（自首） |
+| R4-6 | 选曲标准 BPM 72–85 | 终裁三曲实测：still-life 77 窗内干净；saturation 主峰 59.6/次峰 88.6（3:2 歧义）、warm-fuzz 主峰 62.9/次峰 83.4（4:3 歧义）——谱通量自相关对 wash 型素材失锐 | **船长实听为终裁**（新法入 PROVENANCE 沿革）：BPM 窗降为无耳初筛代理；歧义实测原样入 catalog.bpmNote 不粉饰 | 仅告知（新法记案） |
+| R4-7 | —（换盘副效应） | G4v2 r=0.037、G8 谱距 3.2dB（双 informational 失聪）：C 档低通域收窄（3200–8000）＋saturation 自带持续背景层，谱差分被素材淹没 | 如实记分零粉饰；跳针可辨性由针嗒承运（金 59 已入律，素材无关）；G4v2 判据与素材的耦合入冰箱候仪器轮 | 仅告知 |
+| R4-8 | 管道⑦"落仓后移除 repo 内 mp3" | 一经提交 git 历史永存血胖，"删除"不减重 | 加强执行：**新盘 mp3 从未入 git**（.gitignore sound/records/*.mp3；盘上文件=vendored 播放位；真身 Releases records-v1＋factory 缓存双备份） | 仅告知（原则加强） |
+| R4-9 | 白皮书 v2"总量 ≤15MB"（vendored 预算） | 三曲 320k 原件 18.5MB；Releases 化后 repo 承重=0，旧预算语义失效 | 白皮书 §7 升 **v2.1**：血统条款＋Releases 指纹路线＋明示征询入法典；v2 原文 git 留痕 | 仅告知（法典修订） |
 
-**候船长**：①终裁名单（人类制造盘）→ 当日落仓；②委托首版唱片自选时机（§0.4，不阻塞）。
+**落仓收官（同日续，船长终裁名单 2026-07-06）**：名单三曲 **Saturation／Still Life／Warm Fuzz**（HoliznaCC0《Public Domain Lofi》，FMA 320k/48kHz 原件直存，人类制造——平台字段 "AI generated? No" 三曲快照 `LICENSE-FMA-snapshot-2026-07-06.txt`）；PROVENANCE 三件套逐曲齐＋sha256 三方互证（家谱=manifest=盘上实算，脚本回填错位当场抓修）；AI 四盘依血统条款退厂（git 97f558a 留痕，open-lofi 移居淘碟指南 AI 区）；Releases **records-v1** 挂三曲＋SHASUMS（https://github.com/foley-tape/foley/releases/tag/records-v1）；manifest 回填实 URL/sha256——管道八步首跑全通。全链验证：npm test **105/105**（+22 系 §B/§C 轨并发落案，账目见其台账）；ear 四 active 全绿 **G7 −20.87**（新锚 −13.38/−14.73/−17.67 数据驱动定标自证，换盘零调参）；records 三哈希 → **cce9b3fe**；verify-probe 10/10（三盘上架）；ear 报告模板去 Suno 硬编码（血统单源 PROVENANCE，报告不复写）。
+
+**候 RELEASE 轨**：唱片落仓 PROVENANCE 对审（§0.8 即庭）。**候船长**：委托首版唱片自选时机（§0.4，不阻塞）。
 
 ---
 

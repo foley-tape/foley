@@ -12,5 +12,9 @@ node_modules/
 # Releases 打包产物（scripts/pack-records.mjs 出件，上传后即弃——重媒体不入库 §0.5）
 dist-records/
 
+# 出厂唱片音频永不入 git（§0.3 不进 tarball＋§0.5 存指纹不存重媒体——SOUND-R4 落仓起彻底执行：
+# 盘上文件=vendored 播放位；真身挂 Releases records-v1；指纹在 catalog/manifest/PROVENANCE）
+sound/records/*.mp3
+
 # M-T2 62MB 接带已迁 Releases（§B.3）——本地保留、指纹见 docs/records/mt2/stage/RELEASES-MANIFEST.md
 docs/records/mt2/stage/*.mp4

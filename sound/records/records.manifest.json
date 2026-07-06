@@ -1,5 +1,30 @@
 {
   "_pipeline": "M2.4 §A.4 落仓管道（候船长终裁名单，names 空=管道待料）。落仓日流程：①船长名单曲目入 sound/records/（暂存）→ ②每曲 PROVENANCE 三件套（照 PROVENANCE.template.md，血统条款：必须人类制造）→ ③node sound/records/prep-records.mjs 实测 bpm/lufs/fnv 重写 catalog.json → ④node scripts/pack-records.mjs --repo <owner/repo> --tag <releaseTag> 出 dist-records/（sha256+清单条目）→ ⑤GitHub Release 挂资产 → ⑥清单条目粘回本文件 records[] → ⑦repo 内 mp3 移除（§0.3 唱片不进 tarball；catalog/manifest/PROVENANCE 指纹留仓）→ ⑧AI 旧盘退厂入淘碟指南 AI 区。取回端：node cli/index.ts records fetch（§0.2 明示征询：URL/体积/SHA-256 直呈，同意才取，验哈希落盘 ~/.foley/records/factory/；拒绝走房间层）。",
   "releaseTag": "records-v1",
-  "records": []
+  "records": [
+    {
+      "name": "saturation",
+      "file": "saturation.mp3",
+      "bytes": 6240163,
+      "sha256": "340a14dffd98001edbae1e7da16e2b9f8f54e0687cd215fa5dfc0b351f4777c2",
+      "url": "https://github.com/foley-tape/foley/releases/download/records-v1/saturation.mp3",
+      "provenance": "PROVENANCE.md#saturation"
+    },
+    {
+      "name": "still-life",
+      "file": "still-life.mp3",
+      "bytes": 5395363,
+      "sha256": "f33eb15592fac175217781fc976df2f6a4336eb716b57887b57691e5fc572c47",
+      "url": "https://github.com/foley-tape/foley/releases/download/records-v1/still-life.mp3",
+      "provenance": "PROVENANCE.md#still-life"
+    },
+    {
+      "name": "warm-fuzz",
+      "file": "warm-fuzz.mp3",
+      "bytes": 6905485,
+      "sha256": "974ffd083b09aecbe60412f3376db07fb241adbbb0abf89698a22229a2de02c6",
+      "url": "https://github.com/foley-tape/foley/releases/download/records-v1/warm-fuzz.mp3",
+      "provenance": "PROVENANCE.md#warm-fuzz"
+    }
+  ]
 }

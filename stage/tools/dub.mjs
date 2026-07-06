@@ -33,7 +33,50 @@ try {
 
 const TAPES = ['storm', 'smooth', 'busy', 'jam', 'silence'];
 const VP = { width: 1280, height: 800 };
-const browser = await chromium.launch();
+const FILM = args.includes('--film');
+const filmIdx = args.indexOf('--film');
+// --film [带1,带2,...]：默认 storm,jam＋日带（M-T2 交付三支）；日带卷需先在 runs/ 就位
+const FILM_TAPES = (FILM && args[filmIdx + 1] && !args[filmIdx + 1].startsWith('--'))
+  ? args[filmIdx + 1].split(',')
+  : ['storm', 'jam', '2026-07-05'];
+// AVC 编码器住在正牌 Chrome 里（开源 Chromium 常缺 H.264 编码），胶印轮走 channel:chrome
+const browser = FILM
+  ? await chromium.launch({ channel: 'chrome' }).catch(() => chromium.launch())
+  : await chromium.launch();
+
+if (FILM) {
+  // —— M-T2 胶印：真接带 mp4（撕开即印，done 在胶印落盘后才归） ——
+  const rows = [];
+  for (const tape of FILM_TAPES) {
+    const ctx = await browser.newContext({ viewport: VP, deviceScaleFactor: 2 });
+    const page = await ctx.newPage();
+    page.on('console', m => { if (m.type() === 'warning' || m.type() === 'error') console.log(`  [页面·${tape}]`, m.text()); });
+    await page.goto(`${BASE}/?tape=${encodeURIComponent(tape)}&dub=auto&dubclock=16`, { waitUntil: 'domcontentloaded' });
+    await page.waitForFunction(() => window.__stage?.dub, null, { timeout: 20000 });
+    const res = await page.evaluate(() => window.__stage.dub.done); // 演出→撕→胶印→落盘 全程
+    if (!res.film) { console.log(`✗ ${tape}：胶印未成（${JSON.stringify(res.saved)}）`); fail_hard(tape); }
+    await page.waitForTimeout(900);
+    await page.screenshot({ path: join(OUT, `${tape}-film-rest.png`) });
+    let gifSaved = null;
+    if (tape === 'storm') { // GIF 次级出口首证（静态颗粒单帧化法）
+      gifSaved = await page.evaluate(() => window.__stage.dub.gif());
+    }
+    await ctx.close();
+    const files = [res.saved?.film?.video, res.saved?.film?.poster, ...(res.saved?.saved ?? []), gifSaved?.saved].filter(Boolean);
+    for (const rel of files) copyFileSync(join(repoRoot, rel), join(OUT, rel.split('/').pop()));
+    rows.push({ tape, film: res.film, files });
+    console.log(`${tape.padEnd(10)} ${res.film.codec}/${res.film.container}  ${res.film.frames}帧  片长${(res.film.contentMs / 1000).toFixed(1)}s  壁钟${(res.film.wallMs / 1000).toFixed(1)}s  ${res.film.realtimeX}×实时${res.film.realtimeX >= 2 ? '' : '（<2× 影子红）'}`);
+  }
+  writeFileSync(join(OUT, 'film-shadow-mt2.json'), JSON.stringify({
+    kind: 'film-shadow/M-T2 渲染速度影子（informational，目标 ≥2× 实时）',
+    createdAt: new Date().toISOString(),
+    prints: rows.map(r => ({ tape: r.tape, ...r.film })),
+  }, null, 2) + '\n');
+  console.log('胶印三支＋渲染速度影子 →', OUT);
+  await browser.close();
+  process.exit(0);
+}
+function fail_hard(t) { console.error(`胶印失败：${t}`); process.exit(1); }
 
 if (!RITUAL) {
   // —— 五带自动选段 → 纸条 PNG 各一 ＋ 影子采数 ——

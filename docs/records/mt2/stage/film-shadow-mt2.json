@@ -1,0 +1,42 @@
+{
+  "kind": "film-shadow/M-T2 渲染速度影子（informational，目标 ≥2× 实时）",
+  "createdAt": "2026-07-06T00:02:27.538Z",
+  "prints": [
+    {
+      "tape": "storm",
+      "codec": "avc1.4d0034",
+      "container": "mp4",
+      "preset": "1080p30",
+      "frames": 1335,
+      "contentMs": 44472,
+      "wallMs": 4865,
+      "realtimeX": 9.14,
+      "audio": "none（M-T3 候声音过耳合龙）",
+      "pixelDeterminism": "cuts/调度严格确定；像素不保证跨机逐字节（确定性诚实条款）"
+    },
+    {
+      "tape": "jam",
+      "codec": "avc1.4d0034",
+      "container": "mp4",
+      "preset": "1080p30",
+      "frames": 1333,
+      "contentMs": 44426,
+      "wallMs": 4844,
+      "realtimeX": 9.17,
+      "audio": "none（M-T3 候声音过耳合龙）",
+      "pixelDeterminism": "cuts/调度严格确定；像素不保证跨机逐字节（确定性诚实条款）"
+    },
+    {
+      "tape": "2026-07-05",
+      "codec": "avc1.4d0034",
+      "container": "mp4",
+      "preset": "1080p30",
+      "frames": 1350,
+      "contentMs": 45000,
+      "wallMs": 4921,
+      "realtimeX": 9.15,
+      "audio": "none（M-T3 候声音过耳合龙）",
+      "pixelDeterminism": "cuts/调度严格确定；像素不保证跨机逐字节（确定性诚实条款）"
+    }
+  ]
+}

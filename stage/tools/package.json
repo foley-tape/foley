@@ -3,7 +3,12 @@
   "private": true,
   "description": "拍摄期工具依赖（性格照/影子指标）。运行时零依赖不受此影响。安装：cd stage/tools && npm i && npx playwright install chromium",
   "devDependencies": {
+    "@types/node": "^26.1.0",
+    "ffmpeg-static": "^5.2.0",
+    "gifenc": "^1.0.3",
+    "mp4-muxer": "^5.2.2",
     "playwright": "^1.49.0",
-    "ffmpeg-static": "^5.2.0"
+    "typescript": "^6.0.3",
+    "webm-muxer": "^5.1.4"
   }
 }

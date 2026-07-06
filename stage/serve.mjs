@@ -126,6 +126,34 @@ createServer(async (req, res) => {
     });
     return;
   }
+  // 胶片/海报/GIF 二进制落盘（M-T2）：POST /dub/save-bin?tape=<名>&kind=<mp4|webm|poster.png|gif>
+  if (req.method === 'POST' && url.pathname === '/dub/save-bin') {
+    const tape = String(url.searchParams.get('tape') ?? 'tape').replace(/[^\w.-]/g, '_');
+    const kind = String(url.searchParams.get('kind') ?? 'bin').replace(/[^\w.]/g, '_');
+    const chunks = [];
+    let size = 0, tooBig = false;
+    req.on('data', d => {
+      size += d.length;
+      if (size > 512e6) { tooBig = true; req.destroy(); return; }
+      chunks.push(d);
+    });
+    req.on('end', async () => {
+      if (tooBig) return;
+      try {
+        const dir = join(repoRoot, 'runs', 'dubs');
+        await mkdir(dir, { recursive: true });
+        const stem = `foley-dub-${tape}-${localDate()}`;
+        let n = 1;
+        while (existsSync(join(dir, `${stem}${n > 1 ? '-' + n : ''}.${kind}`))) n++;
+        const nm = `${stem}${n > 1 ? '-' + n : ''}.${kind}`;
+        await writeFile(join(dir, nm), Buffer.concat(chunks));
+        res.writeHead(200, { 'content-type': 'application/json' });
+        res.end(JSON.stringify({ saved: `runs/dubs/${nm}` }));
+        console.log(`[dub] 落盘 runs/dubs/${nm}（${(size / 1e6).toFixed(1)}MB）`);
+      } catch (e) { res.writeHead(400); res.end(String(e)); }
+    });
+    return;
+  }
   if (url.pathname === '/live') {
     if (replayOnly || !liveChild) { res.writeHead(503); res.end('live 未开'); return; }
     res.writeHead(200, {

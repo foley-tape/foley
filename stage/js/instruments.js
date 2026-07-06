@@ -15,12 +15,14 @@ const SHADOW = typeof location !== 'undefined'
 if (SHADOW) window.__shadow = { needlePacketPeak: 0, needleRenderPeak: 0, delays: [] };
 
 // —— 两包重建器：显示值 = p0→p1 的线性插值，恒迟一包 ——
+// _clock（实例级，M-T2）：胶印离线渲染把收包钟换成虚拟 dub 钟——重建法不变、
+// 钟源可换，帧网格上的插值就此确定（同一条恒迟law，两种消费者）。台上器件不受染。
 export class PacketPair {
-  constructor() { this.p0 = null; this.p1 = null; this.realT1 = 0; }
+  constructor() { this.p0 = null; this.p1 = null; this.realT1 = 0; this._clock = null; }
   push(pkt, isSeek) {
     if (isSeek || !this.p1) { this.p0 = pkt; this.p1 = pkt; }
     else { this.p0 = this.p1; this.p1 = pkt; }
-    this.realT1 = performance.now();
+    this.realT1 = this._clock ? this._clock() : performance.now();
   }
   // f∈[0,1] 走完 p0→p1 的 50ms 窗
   frac(now) { return this.p1 === this.p0 ? 1 : Math.min((now - this.realT1) / PACKET_MS, 1); }

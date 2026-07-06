@@ -231,7 +231,9 @@ body {
   touch-action: none;
 }
 #dub-group {
-  position: absolute; right: 6.5vw; bottom: 22px; z-index: 5;
+  /* 锚定视口而非面板（M2.3 §1.3）：面板宽 118vw、右缘在 109vw——右距 9vw 恰是视口右缘。
+     操作件永不出画：镜头法只许机身出画，够不着的按键是缺陷不是构图。 */
+  position: absolute; right: calc(9vw + 26px); bottom: 22px; z-index: 5;
   display: flex; align-items: center; gap: 18px;
 }
 #dub-lengths { display: flex; align-items: flex-end; gap: 7px; }
@@ -270,6 +272,24 @@ body {
   box-shadow: 0 1px 2px rgba(15, 9, 3, 0.5), inset 0 2px 6px rgba(25, 15, 5, 0.45);
   filter: brightness(0.9);
 }
+
+/* mp4 卡（M-T2）：海报帧作卡面（PEAK 取帧），深烟卡座；点它落盘 */
+#dub-card {
+  position: fixed; z-index: 71; cursor: pointer;
+  width: 150px; padding: 6px 6px 14px;
+  background: linear-gradient(172deg, #241D12, #0E0A05 75%);
+  border-radius: 6px;
+  box-shadow: 0 10px 18px rgba(0, 0, 0, 0.65), inset 0 1px 0 rgba(255, 245, 225, 0.14);
+  opacity: 0; transform: translateY(-14px) rotate(1.6deg);
+  transition: opacity 0.4s ease, transform 0.55s cubic-bezier(0.2, 0.7, 0.3, 1);
+}
+#dub-card.down { opacity: 1; transform: translateY(0) rotate(1.6deg); }
+#dub-card img { display: block; width: 100%; border-radius: 3px; }
+#dub-card::after { /* 卡尾极淡边字：与纸条同派印 */
+  content: "F O L E Y"; position: absolute; left: 8px; bottom: 3px;
+  font-size: 6px; letter-spacing: 0.3em; color: rgba(242, 230, 204, 0.30);
+}
+#dub-card:hover { filter: brightness(1.08); }
 
 /* 撕下的纸条：落到胡桃木台面上歇着；点它落盘 */
 #dub-strip-rest {

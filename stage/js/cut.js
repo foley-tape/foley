@@ -204,6 +204,9 @@ export function proposeCuts(tape, params, targetS) {
   }));
 
   // —— 时长求解器：目标为盖，锚段按优先级分配，桥段吸收余量 ——
+  // 桥段生长帽随目标缩放（M2.3 §1.1，60/90 欠交修）：45s 时 ≡ stageMaxS（金件轨迹恒等），
+  // 60→128、90→192——大目标的余量本来就该由桥段吸收（文法锚段上限是设计的弧，不陪着涨）。
+  const capStage = Math.round((g.bridge.stageMaxS * (target / 1000)) / params.solver.defaultS);
   const segs = placed.concat(bridges);
   const viewerMs = s => Math.round(((s.b1 - s.b0) * 1000) / s.speed);
   const total = () => segs.reduce((t, s) => t + viewerMs(s), 0);
@@ -230,7 +233,7 @@ export function proposeCuts(tape, params, targetS) {
     if (over > 0 && bs.length === 1) { drop(bs[0]); continue; }
     break;
   }
-  guard = 64;
+  guard = 256; // 90s 目标三桥各需 ~21 步生长，64 不够（M2.3 §1.1；45s 路径原本 ~15 步，不受影响）
   while (total() < target && guard-- > 0) {
     const cl = byRole('CLOSE');                                            // ① 终段舒展
     if (cl && cl.b1 - cl.b0 < g.close.viewerMaxS * cl.speed) {
@@ -242,8 +245,8 @@ export function proposeCuts(tape, params, targetS) {
       const room = clipAgainst(rp.b1, Math.min(B, rp.b1 + rp.speed), segs.filter(s => s !== rp));
       if (room && room[0] === rp.b1 && room[1] > rp.b1) { rp.b1 = room[1]; continue; }
     }
-    const bs = segs.filter(s => s.role === 'BRIDGE' && s.b1 - s.b0 < Math.min(s.gapSize ?? Infinity, g.bridge.stageMaxS)); // ③ 桥段吸收
-    if (bs.length > 0) { bs[0].b1 = Math.min(bs[0].b0 + (bs[0].b1 - bs[0].b0) + 8, bs[0].b0 + Math.min(bs[0].gapSize, g.bridge.stageMaxS)); continue; }
+    const bs = segs.filter(s => s.role === 'BRIDGE' && s.b1 - s.b0 < Math.min(s.gapSize ?? Infinity, capStage)); // ③ 桥段吸收
+    if (bs.length > 0) { bs[0].b1 = Math.min(bs[0].b0 + (bs[0].b1 - bs[0].b0) + 8, bs[0].b0 + Math.min(bs[0].gapSize, capStage)); continue; }
     if (params.solver.allowUnderrun) break;                                // 短带放宽：不用死气凑数
     break;
   }

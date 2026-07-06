@@ -1,0 +1,75 @@
+{
+  "version": 1,
+  "kind": "foley-dub/M-T2-film",
+  "tape": "storm",
+  "tapeHash": "650107fcc28d6884",
+  "paramsHash": "7607d8a357e4f99c",
+  "targetS": 45,
+  "axis": "tape-stage",
+  "segments": [
+    {
+      "role": "OPEN",
+      "t0": 0,
+      "t1": 24000,
+      "speed": 8
+    },
+    {
+      "role": "BRIDGE",
+      "t0": 24000,
+      "t1": 80000,
+      "speed": 16
+    },
+    {
+      "role": "RAMP",
+      "t0": 709000,
+      "t1": 721000,
+      "speed": 2
+    },
+    {
+      "role": "BRIDGE",
+      "t0": 721000,
+      "t1": 745000,
+      "speed": 16
+    },
+    {
+      "role": "PEAK",
+      "t0": 944000,
+      "t1": 959000,
+      "speed": 1
+    },
+    {
+      "role": "TURN",
+      "t0": 1087000,
+      "t1": 1091000,
+      "speed": 1
+    },
+    {
+      "role": "BRIDGE",
+      "t0": 1091000,
+      "t1": 1187000,
+      "speed": 16
+    },
+    {
+      "role": "CLOSE",
+      "t0": 3964000,
+      "t1": 3969472,
+      "speed": 1
+    }
+  ],
+  "film": {
+    "codec": "avc1.4d0034",
+    "container": "mp4",
+    "preset": "1080p30",
+    "frames": 1335,
+    "contentMs": 44472,
+    "wallMs": 4865,
+    "realtimeX": 9.14,
+    "audio": "none（M-T3 候声音过耳合龙）",
+    "pixelDeterminism": "cuts/调度严格确定；像素不保证跨机逐字节（确定性诚实条款）",
+    "files": {
+      "video": "runs/dubs/foley-dub-storm-2026-07-06.mp4",
+      "poster": "runs/dubs/foley-dub-storm-2026-07-06.poster.png"
+    }
+  },
+  "createdAt": "2026-07-06T00:02:04.373Z"
+}

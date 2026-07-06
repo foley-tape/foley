@@ -71,6 +71,9 @@ function stageTimeOf(rawT, curve, st) {
   return st[lo] + Math.min(rawT - curve.t[lo], GAP_CLAMP);
 }
 
+// 原始 t → 折叠轴（M2.3 §1.5 消费侧）：live 直流轴的手动剪凭 liveEpoch 换回原始 t 后走这里对齐
+export function foldRawT(tape, rawT) { return stageTimeOf(rawT, tape.curve, tape.st); }
+
 // 纯装配（fetch 之外的全部）：Node 侧（金测试/工具）与浏览器共用同一份装配逻辑
 export function buildTape(name, curveText, momentsText = 't\n') {
   const curve = parseCurve(curveText);

@@ -9,8 +9,9 @@
 //
 // 交互法自查：本机构全部交互 ∈ { 按键（DUB/纸长签）、拖选（纸上）、撕（顺齿孔）}。
 // 面板零数字维持：时长以纸长签呈现；精确秒数只活在 HUD。
-import { PACKET_MS, sampleAt, buildTape } from './replay.js';
+import { PACKET_MS, sampleAt, buildTape, foldRawT } from './replay.js';
 import { proposeCuts, cutsDocument } from './cut.js';
+import { FilmPrinter } from './film.js';
 
 const FADE_AFTER_MS = 10000; // 提议搁置十秒，齿孔缓缓淡去
 const FADE_SLOW_MS = 2600;
@@ -33,6 +34,46 @@ function mulberry32(a) {
   };
 }
 
+// —— dub 时刻表的可执行形（M-T2 抽取）：台上演出与胶印离线渲染同吃这一份 ——
+// 铁律③的机器形：导出是回放的另一种消费者。此类只做调度与包变换，无 DOM、无钟。
+export class DubSchedule {
+  constructor(srcTape, segments) {
+    this.tape = srcTape;
+    this.segs = segments;
+    this.starts = [];
+    let acc = 0;
+    for (const s of segments) { this.starts.push(acc); acc += (s.t1 - s.t0) / s.speed; }
+    this.durMs = acc;
+    // 段内 moments 映射到 dub 轴——卡碟态不进演出（M2.3 §1.4 转录姿态）：
+    // dub 是机器誊录自己剪好的带，不是重活一遍会话；卷轴只表达走带速度。
+    this.events = [];
+    for (let i = 0; i < segments.length; i++) {
+      for (const m of srcTape.moments) {
+        if (m.special === 'STUCK_LOOP' || m.special === 'STUCK_CLEARED') continue;
+        if (m.stageT >= segments[i].t0 && m.stageT < segments[i].t1) {
+          this.events.push({ dubT: this.starts[i] + (m.stageT - segments[i].t0) / segments[i].speed, m });
+        }
+      }
+    }
+    this.events.sort((a, b) => a.dubT - b.dubT);
+  }
+  segIndexAt(tau, from = 0) {
+    let i = Math.max(0, from);
+    while (i + 1 < this.segs.length && tau >= this.starts[i + 1] - 1e-9) i++;
+    return i;
+  }
+  // dub 时刻 τ 的包：源内容按段速压缩采样；桥段=快绕（走带是机器动作，供电不看内容）；
+  // A×段速=复制机走带速度的真话（针/墨的值不缩放，只有变化率随压缩加快）。
+  packetAt(tau, i) {
+    const seg = this.segs[i];
+    const srcT = Math.min(seg.t1 - 1e-6, seg.t0 + (tau - this.starts[i]) * seg.speed);
+    const pkt = sampleAt(this.tape, srcT);
+    let phase = pkt.phase, A = pkt.A;
+    if (seg.role === 'BRIDGE') { phase = 'WORKING'; A = Math.max(A, 0.3); }
+    return { ...pkt, phase, A: A * seg.speed };
+  }
+}
+
 export class DubController {
   constructor(opts) {
     // { mode, tapeName, tape, replayer, live, chart, deck, feed, feedMoment,
@@ -42,6 +83,10 @@ export class DubController {
     this.state = 'idle'; // idle|proposing|armed|tearing|fading|torn|resting
     this.dubClock = Math.max(0.25, Number(q.get('dubclock')) || 1); // 加速演出（自动化；纸空间法保墨迹恒等）
     this.auto = q.get('dub') === 'auto';
+    this.filmOn = q.get('film') !== '0'; // 撕开即胶印（M-T2）；?film=0 只出纸条（dev）
+    this.presetName = q.get('preset') === '720p30' ? '720p30' : '1080p30';
+    this.printer = null; this.printResult = null;
+    this._cardEl = null; this._theater = null;
     this.params = null; this.paramsHash = null;
     this.cuts = null; this.doc = null;
     this.marks = [];        // {pos, end?}——齿孔的纸位（纸空间，随纸走）
@@ -94,6 +139,7 @@ export class DubController {
     if (this.state === 'armed') { this._dismiss(FADE_QUICK_MS); return; }  // 收回提议
     if (this.state !== 'idle' && this.state !== 'resting') return;
     if (this._restEl) { this._restEl.remove(); this._restEl = null; }      // 台面清位
+    if (this._cardEl) { this._cardEl.remove(); this._cardEl = null; }
     this.keyEl.classList.add('latched');
     try {
       await this._propose();
@@ -135,6 +181,7 @@ export class DubController {
       tapeName: src.name, tapeHash, paramsHash: this.paramsHash,
       targetS: this.targetS, segments: cuts.segments,
     });
+    this.doc.axis = 'tape-stage'; // 折叠轴（buildTape 拼接折叠后）；正典件不含此注，meta 记账用
     this._startPerformance(src.tape);
   }
 
@@ -151,23 +198,12 @@ export class DubController {
       this.replayer.pause();
     }
     this._deckStuck = { stuck: this.deck.stuck, theta: this.deck.stuckTheta };
+    this.deck.stuck = false; this.deck.stuckTheta = null; // 转录姿态：誊录的机器不卡碟（收场按快照还原）
 
-    const segs = this.doc.segments;
-    const starts = []; let acc = 0;
-    for (const s of segs) { starts.push(acc); acc += (s.t1 - s.t0) / s.speed; }
-    const events = []; // 段内 moments 映射到 dub 轴（卡碟、脱卡、里程碑都随片走）
-    for (let i = 0; i < segs.length; i++) {
-      for (const m of srcTape.moments) {
-        if (m.stageT >= segs[i].t0 && m.stageT < segs[i].t1) {
-          events.push({ dubT: starts[i] + (m.stageT - segs[i].t0) / segs[i].speed, m });
-        }
-      }
-    }
-    events.sort((a, b) => a.dubT - b.dubT);
-
+    this._sched = new DubSchedule(srcTape, this.doc.segments); // 胶印（M-T2）与演出同吃这一份
     const p = this._perf = {
-      srcTape, segs, starts, events, ei: 0,
-      dubDur: acc,
+      srcTape, sched: this._sched, ei: 0,
+      dubDur: this._sched.durMs,
       base: this.chart.lastStageT + PACKET_MS,
       dubT: 0, gridT: 0, segIdx: -1, lastReal: null,
       timer: null,
@@ -195,8 +231,7 @@ export class DubController {
 
   _emitAt(tau) {
     const p = this._perf;
-    let i = Math.max(0, p.segIdx);
-    while (i + 1 < p.segs.length && tau >= p.starts[i + 1] - 1e-9) i++;
+    const i = p.sched.segIndexAt(tau, p.segIdx);
     if (i !== p.segIdx || p.segIdx === -1) {
       // 段界簿记：首段起点即条头齿孔；段接处打真接带痕＋齿孔
       if (p.segIdx === -1) {
@@ -208,15 +243,9 @@ export class DubController {
       }
       p.segIdx = i;
     }
-    const seg = p.segs[i];
-    const srcT = Math.min(seg.t1 - 1e-6, seg.t0 + (tau - p.starts[i]) * seg.speed);
-    const pkt = sampleAt(p.srcTape, srcT);
-    // 桥段=快绕：走带是机器自己的动作，供电不看内容；其余段照抄内容
-    let phase = pkt.phase, A = pkt.A;
-    if (seg.role === 'BRIDGE') { phase = 'WORKING'; A = Math.max(A, 0.3); }
-    const dubPkt = { ...pkt, stageT: p.base + tau, phase, A: A * seg.speed };
-    while (p.ei < p.events.length && p.events[p.ei].dubT <= tau) {
-      this.feedMoment(p.events[p.ei].m);
+    const dubPkt = { ...p.sched.packetAt(tau, i), stageT: p.base + tau };
+    while (p.ei < p.sched.events.length && p.sched.events[p.ei].dubT <= tau) {
+      this.feedMoment(p.sched.events[p.ei].m);
       p.ei++;
     }
     this.feed(dubPkt, false);
@@ -257,9 +286,9 @@ export class DubController {
   }
   noteMoment(m) { if (this._gatedMoments.length < 512) this._gatedMoments.push(m); }
   _resumeFeed() {
-    if (this.deck.stuck && !this._deckStuck?.stuck) { // 演出把卡碟带走了：恢复上场前的走带姿态
-      this.deck.stuck = false; this.deck.stuckTheta = null;
-    }
+    // 收场按快照还原走带姿态（演出洁净：卡碟态从不进演出，M2.3 §1.4）
+    this.deck.stuck = this._deckStuck?.stuck ?? false;
+    this.deck.stuckTheta = this._deckStuck?.theta ?? null;
     if (this.mode === 'replay' && this._savedReplay) {
       this._gatedMoments = [];
       this.replayer.seek(this._savedReplay.t);
@@ -272,10 +301,11 @@ export class DubController {
     }
   }
 
-  // live 真包在演出/提议期间由此吞下（LiveStream 水位照走，恢复即接最新真实）
+  // live 真包在演出/提议/胶印期间由此吞下（LiveStream 水位照走，恢复即接最新真实）
   eats() {
     return this.state === 'proposing' || this.state === 'armed'
-      || this.state === 'tearing' || this.state === 'fading';
+      || this.state === 'tearing' || this.state === 'fading'
+      || this.state === 'torn' || this.state === 'printing';
   }
 
   // ———————————————————————— 指针：拖选与撕 ————————————————————————
@@ -292,6 +322,11 @@ export class DubController {
 
   _capture(e) { try { this.overlayEl.setPointerCapture(e.pointerId); } catch { /* 合成事件无活跃指针 */ } }
   _pointerDown(e) {
+    if (this.state === 'resting') { // 台上有条歇着：纸上按下=清台＋进拖选（M2.3 §1.2，死区修）
+      if (this._restEl) { this._restEl.remove(); this._restEl = null; }
+      if (this._cardEl) { this._cardEl.remove(); this._cardEl = null; }
+      this.state = 'idle';
+    }
     if (this.state === 'armed' && this.stripRange) {
       const [p0, p1] = this.stripRange;
       const pos = this._posOf(e.clientX);
@@ -352,6 +387,10 @@ export class DubController {
     const segments = [{ role: 'MANUAL', t0: Math.round(t0), t1: Math.round(t1), speed: 1 }];
     this.cuts = { segments, analysis: null };
     this.doc = cutsDocument({ tapeName: name, tapeHash, paramsHash: this.paramsHash, targetS: 0, segments });
+    // 双轴口径（M2.3 §1.5）：live 手动剪的 t0/t1 记 live 直流轴（t−t₀），tapeHash 记 /today 折叠轴素材
+    // ——消费侧（M-T2 胶印）凭 liveEpoch 把直流轴换回原始 t 再对齐折叠轴。
+    this.doc.axis = this.mode === 'live' ? 'live-stage' : 'tape-stage';
+    if (this.mode === 'live') this.doc.liveEpoch = this.live?.t0 ?? null;
     this.marks = [{ pos: posA, end: true }, { pos: posB, end: true }];
     this.stripRange = [posA, posB];
     this.chart.retain = true; // 撕之前别把这段的账剪了
@@ -387,18 +426,102 @@ export class DubController {
     this.state = 'torn';
     this.chart.woundRange(p0, p1);
     this.chart.retain = false;
-    const saved = await this._saveDub().catch(err => { console.warn('[dub] 落盘不成：', err); return null; });
     this._restStrip();
     this.marks = []; this.stripRange = null;
     this._alphaTarget = 0; this._fadeRate = FADE_QUICK_MS;
+    // 撕开→进入渲染（设计案 §2.3/§2.4）：胶印期间台上做转录戏——
+    // 双轴快穿、计数轮飞转，进度由机器的动作陈述，无进度条无数字。
+    let filmRes = null;
+    if (this.filmOn && typeof VideoEncoder !== 'undefined') {
+      try { filmRes = await this._print(); }
+      catch (err) { console.warn('[dub] 胶印不成（纸条照旧）：', err.message ?? err); }
+    }
+    this.printResult = filmRes;
+    const saved = await this._saveDub(filmRes).catch(err => { console.warn('[dub] 落盘不成：', err); return null; });
+    if (filmRes) this._restCard(filmRes);
     this.overlayEl.classList.remove('live-gate');
     this.keyEl.classList.remove('latched');
     this._resumeFeed();
     this.state = 'resting';
     if (this._doneResolve) {
-      this._doneResolve({ doc: this.doc, analysis: this.cuts?.analysis ?? null, saved });
+      this._doneResolve({ doc: this.doc, analysis: this.cuts?.analysis ?? null, saved, film: filmRes?.stats ?? null });
       this._doneResolve = null;
     }
+  }
+
+  // ———————————————————— 胶印（M-T2）：同一份时刻表的离线消费者 ————————————————————
+  async _print() {
+    // 时刻表：演出留下的直接复用；手动剪补造一份（同一个类，一段也成片）
+    let sched = this._sched && this._sched.segs === this.doc.segments ? this._sched : null;
+    let srcTape = sched?.tape ?? null;
+    if (!sched) {
+      const src = await this._sourceTape();
+      let segs = this.doc.segments;
+      if (this.doc.axis === 'live-stage' && this.doc.liveEpoch != null) {
+        // 双轴消费（M2.3 §1.5）：live 直流轴 → 原始 t → /today 折叠轴，胶印按折叠轴采样
+        segs = segs.map(s => ({
+          ...s,
+          t0: Math.round(foldRawT(src.tape, this.doc.liveEpoch + s.t0)),
+          t1: Math.round(foldRawT(src.tape, this.doc.liveEpoch + s.t1)),
+        })).filter(s => s.t1 > s.t0);
+      }
+      sched = new DubSchedule(src.tape, segs);
+      srcTape = src.tape;
+    }
+    this.state = 'printing';
+    if (!this.printer) this.printer = new FilmPrinter();
+    this._theaterStart();
+    try {
+      return await this.printer.print({ sched, srcTape, presetName: this.presetName });
+    } finally {
+      this._theaterStop();
+    }
+  }
+
+  // 转录戏：机器手势（走带姿态），不是内容回放——T 低伏、针垂息、相位 WORKING
+  _theaterStart() {
+    const room = document.getElementById('room');
+    const weather = room?.dataset.weather || 'CLEAR';
+    let st = this.chart.lastStageT + PACKET_MS;
+    this._theater = setInterval(() => {
+      st += PACKET_MS * 8; // 8× 快绕
+      this.feed({ stageT: st, S: 0, T: 0.06, A: 0.95, wow: 0.05, needle: 0.08, phase: 'WORKING', weather, pendingAsk: false }, false);
+    }, PACKET_MS);
+  }
+  _theaterStop() { if (this._theater) { clearInterval(this._theater); this._theater = null; } }
+
+  // mp4 卡：海报帧（PEAK 取帧）作卡面，落在纸条旁的胡桃木上；点它落盘
+  _restCard(filmRes) {
+    const el = document.createElement('div');
+    el.id = 'dub-card';
+    const img = document.createElement('img');
+    img.src = URL.createObjectURL(filmRes.posterBlob);
+    el.appendChild(img);
+    const railR = this.railEl.getBoundingClientRect();
+    const stripR = this._restEl?.getBoundingClientRect();
+    const w = 150;
+    el.style.left = `${Math.min((stripR?.right ?? window.innerWidth * 0.58) + 16, window.innerWidth - w - 14)}px`;
+    el.style.top = `${Math.min(railR.top, window.innerHeight - 40) - 86}px`;
+    document.body.appendChild(el);
+    requestAnimationFrame(() => el.classList.add('down'));
+    el.addEventListener('click', () => {
+      const a = document.createElement('a');
+      a.download = `foley-dub-${this.doc?.tape ?? 'tape'}.${filmRes.stats.container}`;
+      a.href = URL.createObjectURL(filmRes.blob);
+      a.click();
+    });
+    this._cardEl = el;
+  }
+
+  // GIF 次级出口（自动化/发布物料用；≤8s，静态颗粒单帧化法）
+  async gif() {
+    if (!this.doc) throw new Error('无 cuts 可出 GIF');
+    const src = await this._sourceTape();
+    const sched = new DubSchedule(src.tape, this.doc.segments);
+    if (!this.printer) this.printer = new FilmPrinter();
+    const g = await this.printer.printGif({ sched, srcTape: src.tape });
+    const r = await fetch(`/dub/save-bin?tape=${encodeURIComponent(this.doc.tape)}&kind=gif`, { method: 'POST', body: g.blob });
+    return r.ok ? await r.json() : null;
   }
 
   // 撕下的纸条滑落到胡桃木台面上歇着；点它落盘（浏览器下载）
@@ -435,17 +558,32 @@ export class DubController {
     this._restEl = el;
   }
 
-  async _saveDub() {
+  async _saveDub(filmRes = null) {
     const c = this._stripCanvas;
     if (!c || !this.doc) return null;
+    // 先传胶片与海报（拿到落盘名），meta 才好把 files 记全
+    let filmFiles = null;
+    if (filmRes) {
+      const up = async (blob, kind) => {
+        const r = await fetch(`/dub/save-bin?tape=${encodeURIComponent(this.doc.tape)}&kind=${kind}`, { method: 'POST', body: blob });
+        return r.ok ? (await r.json()).saved : null;
+      };
+      filmFiles = {
+        video: await up(filmRes.blob, filmRes.stats.container),
+        poster: await up(filmRes.posterBlob, 'poster.png'),
+      };
+    }
     const meta = {
       version: this.doc.version,
-      kind: 'foley-dub/M-T1-paper',
+      kind: filmRes ? 'foley-dub/M-T2-film' : 'foley-dub/M-T1-paper',
       tape: this.doc.tape,
       tapeHash: this.doc.tapeHash,
       paramsHash: this.doc.paramsHash,
       targetS: this.doc.targetS,
+      axis: this.doc.axis ?? 'tape-stage', // 轴口径：tape-stage=折叠轴｜live-stage=直流轴（M2.3 §1.5）
+      ...(this.doc.liveEpoch != null ? { liveEpoch: this.doc.liveEpoch } : {}),
       segments: this.doc.segments,
+      ...(filmRes ? { film: { ...filmRes.stats, files: filmFiles } } : {}),
       createdAt: new Date().toISOString(),
     };
     const png = c.toDataURL('image/png').split(',')[1];
@@ -455,7 +593,9 @@ export class DubController {
       body: JSON.stringify({ tape: this.doc.tape, png, meta }),
     });
     if (!res.ok) throw new Error(`save ${res.status}`);
-    return res.json();
+    const out = await res.json();
+    if (filmFiles) out.film = filmFiles;
+    return out;
   }
 
   // ———————————————————— 纸条合成：真墨迹＋齿孔边＋毛边＋FOLEY 边字 ————————————————————

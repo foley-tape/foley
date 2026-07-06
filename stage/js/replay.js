@@ -7,7 +7,7 @@
 //   GAP_CLAMP 即折叠为 GAP_CLAMP，超过 SPLICE_MS 的记为一道接带痕（走纸上可见）。
 //   磁带宇宙的诚实：空洞不假装播放，也不假装不存在。
 
-const GAP_CLAMP = 400;    // ms，单步舞台时间上限
+export const GAP_CLAMP = 400; // ms，单步舞台时间上限（M-T3 起出口：剖段器要认折叠步）
 const SPLICE_MS = 2000;   // ms，超过即算接带
 export const PACKET_MS = 50; // 20Hz
 
@@ -73,6 +73,21 @@ function stageTimeOf(rawT, curve, st) {
 
 // 原始 t → 折叠轴（M2.3 §1.5 消费侧）：live 直流轴的手动剪凭 liveEpoch 换回原始 t 后走这里对齐
 export function foldRawT(tape, rawT) { return stageTimeOf(rawT, tape.curve, tape.st); }
+
+// 折叠轴 → 原始 t（M-T3 音轨消费）：renderCuts 吃原始相对 ms——舞台折叠轴须先反折叠。
+// 折叠残段（stage 400ms 桩）内按比例回展到原始跨度；样本点上恒精确。
+export function unfoldStageT(tape, stageT) {
+  const { curve, st } = tape;
+  const n = curve.n;
+  if (n === 0) return 0;
+  if (stageT <= 0) return curve.t[0];
+  if (stageT >= st[n - 1]) return curve.t[n - 1];
+  let lo = 0, hi = n - 1;
+  while (hi - lo > 1) { const mid = (lo + hi) >> 1; if (st[mid] <= stageT) lo = mid; else hi = mid; }
+  const span = st[lo + 1] - st[lo];
+  const f = span > 0 ? (stageT - st[lo]) / span : 0;
+  return curve.t[lo] + f * (curve.t[lo + 1] - curve.t[lo]);
+}
 
 // 纯装配（fetch 之外的全部）：Node 侧（金测试/工具）与浏览器共用同一份装配逻辑
 export function buildTape(name, curveText, momentsText = 't\n') {

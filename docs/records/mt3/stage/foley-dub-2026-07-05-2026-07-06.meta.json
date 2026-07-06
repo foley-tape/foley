@@ -1,0 +1,84 @@
+{
+  "version": 1,
+  "kind": "foley-dub/M-T2-film",
+  "tape": "2026-07-05",
+  "tapeHash": "d8348200e75e03d7",
+  "paramsHash": "7607d8a357e4f99c",
+  "targetS": 45,
+  "axis": "tape-stage",
+  "segments": [
+    {
+      "role": "OPEN",
+      "t0": 0,
+      "t1": 24000,
+      "speed": 8
+    },
+    {
+      "role": "BRIDGE",
+      "t0": 24000,
+      "t1": 48000,
+      "speed": 16
+    },
+    {
+      "role": "RAMP",
+      "t0": 3613000,
+      "t1": 3629000,
+      "speed": 2
+    },
+    {
+      "role": "PEAK",
+      "t0": 3761000,
+      "t1": 3776000,
+      "speed": 1
+    },
+    {
+      "role": "BRIDGE",
+      "t0": 3776000,
+      "t1": 3872000,
+      "speed": 16
+    },
+    {
+      "role": "TURN",
+      "t0": 8041000,
+      "t1": 8045000,
+      "speed": 1
+    },
+    {
+      "role": "BRIDGE",
+      "t0": 8045000,
+      "t1": 8069000,
+      "speed": 16
+    },
+    {
+      "role": "CLOSE",
+      "t0": 9029000,
+      "t1": 9035000,
+      "speed": 1
+    }
+  ],
+  "film": {
+    "codec": "avc1.4d0034",
+    "container": "mp4",
+    "preset": "1080p30",
+    "frames": 1350,
+    "contentMs": 45000,
+    "filmMs": 45000,
+    "wallMs": 4946,
+    "realtimeX": 9.1,
+    "audio": {
+      "codec": "none",
+      "note": "音轨缺席（无生带或中继不通）——无声出片"
+    },
+    "sync": null,
+    "pixelDeterminism": "cuts/调度严格确定；像素不保证跨机逐字节（确定性诚实条款）",
+    "files": {
+      "video": "runs/dubs/foley-dub-2026-07-05-2026-07-06.mp4",
+      "poster": "runs/dubs/foley-dub-2026-07-05-2026-07-06.poster.png"
+    }
+  },
+  "audio": {
+    "codec": "none",
+    "note": "音轨缺席（无生带或中继不通）——无声出片"
+  },
+  "createdAt": "2026-07-06T04:21:35.983Z"
+}

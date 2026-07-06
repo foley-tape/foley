@@ -1,0 +1,79 @@
+{
+  "kind": "film-shadow/M-T3 渲染速度＋AV 同步影子（informational：渲染 ≥2× 实时；同步 ≤1 帧）",
+  "createdAt": "2026-07-06T04:21:37.474Z",
+  "prints": [
+    {
+      "tape": "storm",
+      "codec": "avc1.4d0034",
+      "container": "mp4",
+      "preset": "1080p30",
+      "frames": 1414,
+      "contentMs": 43397,
+      "filmMs": 47117,
+      "wallMs": 5707,
+      "realtimeX": 8.26,
+      "audio": {
+        "codec": "mp4a.40.2",
+        "sampleRate": 48000,
+        "channels": 1,
+        "bitrate": 128000,
+        "durationSec": 47.12,
+        "source": "machine+foley（接带音 PCM 内含，sound/renderCuts 供货）",
+        "withRecord": false,
+        "records": []
+      },
+      "sync": {
+        "videoMs": 47133,
+        "audioMs": 47117,
+        "deltaMs": 16.8,
+        "frameBudgetMs": 33.3
+      },
+      "pixelDeterminism": "cuts/调度严格确定；像素不保证跨机逐字节（确定性诚实条款）"
+    },
+    {
+      "tape": "jam",
+      "codec": "avc1.4d0034",
+      "container": "mp4",
+      "preset": "1080p30",
+      "frames": 1445,
+      "contentMs": 44426,
+      "filmMs": 48166,
+      "wallMs": 5807,
+      "realtimeX": 8.29,
+      "audio": {
+        "codec": "mp4a.40.2",
+        "sampleRate": 48000,
+        "channels": 1,
+        "bitrate": 128000,
+        "durationSec": 48.17,
+        "source": "machine+foley（接带音 PCM 内含，sound/renderCuts 供货）",
+        "withRecord": false,
+        "records": []
+      },
+      "sync": {
+        "videoMs": 48167,
+        "audioMs": 48166,
+        "deltaMs": 0.6,
+        "frameBudgetMs": 33.3
+      },
+      "pixelDeterminism": "cuts/调度严格确定；像素不保证跨机逐字节（确定性诚实条款）"
+    },
+    {
+      "tape": "2026-07-05",
+      "codec": "avc1.4d0034",
+      "container": "mp4",
+      "preset": "1080p30",
+      "frames": 1350,
+      "contentMs": 45000,
+      "filmMs": 45000,
+      "wallMs": 4946,
+      "realtimeX": 9.1,
+      "audio": {
+        "codec": "none",
+        "note": "音轨缺席（无生带或中继不通）——无声出片"
+      },
+      "sync": null,
+      "pixelDeterminism": "cuts/调度严格确定；像素不保证跨机逐字节（确定性诚实条款）"
+    }
+  ]
+}

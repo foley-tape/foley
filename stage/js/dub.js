@@ -9,7 +9,7 @@
 //
 // 交互法自查：本机构全部交互 ∈ { 按键（DUB/纸长签）、拖选（纸上）、撕（顺齿孔）}。
 // 面板零数字维持：时长以纸长签呈现；精确秒数只活在 HUD。
-import { PACKET_MS, sampleAt, buildTape, foldRawT } from './replay.js';
+import { PACKET_MS, GAP_CLAMP, sampleAt, buildTape, foldRawT, unfoldStageT } from './replay.js';
 import { proposeCuts, cutsDocument } from './cut.js';
 import { FilmPrinter } from './film.js';
 
@@ -41,28 +41,67 @@ function mulberry32(a) {
   };
 }
 
+// 折叠剖段（M-T3 轴对齐）：舞台折叠帽 400ms、声侧压缩帽 1500ms——段内含折叠步则
+// 音画时长必然分家。剖法：在每个 raw dt>GAP_CLAMP 的样本步剖开，折叠桩退场——
+// 桩不是内容，是折叠残段；剖点即接带（纸上落痕、声里落"噗"），剖后每子段两轴逐 ms 恒等。
+// cuts 正典（doc.segments）不动；预览与胶印同吃剖后表（同源不裂）。
+const MIN_SUB_VIEWER_MS = 520; // 低于声侧最小渲染颗粒（0.5s+淡化）的观感残段整段弃
+function splitAtFolds(tape, segments) {
+  const { curve, st } = tape;
+  const out = [];
+  const push = (seg, t0, t1, fold) => {
+    if ((t1 - t0) / seg.speed < MIN_SUB_VIEWER_MS) return;
+    out.push({ role: seg.role, t0: Math.round(t0), t1: Math.round(t1), speed: seg.speed, _fold: fold });
+  };
+  for (const seg of segments) {
+    let cursor = seg.t0, fold = false;
+    let lo = 0, hi = Math.max(0, curve.n - 1);
+    while (hi - lo > 1) { const mid = (lo + hi) >> 1; if (st[mid] <= seg.t0) lo = mid; else hi = mid; }
+    for (let i = lo + 1; i < curve.n && st[i] <= seg.t1; i++) {
+      if (curve.t[i] - curve.t[i - 1] <= GAP_CLAMP) continue;
+      push(seg, cursor, st[i - 1], fold);
+      cursor = st[i];
+      fold = true;
+    }
+    push(seg, cursor, seg.t1, fold);
+  }
+  return out.length > 0 ? out : segments.map(s => ({ ...s, _fold: false }));
+}
+
 // —— dub 时刻表的可执行形（M-T2 抽取）：台上演出与胶印离线渲染同吃这一份 ——
 // 铁律③的机器形：导出是回放的另一种消费者。此类只做调度与包变换，无 DOM、无钟。
 export class DubSchedule {
   constructor(srcTape, segments) {
     this.tape = srcTape;
-    this.segs = segments;
+    this.canonical = segments;               // cuts 正典形（doc/meta 用，金件之源）
+    this.segs = splitAtFolds(srcTape, segments); // 剖后执行形（调度/音轨用）
     this.starts = [];
     let acc = 0;
-    for (const s of segments) { this.starts.push(acc); acc += (s.t1 - s.t0) / s.speed; }
+    for (const s of this.segs) { this.starts.push(acc); acc += (s.t1 - s.t0) / s.speed; }
     this.durMs = acc;
     // 段内 moments 映射到 dub 轴——卡碟态不进演出（M2.3 §1.4 转录姿态）：
     // dub 是机器誊录自己剪好的带，不是重活一遍会话；卷轴只表达走带速度。
     this.events = [];
-    for (let i = 0; i < segments.length; i++) {
+    for (let i = 0; i < this.segs.length; i++) {
       for (const m of srcTape.moments) {
         if (m.special === 'STUCK_LOOP' || m.special === 'STUCK_CLEARED') continue;
-        if (m.stageT >= segments[i].t0 && m.stageT < segments[i].t1) {
-          this.events.push({ dubT: this.starts[i] + (m.stageT - segments[i].t0) / segments[i].speed, m });
+        if (m.stageT >= this.segs[i].t0 && m.stageT < this.segs[i].t1) {
+          this.events.push({ dubT: this.starts[i] + (m.stageT - this.segs[i].t0) / this.segs[i].speed, m });
         }
       }
     }
     this.events.sort((a, b) => a.dubT - b.dubT);
+  }
+
+  // 音轨消费形（M-T3）：剖后子段 → renderCuts 的原始相对 ms 域（样本点上反折叠恒精确）
+  rawRelSegments() {
+    const t0raw = this.tape.curve.t[0];
+    return this.segs.map(s => ({
+      role: s.role,
+      t0: Math.round(unfoldStageT(this.tape, s.t0) - t0raw),
+      t1: Math.round(unfoldStageT(this.tape, s.t1) - t0raw),
+      speed: s.speed,
+    }));
   }
   segIndexAt(tau, from = 0) {
     let i = Math.max(0, from);
@@ -240,13 +279,14 @@ export class DubController {
     const p = this._perf;
     const i = p.sched.segIndexAt(tau, p.segIdx);
     if (i !== p.segIdx || p.segIdx === -1) {
-      // 段界簿记：首段起点即条头齿孔；段接处打真接带痕＋齿孔
+      // 段界簿记：首段起点即条头齿孔；剪切接（cut）打痕＋齿孔；折叠接（fold）只打痕——
+      // 齿孔是"这里剪过"的提议记号，折叠痕是素材自己的接带（M-T3 剖段语义）
       if (p.segIdx === -1) {
         p.stripStart = this.chart.pos;
         this.marks.push({ pos: this.chart.pos, end: true });
       } else {
         this.chart.markSeam();
-        this.marks.push({ pos: this.chart.pos });
+        if (!p.sched.segs[i]._fold) this.marks.push({ pos: this.chart.pos });
       }
       p.segIdx = i;
     }
@@ -477,12 +517,34 @@ export class DubController {
     }
     this.state = 'printing';
     if (!this.printer) this.printer = new FilmPrinter();
+    // M-T3：先取音轨（sound/renderCuts 经 serve 中继）；缺席即无声出片注明
+    let audio = null;
+    try { audio = await this._fetchAudio(sched); }
+    catch (err) { console.warn('[dub] 音轨缺席（无声出片注明）：', err.message ?? err); }
     this._theaterStart();
     try {
-      return await this.printer.print({ sched, srcTape, presetName: this.presetName });
+      return await this.printer.print({ sched, srcTape, presetName: this.presetName, audio });
     } finally {
       this._theaterStop();
     }
+  }
+
+  // 音轨（M-T3）：剖后子段以原始相对 ms 递给声侧；WAV PCM16 mono 解回浮点
+  async _fetchAudio(sched) {
+    if (this.mode !== 'replay') return null; // live 无生带：无声出片注明
+    const res = await fetch('/dub/render-audio', {
+      method: 'POST', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ tape: this.doc.tape, segments: sched.rawRelSegments() }),
+    });
+    if (!res.ok) throw new Error(`${res.status} ${(await res.text()).slice(0, 120)}`);
+    const meta = JSON.parse(decodeURIComponent(res.headers.get('x-dub-audio-meta') ?? '%7B%7D'));
+    const buf = await res.arrayBuffer();
+    const dv = new DataView(buf);
+    const sr = dv.getUint32(24, true);
+    const n = Math.max(0, (buf.byteLength - 44) >> 1);
+    const pcm = new Float32Array(n);
+    for (let i = 0; i < n; i++) pcm[i] = dv.getInt16(44 + i * 2, true) / 32768;
+    return { pcm, sr, meta };
   }
 
   // 转录戏：机器手势（走带姿态），不是内容回放——T 低伏、针垂息、相位 WORKING
@@ -591,6 +653,8 @@ export class DubController {
       ...(this.doc.liveEpoch != null ? { liveEpoch: this.doc.liveEpoch } : {}),
       segments: this.doc.segments,
       ...(filmRes ? { film: { ...filmRes.stats, files: filmFiles } } : {}),
+      // audio: 段（M2.4 §C.1）：编码/来源；无声出片时如实记 none+缘由
+      ...(filmRes ? { audio: filmRes.stats.audio } : {}),
       createdAt: new Date().toISOString(),
     };
     const png = c.toDataURL('image/png').split(',')[1];

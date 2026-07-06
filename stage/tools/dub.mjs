@@ -65,10 +65,13 @@ if (FILM) {
     const files = [res.saved?.film?.video, res.saved?.film?.poster, ...(res.saved?.saved ?? []), gifSaved?.saved].filter(Boolean);
     for (const rel of files) copyFileSync(join(repoRoot, rel), join(OUT, rel.split('/').pop()));
     rows.push({ tape, film: res.film, files });
-    console.log(`${tape.padEnd(10)} ${res.film.codec}/${res.film.container}  ${res.film.frames}帧  片长${(res.film.contentMs / 1000).toFixed(1)}s  壁钟${(res.film.wallMs / 1000).toFixed(1)}s  ${res.film.realtimeX}×实时${res.film.realtimeX >= 2 ? '' : '（<2× 影子红）'}`);
+    const au = res.film.audio?.codec && res.film.audio.codec !== 'none'
+      ? `声${res.film.audio.codec}${res.film.sync ? ` Δ${res.film.sync.deltaMs}ms` : ''}`
+      : `无声（${res.film.audio?.note ?? ''}）`;
+    console.log(`${tape.padEnd(10)} ${res.film.codec}/${res.film.container}  ${res.film.frames}帧  片长${((res.film.filmMs ?? res.film.contentMs) / 1000).toFixed(1)}s  壁钟${(res.film.wallMs / 1000).toFixed(1)}s  ${res.film.realtimeX}×实时${res.film.realtimeX >= 2 ? '' : '（<2× 影子红）'}  ${au}`);
   }
-  writeFileSync(join(OUT, 'film-shadow-mt2.json'), JSON.stringify({
-    kind: 'film-shadow/M-T2 渲染速度影子（informational，目标 ≥2× 实时）',
+  writeFileSync(join(OUT, 'film-shadow.json'), JSON.stringify({
+    kind: 'film-shadow 渲染速度＋AV 同步影子（informational：渲染 ≥2× 实时；同步 ≤1 帧）',
     createdAt: new Date().toISOString(),
     prints: rows.map(r => ({ tape: r.tape, ...r.film })),
   }, null, 2) + '\n');

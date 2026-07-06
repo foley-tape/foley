@@ -1,0 +1,95 @@
+{
+  "version": 1,
+  "kind": "foley-dub/M-T2-film",
+  "tape": "jam",
+  "tapeHash": "cebb45fcd7286baf",
+  "paramsHash": "7607d8a357e4f99c",
+  "targetS": 45,
+  "axis": "tape-stage",
+  "segments": [
+    {
+      "role": "OPEN",
+      "t0": 0,
+      "t1": 24000,
+      "speed": 8
+    },
+    {
+      "role": "BRIDGE",
+      "t0": 24000,
+      "t1": 120000,
+      "speed": 16
+    },
+    {
+      "role": "RAMP",
+      "t0": 447000,
+      "t1": 459000,
+      "speed": 2
+    },
+    {
+      "role": "BRIDGE",
+      "t0": 459000,
+      "t1": 507000,
+      "speed": 16
+    },
+    {
+      "role": "PEAK",
+      "t0": 524000,
+      "t1": 539000,
+      "speed": 1
+    },
+    {
+      "role": "BRIDGE",
+      "t0": 539000,
+      "t1": 635000,
+      "speed": 16
+    },
+    {
+      "role": "CLOSE",
+      "t0": 3074000,
+      "t1": 3079426,
+      "speed": 1
+    }
+  ],
+  "film": {
+    "codec": "avc1.4d0034",
+    "container": "mp4",
+    "preset": "1080p30",
+    "frames": 1445,
+    "contentMs": 44426,
+    "filmMs": 48166,
+    "wallMs": 5807,
+    "realtimeX": 8.29,
+    "audio": {
+      "codec": "mp4a.40.2",
+      "sampleRate": 48000,
+      "channels": 1,
+      "bitrate": 128000,
+      "durationSec": 48.17,
+      "source": "machine+foley（接带音 PCM 内含，sound/renderCuts 供货）",
+      "withRecord": false,
+      "records": []
+    },
+    "sync": {
+      "videoMs": 48167,
+      "audioMs": 48166,
+      "deltaMs": 0.6,
+      "frameBudgetMs": 33.3
+    },
+    "pixelDeterminism": "cuts/调度严格确定；像素不保证跨机逐字节（确定性诚实条款）",
+    "files": {
+      "video": "runs/dubs/foley-dub-jam-2026-07-06.mp4",
+      "poster": "runs/dubs/foley-dub-jam-2026-07-06.poster.png"
+    }
+  },
+  "audio": {
+    "codec": "mp4a.40.2",
+    "sampleRate": 48000,
+    "channels": 1,
+    "bitrate": 128000,
+    "durationSec": 48.17,
+    "source": "machine+foley（接带音 PCM 内含，sound/renderCuts 供货）",
+    "withRecord": false,
+    "records": []
+  },
+  "createdAt": "2026-07-06T04:21:25.231Z"
+}

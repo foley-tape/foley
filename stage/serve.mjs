@@ -6,7 +6,7 @@
 // 经 /live SSE 中继进浏览器。--replay-only 时只当静态服务器（性格照/回放捕捉用）。
 // 中继与钟都不依赖标签页可见性——藏页照走（M2.0 §2 验证件二）。
 import { createServer } from 'node:http';
-import { readFile, writeFile, mkdir } from 'node:fs/promises';
+import { readFile, writeFile, mkdir, mkdtemp, rm } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
 import { join, extname, normalize, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -148,6 +148,49 @@ createServer(async (req, res) => {
     });
     return;
   }
+  // M-T3 音轨中继：POST /dub/render-audio {tape, segments[原始相对 ms]} → WAV（meta 在响应头）。
+  // 消费 sound/ 的 renderCuts（cli render-cuts 子命令）；dub 授权卫生=默认无唱片。
+  // 红线①：tape 走白名单（五带生带），segments 逐字段验数；日带/live 无生带诚实报缺。
+  if (req.method === 'POST' && url.pathname === '/dub/render-audio') {
+    const AUDIO_TAPES = new Set(['storm', 'smooth', 'busy', 'jam', 'silence']);
+    let body = '', size = 0;
+    req.on('data', d => { size += d.length; if (size > 1e6) req.destroy(); else body += d; });
+    req.on('end', async () => {
+      try {
+        const { tape, segments } = JSON.parse(body);
+        if (!AUDIO_TAPES.has(tape)) { res.writeHead(404); res.end('该带无生带（日带/live 音轨候适配）'); return; }
+        if (!Array.isArray(segments) || segments.length === 0 || segments.length > 64
+          || !segments.every(s => Number.isFinite(s.t0) && Number.isFinite(s.t1) && Number.isFinite(s.speed) && s.t1 > s.t0 && s.speed >= 1)) {
+          res.writeHead(400); res.end('segments 不像样'); return;
+        }
+        const tmp = await mkdtemp(join(repoRoot, 'runs', 'rendercuts-'));
+        const clean = segments.map(s => ({
+          role: String(s.role ?? 'SEG').replace(/[^\w-]/g, '').slice(0, 12),
+          t0: Math.round(s.t0), t1: Math.round(s.t1), speed: Math.round(s.speed),
+        }));
+        await writeFile(join(tmp, 'cuts.json'), JSON.stringify({ segments: clean }));
+        const child = spawn('node', ['cli/index.ts', 'render-cuts',
+          join(repoRoot, 'tapes', `${tape}.tape.jsonl`), join(tmp, 'cuts.json'), '--out', tmp],
+          { cwd: repoRoot, stdio: ['ignore', 'pipe', 'pipe'] });
+        let errBuf = '';
+        child.stderr.on('data', d => { errBuf += d; });
+        const timer = setTimeout(() => child.kill('SIGKILL'), 180000);
+        child.on('exit', async code => {
+          clearTimeout(timer);
+          try {
+            if (code !== 0) { res.writeHead(500); res.end(`render-cuts 退 ${code}：${errBuf.slice(0, 400)}`); return; }
+            const wav = await readFile(join(tmp, 'cuts-audio.wav'));
+            const meta = await readFile(join(tmp, 'cuts-audio.meta.json'), 'utf8');
+            res.writeHead(200, { 'content-type': 'audio/wav', 'x-dub-audio-meta': encodeURIComponent(meta) });
+            res.end(wav);
+            console.log(`[dub] 音轨 ${tape}：${(wav.length / 1e6).toFixed(1)}MB WAV`);
+          } catch (e) { res.writeHead(500); res.end(String(e)); }
+          finally { rm(tmp, { recursive: true, force: true }).catch(() => {}); }
+        });
+      } catch (e) { res.writeHead(400); res.end(String(e)); }
+    });
+    return;
+  }
   // 胶片/海报/GIF 二进制落盘（M-T2）：POST /dub/save-bin?tape=<名>&kind=<mp4|webm|poster.png|gif>
   if (req.method === 'POST' && url.pathname === '/dub/save-bin') {
     if (!writeAuthed(req)) { res.writeHead(403); res.end('forbidden'); return; }
@@ -206,7 +249,7 @@ createServer(async (req, res) => {
   } catch {
     res.writeHead(404); res.end('not found');
   }
-}).listen(port, '127.0.0.1', () => {  // §0.6.② 只绑回环：断局域网/DNS-rebinding 直写面
+}).listen(port, '127.0.0.1', () => { // §0.6.② 只绑回环：断局域网/DNS-rebinding 直写面（两轨同刀，措辞取安全批原文）
   console.log(`stage @ http://127.0.0.1:${port}/${replayOnly ? '?tape=storm（replay-only）' : '（live 默认；?tape=storm 走 replay）'}`);
 });
 

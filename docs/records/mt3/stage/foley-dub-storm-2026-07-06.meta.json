@@ -1,0 +1,101 @@
+{
+  "version": 1,
+  "kind": "foley-dub/M-T2-film",
+  "tape": "storm",
+  "tapeHash": "650107fcc28d6884",
+  "paramsHash": "7607d8a357e4f99c",
+  "targetS": 45,
+  "axis": "tape-stage",
+  "segments": [
+    {
+      "role": "OPEN",
+      "t0": 0,
+      "t1": 24000,
+      "speed": 8
+    },
+    {
+      "role": "BRIDGE",
+      "t0": 24000,
+      "t1": 80000,
+      "speed": 16
+    },
+    {
+      "role": "RAMP",
+      "t0": 709000,
+      "t1": 721000,
+      "speed": 2
+    },
+    {
+      "role": "BRIDGE",
+      "t0": 721000,
+      "t1": 745000,
+      "speed": 16
+    },
+    {
+      "role": "PEAK",
+      "t0": 944000,
+      "t1": 959000,
+      "speed": 1
+    },
+    {
+      "role": "TURN",
+      "t0": 1087000,
+      "t1": 1091000,
+      "speed": 1
+    },
+    {
+      "role": "BRIDGE",
+      "t0": 1091000,
+      "t1": 1187000,
+      "speed": 16
+    },
+    {
+      "role": "CLOSE",
+      "t0": 3964000,
+      "t1": 3969472,
+      "speed": 1
+    }
+  ],
+  "film": {
+    "codec": "avc1.4d0034",
+    "container": "mp4",
+    "preset": "1080p30",
+    "frames": 1414,
+    "contentMs": 43397,
+    "filmMs": 47117,
+    "wallMs": 5707,
+    "realtimeX": 8.26,
+    "audio": {
+      "codec": "mp4a.40.2",
+      "sampleRate": 48000,
+      "channels": 1,
+      "bitrate": 128000,
+      "durationSec": 47.12,
+      "source": "machine+foley（接带音 PCM 内含，sound/renderCuts 供货）",
+      "withRecord": false,
+      "records": []
+    },
+    "sync": {
+      "videoMs": 47133,
+      "audioMs": 47117,
+      "deltaMs": 16.8,
+      "frameBudgetMs": 33.3
+    },
+    "pixelDeterminism": "cuts/调度严格确定；像素不保证跨机逐字节（确定性诚实条款）",
+    "files": {
+      "video": "runs/dubs/foley-dub-storm-2026-07-06.mp4",
+      "poster": "runs/dubs/foley-dub-storm-2026-07-06.poster.png"
+    }
+  },
+  "audio": {
+    "codec": "mp4a.40.2",
+    "sampleRate": 48000,
+    "channels": 1,
+    "bitrate": 128000,
+    "durationSec": 47.12,
+    "source": "machine+foley（接带音 PCM 内含，sound/renderCuts 供货）",
+    "withRecord": false,
+    "records": []
+  },
+  "createdAt": "2026-07-06T04:21:10.966Z"
+}

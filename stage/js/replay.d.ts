@@ -1,5 +1,6 @@
 // 手写声明（M2.3 §1.6，Track-SOUND 移交件）：与 replay.js 导出面一致。
 export const PACKET_MS: number;
+export const GAP_CLAMP: number;
 export const PHASES: readonly string[];
 export const WEATHERS: readonly string[];
 
@@ -48,6 +49,8 @@ export interface StatePacket {
   pendingAsk: boolean;
 }
 
+export function foldRawT(tape: Tape, rawT: number): number;
+export function unfoldStageT(tape: Tape, stageT: number): number;
 export function parseCurve(text: string): Curve;
 export function parseMoments(text: string): Omit<Moment, 'stageT'>[];
 export function buildTape(name: string, curveText: string, momentsText?: string): Tape;

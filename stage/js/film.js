@@ -381,15 +381,42 @@ export class FilmPrinter {
     };
   }
 
-  // ———————————————————————— 主口：胶印一支 mp4（附 PEAK 海报帧） ————————————————————————
-  async print({ sched, srcTape, presetName = '1080p30', onProgress }) {
+  // ——————————— 主口：胶印一支 mp4（附 PEAK 海报帧；M-T3 起随片封音轨） ———————————
+  async print({ sched, srcTape, presetName = '1080p30', onProgress, audio = null }) {
     const preset = PRESETS[presetName] ?? PRESETS['1080p30'];
     // 合成走视口空间：窗口被折叠（0×0 视口）时几何全灭——诚实拒印好过无声出废片
     if (window.innerWidth < 100 || window.innerHeight < 100) {
       throw new Error(`视口不可用（${window.innerWidth}×${window.innerHeight}）——窗口被折叠？`);
     }
-    const probed = await this.probe(preset);
+    let probed = await this.probe(preset);
     if (probed.kind === 'none') throw new Error(probed.note);
+
+    // 音轨编码矩阵（M2.4 §C.1）：AAC（mp4 内封）优先；AAC 缺席→Opus/webm 整链兜底；
+    // 编码器缺席→无声出片＋注明缘由（meta.audio 记 none+note，不哑巴装聋）
+    let audioCfg = null, audioKind = 'none';
+    let audioNote = audio ? null : '音轨缺席（无生带或中继不通）——无声出片';
+    if (audio && typeof AudioEncoder !== 'undefined') {
+      const aac = { codec: 'mp4a.40.2', sampleRate: audio.sr, numberOfChannels: 1, bitrate: 128000 };
+      const opus = { codec: 'opus', sampleRate: audio.sr, numberOfChannels: 1, bitrate: 96000 };
+      try { if ((await AudioEncoder.isConfigSupported(aac)).supported) { audioCfg = aac; audioKind = 'aac'; } } catch { /* 落兜底 */ }
+      if (!audioCfg) {
+        try { if ((await AudioEncoder.isConfigSupported(opus)).supported) { audioCfg = opus; audioKind = 'opus'; } } catch { /* 落 none */ }
+      }
+      if (!audioCfg) audioNote = 'AAC/Opus 编码器皆缺席——无声出片';
+    } else if (audio) {
+      audioNote = 'WebCodecs AudioEncoder 缺席——无声出片';
+    }
+    if (audioKind === 'opus' && probed.kind === 'avc') {
+      // Opus 走 webm 兜底（按令整链降 VP9/webm）；VP9 亦缺则 mp4 无声＋注明
+      const vp9 = { ...probed.config, codec: 'vp09.00.10.08' };
+      let ok = false;
+      try { ok = (await VideoEncoder.isConfigSupported(vp9)).supported; } catch { /* 保持 avc */ }
+      if (ok) probed = { kind: 'vp9', config: vp9 };
+      else { audioCfg = null; audioKind = 'none'; audioNote = 'AAC 缺席且 VP9 不可用——无声 mp4 出片'; }
+    }
+    if (probed.kind === 'vp9' && audioKind === 'aac') { // webm 不封 AAC
+      audioCfg = null; audioKind = 'none'; audioNote = 'webm 容器不封 AAC——无声出片';
+    }
 
     const S = this._newState(sched, srcTape, preset);
     S.plates = await this._buildPlates(S.geo.scale);
@@ -398,8 +425,15 @@ export class FilmPrinter {
     const isAvc = probed.kind === 'avc';
     const target = isAvc ? new Mp4Target() : new WebmTarget();
     const muxer = isAvc
-      ? new Mp4Muxer({ target, video: { codec: 'avc', width: preset.w, height: preset.h }, fastStart: 'in-memory' })
-      : new WebmMuxer({ target, video: { codec: 'V_VP9', width: preset.w, height: preset.h } });
+      ? new Mp4Muxer({
+        target, video: { codec: 'avc', width: preset.w, height: preset.h },
+        ...(audioCfg ? { audio: { codec: 'aac', sampleRate: audio.sr, numberOfChannels: 1 } } : {}),
+        fastStart: 'in-memory',
+      })
+      : new WebmMuxer({
+        target, video: { codec: 'V_VP9', width: preset.w, height: preset.h },
+        ...(audioCfg ? { audio: { codec: 'A_OPUS', sampleRate: audio.sr, numberOfChannels: 1 } } : {}),
+      });
     let encErr = null;
     const enc = new VideoEncoder({
       output: (chunk, meta) => muxer.addVideoChunk(chunk, meta),
@@ -414,10 +448,15 @@ export class FilmPrinter {
       : sched.durMs / 2;
     let posterBlob = null;
 
+    // 片长=内容与音轨取长（音轨含正格终止＋≥2s 尾静默：尾段视频为机器歇场帧——
+    // 纸停针垂灯自呼吸，声音在静默里收干净）
+    const audioMs = audioCfg ? (audio.pcm.length / audio.sr) * 1000 : 0;
+    const filmMs = Math.max(sched.durMs, audioMs);
+
     const wall0 = performance.now();
     const frameUs = Math.round(1e6 / FPS);
     const frames = await this._renderRange(S, {
-      fromMs: 0, toMs: sched.durMs, fps: FPS, onProgress,
+      fromMs: 0, toMs: filmMs, fps: FPS, onProgress,
       perFrame: async (k, tau) => {
         if (encErr) throw encErr;
         const vf = new VideoFrame(S.out, { timestamp: k * frameUs, duration: frameUs });
@@ -430,6 +469,37 @@ export class FilmPrinter {
       },
     });
     await enc.flush();
+
+    // 音轨编码（与视频同轴零起点；1024 帧一片，f32-planar）
+    let sync = null;
+    if (audioCfg) {
+      const aenc = new AudioEncoder({
+        output: (chunk, meta) => muxer.addAudioChunk(chunk, meta),
+        error: e => { encErr = e; },
+      });
+      aenc.configure(audioCfg);
+      const CHUNK = 1024;
+      for (let off = 0; off < audio.pcm.length; off += CHUNK) {
+        if (encErr) throw encErr;
+        const len = Math.min(CHUNK, audio.pcm.length - off);
+        const ad = new AudioData({
+          format: 'f32-planar', sampleRate: audio.sr, numberOfFrames: len, numberOfChannels: 1,
+          timestamp: Math.round((off / audio.sr) * 1e6),
+          data: audio.pcm.subarray(off, off + len),
+        });
+        aenc.encode(ad);
+        ad.close();
+        if (aenc.encodeQueueSize > 16) await new Promise(r => setTimeout(r, 2));
+      }
+      await aenc.flush();
+      // AV 同步影子（构造侧，informational 首轮）：同轴零起点、视频延至音尾——差 ≤1 帧为绿
+      sync = {
+        videoMs: Math.round(frames * FRAME_MS),
+        audioMs: Math.round(audioMs),
+        deltaMs: +Math.abs(frames * FRAME_MS - audioMs).toFixed(1),
+        frameBudgetMs: +FRAME_MS.toFixed(1),
+      };
+    }
     muxer.finalize();
     const wallMs = performance.now() - wall0;
     S.rig.rig.remove();
@@ -439,10 +509,19 @@ export class FilmPrinter {
       blob, posterBlob,
       stats: {
         codec: probed.config.codec, container: isAvc ? 'mp4' : 'webm',
-        preset: presetName, frames, contentMs: Math.round(sched.durMs),
+        preset: presetName, frames, contentMs: Math.round(sched.durMs), filmMs: Math.round(filmMs),
         wallMs: Math.round(wallMs),
-        realtimeX: +(sched.durMs / wallMs).toFixed(2), // 渲染速度影子：目标 ≥2×
-        audio: 'none（M-T3 候声音过耳合龙）',
+        realtimeX: +(filmMs / wallMs).toFixed(2), // 渲染速度影子：目标 ≥2×
+        audio: audioCfg
+          ? {
+            codec: audioCfg.codec, sampleRate: audio.sr, channels: 1, bitrate: audioCfg.bitrate,
+            durationSec: +(audioMs / 1000).toFixed(2),
+            source: 'machine+foley（接带音 PCM 内含，sound/renderCuts 供货）',
+            withRecord: audio.meta?.withRecord ?? false,
+            records: audio.meta?.records ?? [],
+          }
+          : { codec: 'none', note: audioNote },
+        sync,
         pixelDeterminism: 'cuts/调度严格确定；像素不保证跨机逐字节（确定性诚实条款）',
       },
     };

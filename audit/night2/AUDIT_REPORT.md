@@ -3,7 +3,9 @@
 > 审计分支 `audit/night2` @ 快照锚 `ba5e777`（取锚 2026-07-06 00:54 +0800）。源码零改动，仅新增 `audit/night2/**`。
 > 并发：夜里 SOUND-R3 与 M-T2 双轨在同仓活跃；本报告全程只审锚定快照，晨间分诊须与夜间新提交去重（见 §末去重注记）。
 > 严重度：**P0** 阻断发布 / **P1** 发布前应修 / **P2** v1.x / **P3** 冰箱。每条附：复现·证据·建议修法·为何现有金测试没抓住。
-> 姊妹件：`COLD_READER.md`（§0 冷读者庭）、`SOAK2_REPORT.md`（§2 通宵值机，晨间生成）、`repro/`（失败测试即证据）。
+> 姊妹件：`COLD_READER.md`（§0 冷读者庭）、`SOAK2_REPORT.md`（§2 通宵值机）、`TRIAGE.md`（晨间去重）、`repro/`（失败测试即证据）。
+
+> **⚠️ 晨间分诊已出（见 `TRIAGE.md`）**：本正文审快照 `ba5e777`；夜里 main 已推进至 `4fdd585`。复验后 **B1 求解器天花板／B2 probe coreDegreeHz／D1 金测试覆盖 三条夜间 M-T1「四修」已解**（B2 被 main 显式署名「NIGHT-2 审计 probe-coreDegreeHz 案」）。**仍开：C1 XSS、A1 邮箱 PII、C2 崩溃、C3 写盘鉴权（且 M-T2 新增 `/dub/save-bin` 使其扩大）、及发布打包三件套（npx/LICENSE/version）。** 下列正文保留快照原貌，定级以 TRIAGE.md 为准。
 
 ---
 

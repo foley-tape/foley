@@ -3,11 +3,13 @@
 > 规矩：每轮一夹；值得留的才进来（晋升规则，M2.0 §1.2）；runs/ 里的一切默认可弃。
 > 桌面手令堆已于 M2.1 清空入仓——本目录自此是历史的唯一住址。
 > **命名法**：归档件一律带 `@轮次` 后缀（如 `舞台手记@M2.1.md`）——文件离开文件夹仍能自述身份；
-> 仓库根目录同名而不带后缀者，是各轨的**活版**。唯 `night1/audit/` 为自包含代码档，保持原名。
+> 仓库根目录同名而不带后缀者，是各轨的**活版**。唯审计原始档为自包含代码档保持原名，统一住仓库根 [`/audit/`](../../audit/)（ARCHIVE-1 迁）。
+> 每夹一份 `_index.md`：本轮做了什么／关键裁决／令与正典指向（ARCHIVE-1 起）。
 
 | 夹 | 轮次 | 内容 |
 |---|---|---|
-| `night1/` | 审计夜（M1.7→M1.8 间） | 恢复-审计与修复实录（ce25a3e2）＋ `audit/` 原始档（自仓库根迁入：AUDIT_REPORT/预注册/b/c 轮/handoff） |
+| `night1/` | 审计夜（M1.7→M1.8 间） | 恢复-审计与修复实录（ce25a3e2）；审计原始档已迁 [`/audit/night1/`](../../audit/night1/)（AUDIT_REPORT/预注册/b 轮/handoff/soak/repro） |
+| `night2/` | 审计夜二·发布前（M2.3→M2.4 间） | hotfix/（总览/已修执行报告/DOM-XSS 与写盘鉴权选项/62MB 重媒体选项）；审计正文住 [`/audit/night2/`](../../audit/night2/)（四队+十大发现+SOAK2+TRIAGE） |
 | `m15/` | M1.5 蒸馏工序 | 读我/FEEDBACK/施工方手记/params ＋ **storm 证据卷 1bb942f0**（旧引擎产物，不可复现，特批晋升） |
 | `m16/` | M1.6 扫参与五带 | FEEDBACK/手记/冰箱/params/verdict/sweep 全套 |
 | `m17/` | M1.7 判据二版＋耳朵上岗 | 必发（EAR_REPORT/FEEDBACK/SWEEP/verdict/手记）＋备查（盲听包等） |
@@ -21,6 +23,7 @@
 | `mt3/` | M2.4 §C M-T3 音画合龙＋定妆照（be619bb+cf043e7，候庭） | stage/（交付件/指纹/AV 影子/歇场尾帧/live定妆照@M2.4 两帧+视频指纹/FEEDBACK@M2.4C） |
 | `m25/` | M2.5 §B 发布物料 | stage/（示范带审计@M2.5/demo站构建纪要/hero 主片 meta+海报帧+指纹/FEEDBACK@M2.5B） |
 | `sound-r1/` | 声音相 EAR 升级 | 致架构师升级报告（EAR-1…4 台账另见 FEEDBACK-FIX） |
+| `sound-r2/` | SOUND-R2 床的重做（EAR 战役终裁） | 输入件：EAR5-8 交接＋EAR 战役复盘检讨；收官件：下一会话入职包（均 @SOUND-R2） |
 | `sound-r3/` | SOUND-R3 唱机改造（97f558a） | FEEDBACK-SOUND@SOUND-R3 快照 ＋ EAR_MACHINE@SOUND-R3（机器耳 v3 首份三哈希报告）＋ **复核庭@SOUND-R3**（通过，放行实听） |
 | `sound-r4/` | SOUND-R4 平移与落仓（M2.4 §A） | FEEDBACK-SOUND@SOUND-R4 快照 ＋ EAR_MACHINE@SOUND-R4（平移后 8ac2c5c6 首份报告，G7 −20.78） |
 

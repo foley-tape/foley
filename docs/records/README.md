@@ -20,5 +20,6 @@
 | `mt2/` | M2.3 四修＋M-T2 复制机（4fdd585） | stage/（交付件/真接带 mp4×3＋PEAK 海报帧/GIF 首证/渲染速度影子/FEEDBACK@M2.3） |
 | `sound-r1/` | 声音相 EAR 升级 | 致架构师升级报告（EAR-1…4 台账另见 FEEDBACK-FIX） |
 | `sound-r3/` | SOUND-R3 唱机改造（97f558a） | FEEDBACK-SOUND@SOUND-R3 快照 ＋ EAR_MACHINE@SOUND-R3（机器耳 v3 首份三哈希报告）＋ **复核庭@SOUND-R3**（通过，放行实听） |
+| `sound-r4/` | SOUND-R4 平移与落仓（M2.4 §A） | FEEDBACK-SOUND@SOUND-R4 快照 ＋ EAR_MACHINE@SOUND-R4（平移后 8ac2c5c6 首份报告，G7 −20.78） |
 
 **未晋升说明**（M2.1 桌面清空时的取舍，均可由带子＋对应分支复现）：m1.5/1.6/1.7 交接夹中的 `曲线-*` 逐带 CSV 与 m1.6 `探针` HTML 为跑批产物，按晋升规则未入仓，随桌面清空删除；唯 storm 证据卷因系旧引擎不可复现之证据，整卷晋升 `m15/`。

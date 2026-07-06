@@ -423,3 +423,61 @@ test('58 renderCuts 钩子（M-T3 预提）：段拼接时长、尾静默 ≥2s�
   assert.ok(wr.meta.records.length === 1 && wr.meta.records[0]!.license === 'CC0-1.0'
     && wr.meta.records[0]!.fnv && wr.meta.records[0]!.source, 'meta 记录唱片来源四件');
 });
+
+// —— M2.4 §A 新律（59 针嗒法典化=复核庭探针入律；60 hiss 采样率不变性=漂修执法形） ——
+
+test('59 针嗒真身（复核庭探针法典化）：静默唱片+全床静音重演卡碟——嗒可测、等距、峰间静默、复走无僵尸', () => {
+  const SRC = EAR_SR, DUR = 10;
+  const ctx = new OfflineCtx(EAR_SR);
+  const eng = buildEngine(ctx, sp, {
+    repoKey: 'golden-tick', records: [{ name: 'silent', x: new Float32Array(SRC * DUR), sr: SRC, lufs: -20, seconds: DUR }],
+  });
+  for (const n of ['l1', 'crackle', 'l2', 's2', 's3', 'hiss', 'fg']) eng.setMute(n, true); // 唱片链不静音
+  const track: TrackRow[] = [[0, 0.5, 0.5, 0.5, 0, 1, 0.2, 0], [9000, 0.5, 0.5, 0.5, 0, 3, 0.2, 0]];
+  eng.startTransport(0.05, 1, track, 12000, 0);
+  eng.scheduleGridUntil(12);
+  eng.trigger(7, 4, 0, 2); // STUCK @4s 卡 2s（speed=1，轴不换算）
+  const y = ctx.render(9);
+  assert.ok(rmsDb(y, EAR_SR, 2, 3.9) < -90, '卡前全静（静默唱片+全床静音）');
+  assert.ok(rmsDb(y, EAR_SR, 6.5, 8.5) < -90, '复走后全静（无僵尸嗒）');
+  // 10ms 窗/5ms 步包络找瞬态峰（>-50dBFS 局部峰，50ms 内归并）
+  const hop = EAR_SR * 0.005, win = EAR_SR * 0.01;
+  const env: { t: number; db: number }[] = [];
+  for (let i = EAR_SR * 4; i + win < EAR_SR * 6; i += hop) {
+    let e = 0;
+    for (let j = i; j < i + win; j++) e += y[j]! * y[j]!;
+    env.push({ t: i / EAR_SR, db: 10 * Math.log10(e / win + 1e-20) });
+  }
+  const peaks: { t: number; db: number }[] = [];
+  for (let i = 1; i < env.length - 1; i++) {
+    const e = env[i]!;
+    if (e.db > -50 && e.db >= env[i - 1]!.db && e.db >= env[i + 1]!.db) {
+      if (!peaks.length || e.t - peaks[peaks.length - 1]!.t > 0.05) peaks.push(e);
+      else if (e.db > peaks[peaks.length - 1]!.db) peaks[peaks.length - 1] = e;
+    }
+  }
+  assert.ok(peaks.length >= 2 && peaks.length <= 7, `嗒数在循环数学内（实测 ${peaks.length}，卡 2s÷循环 [0.3,0.8]s）`);
+  const gaps = peaks.slice(1).map((p, i) => p.t - peaks[i]!.t);
+  for (const g of gaps) {
+    assert.ok(g >= sp.record.stuckLoopSecLo - 0.02 && g <= sp.record.stuckLoopSecHi + 0.02, `峰间距=循环长（实测 ${g.toFixed(3)}s ∈ [${sp.record.stuckLoopSecLo},${sp.record.stuckLoopSecHi}]）`);
+    assert.ok(Math.abs(g - gaps[0]!) < 0.015, '同一卡碟等距（同一循环长）');
+  }
+  const floor = env.filter((e) => peaks.every((p) => Math.abs(e.t - p.t) > 0.03));
+  const floorDb = 10 * Math.log10(floor.reduce((s, e) => s + Math.pow(10, e.db / 10), 0) / floor.length + 1e-20);
+  assert.ok(floorDb < -90, `峰间地板静默（实测 ${floorDb.toFixed(1)}dBFS）——声只来自嗒本身`);
+});
+
+test('60 hiss 采样率不变性（M2.4 §A.2 漂修执法）：44.1k/48k 带内 RMS 同刻度', () => {
+  const bandAt = (sr: number) => {
+    const ctx = new OfflineCtx(sr);
+    const eng = buildEngine(ctx, sp, { repoKey: 'golden-sr' });
+    for (const n of ['l1', 'crackle', 'l2', 's2', 's3', 'fg', 'record']) eng.setMute(n, true); // 唯 hiss 在场
+    const track: TrackRow[] = [[0, 0.5, 0.9, 0.5, 0, 4, 0.2, 0], [9000, 0.5, 0.9, 0.5, 0, 4, 0.2, 0]];
+    eng.startTransport(0.05, 1, track, 10000, 0);
+    eng.scheduleGridUntil(10);
+    const y = ctx.render(8);
+    return bandRmsDb(y, sr, 2200, 7500, 3, 8);
+  };
+  const d48 = bandAt(48000), d44 = bandAt(44100);
+  assert.ok(Math.abs(d48 - d44) < 0.15, `hiss 带内 RMS 采样率漂 ${Math.abs(d48 - d44).toFixed(3)}dB（判据 <0.15；修前 0.37）`);
+});

@@ -13,6 +13,7 @@ import { runEar } from './ear.ts';
 import { runRuns } from './runs.ts';
 import { runCalibrate } from './calibrate.ts';
 import { runRenderCuts } from './rendercuts.ts';
+import { runRecordsFetch } from './records-fetch.ts';
 
 const cmd = process.argv[2];
 
@@ -49,6 +50,9 @@ switch (cmd) {
     break;
   case 'render-cuts':
     runRenderCuts(process.argv.slice(3));
+    break;
+  case 'records':
+    runRecordsFetch(process.argv.slice(3)).catch((e) => { console.error(String(e?.message || e)); process.exit(1); });
     break;
   default:
     console.error('用法: node cli/index.ts <distill|scan|replay|live|hunt|probe>');

@@ -1,0 +1,5 @@
+{
+  "_pipeline": "M2.4 §A.4 落仓管道（候船长终裁名单，names 空=管道待料）。落仓日流程：①船长名单曲目入 sound/records/（暂存）→ ②每曲 PROVENANCE 三件套（照 PROVENANCE.template.md，血统条款：必须人类制造）→ ③node sound/records/prep-records.mjs 实测 bpm/lufs/fnv 重写 catalog.json → ④node scripts/pack-records.mjs --repo <owner/repo> --tag <releaseTag> 出 dist-records/（sha256+清单条目）→ ⑤GitHub Release 挂资产 → ⑥清单条目粘回本文件 records[] → ⑦repo 内 mp3 移除（§0.3 唱片不进 tarball；catalog/manifest/PROVENANCE 指纹留仓）→ ⑧AI 旧盘退厂入淘碟指南 AI 区。取回端：node cli/index.ts records fetch（§0.2 明示征询：URL/体积/SHA-256 直呈，同意才取，验哈希落盘 ~/.foley/records/factory/；拒绝走房间层）。",
+  "releaseTag": "records-v1",
+  "records": []
+}

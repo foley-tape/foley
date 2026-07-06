@@ -363,7 +363,9 @@ export function buildEngine(ctx, SP, opts) {
   }
   R.connect(crackleLevel, wearBus);
   const hissLevel = R.level('hiss');
-  const hissNorm = R.gain('hissNorm', CALIB.hissNorm);
+  // 带内归一（M2.4 §A.2）：白噪总功率恒定而谱密度 ∝ 1/sr → 2.2–7.5k 带内 RMS ∝ 1/√sr，
+  // 44.1k 比 48k 定标尺热 +0.37dB。×√(sr/48000) 归一到定标尺；48k 恒等 1（金测试/哈希零扰）。
+  const hissNorm = R.gain('hissNorm', CALIB.hissNorm * Math.sqrt(ctx.sampleRate / 48000));
   const hiss = R.noise('hissNoise', 2);
   const hf = R.filter('hissHP', 'highpass', 2200, 0.5);
   const hlp = R.filter('hissLP', 'lowpass', 7500, 0.4);

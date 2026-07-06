@@ -8,3 +8,6 @@ runs/
 node_modules/
 *.log
 .DS_Store
+
+# Releases 打包产物（scripts/pack-records.mjs 出件，上传后即弃——重媒体不入库 §0.5）
+dist-records/

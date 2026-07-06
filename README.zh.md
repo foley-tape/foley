@@ -2,7 +2,7 @@
 
 **给 coding agent 的 lo-fi 磁带仪器。** 首台机器：TAPE·ZERO。英文对外说明见 [README.md](README.md)。
 
-**隐私纪律**：只读本地会话日志并**蒸馏**为事件骨架（动词/时刻/量级/哈希目标）——工具输入、输出正文、对话内容永不落盘；零遥测、全离线。
+**隐私纪律**：只读本地会话日志并**蒸馏**为事件骨架（动词/时刻/量级/哈希目标）——工具输入与对话内容永不落盘；失败步只留**脱敏错误类**（凭据/路径/令牌/邮箱抹为占位符）供聚类；零遥测、全离线。
 
 > 一句话：**这个仓库只有一扇正门——`docs/`。其余全是机器的内脏，不必打开。**
 
@@ -14,7 +14,7 @@
 | 看每轮干成了什么（交接归档） | [`docs/records/README.md`](docs/records/README.md) ← 先看这页索引 |
 | 查某道施工令原文 | [`docs/orders/`](docs/orders/) |
 | 看三轨现在的状态 | 根目录 [`FEEDBACK-FIX.md`](FEEDBACK-FIX.md) / [`FEEDBACK-SOUND.md`](FEEDBACK-SOUND.md) / [`FEEDBACK-STAGE.md`](FEEDBACK-STAGE.md) |
-| 开机看舞台 | `node stage/serve.mjs` → http://localhost:4173/ （live 直播；`?tape=storm` 看回放） |
+| 开机看舞台 | `node stage/serve.mjs` → http://127.0.0.1:4173/ （live 直播；`?tape=storm` 看回放） |
 
 ## 根目录每样东西是什么（一行一件）
 

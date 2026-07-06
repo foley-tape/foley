@@ -1,0 +1,11 @@
+# 二进制媒体：不做行级 diff/merge（重媒体策 §0.5）。
+# >5MB 的应走 GitHub Releases 而非入库——闸见 scripts/check-heavy-media.mjs。
+*.mp4  binary
+*.webm binary
+*.mov  binary
+*.gif  binary
+*.png  binary
+*.jpg  binary
+*.wav  binary
+*.mp3  binary
+*.m4a  binary

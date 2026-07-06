@@ -13,17 +13,24 @@ Glance at it from across the room and you know which kind of day it is: smooth s
 
 ## Quickstart
 
-```bash
-npx foley
-```
-
-Foley finds your most recent Claude Code session and starts playing it. No config. No account. No network. Nothing leaves your machine.
-
-Replay any past session:
+> `npx foley` isn't published yet — the package is still private (see **Status**). Run from source:
 
 ```bash
-npx foley replay <session>
+git clone https://github.com/foley-tape/foley && cd foley
+npm install                 # Node >= 23.6 (the CLI runs TypeScript directly)
+node stage/serve.mjs        # → http://127.0.0.1:4173
+                            #   /             the deck, live on your most recent session
+                            #   /?tape=storm  a bundled demo reel
 ```
+
+Or work a past session from the terminal:
+
+```bash
+node cli/index.ts scan               # list recent Claude Code sessions
+node cli/index.ts replay <tape>      # → REPORT.md + curve.csv + moments.csv (an analysis, not playback)
+```
+
+No account, no telemetry, fully offline — nothing leaves your machine. (CLI output is currently Chinese; the deck itself is wordless.)
 
 ## What you're looking at
 
@@ -40,9 +47,9 @@ npx foley replay <session>
 
 ## Sound (early)
 
-Three sounds today: a **pluck** for work, a **chord** for resolution, a **needle-skip** for a jam. Success sits high, failure sits low; you can hear the register of a session without looking.
+Two layers. **Foreground cues** mark the moments — a **pluck** for work, a **chord** for resolution, a **needle-skip** for a jam, and a few more — success high, failure low, so you hear a session's register without looking.
 
-In progress: a continuous lo-fi bed where *the tape itself ages* as tension rises — hiss thickens, wow deepens, highs dull — and clears again when the trouble passes. Rain stopping isn't a chime; it's the room going quiet. See the [sensory design whitepaper](docs/canon/TAPE0_WHITEPAPER_SENSES_v1.md).
+**Under them** runs a continuous lo-fi bed: a record supplies the music, the machine supplies the information, and *the tape itself ages* as tension rises — hiss thickens, wow deepens, highs dull — clearing again when the trouble passes. Rain stopping isn't a chime; it's the room going quiet. See the [sensory design whitepaper](docs/canon/TAPE0_WHITEPAPER_SENSES_v1.md).
 
 ## House rules
 
@@ -56,7 +63,7 @@ A few laws this machine lives by:
 
 ## Privacy
 
-Foley reads your local session logs and **distills** them into event skeletons — verbs, timings, sizes, hashed targets. Tool inputs, outputs, and conversation text are never stored. Zero telemetry, fully offline. A `--redact` mode produces a minimized shareable form (adversarially red-teamed; still, don't share tapes you haven't reviewed).
+Foley reads your local session logs and **distills** them into event skeletons — verbs, timings, sizes, hashed targets. Tool inputs and conversation text are never stored; a failed step keeps only a **redacted error class** — credentials, paths, tokens, and emails scrubbed to placeholders — for clustering. Zero telemetry, fully offline. A `--redact` mode produces a minimized shareable form (adversarially red-teamed, with a standing privacy gate in the test suite; still, don't share tapes you haven't reviewed).
 
 ## Why "Foley"
 
@@ -64,11 +71,12 @@ In the 1930s, Jack Foley watched the picture and performed its sounds by hand �
 
 ## Status
 
-- ✅ Engine sealed (`v0.1.0`) — deterministic, calibrated on real session tapes, 38 golden tests
-- ✅ The deck — needle, recorder, lamps, reels, counter (replay)
-- 🔊 Sound layer — three sounds live; lo-fi bed in progress
-- 🚧 Live mode wiring · trailer export · multi-track (**AUTOREVERSE**) · hosted replays
+- ✅ Engine sealed (`v0.1.0`) — deterministic, calibrated on real session tapes, <!--test-count-->95<!--/test-count--> golden tests
+- ✅ The deck — needle, recorder, lamps, reels, counter — live or replay
+- ✅ Trailer export — tear a highlight strip to an mp4 (with sound)
+- 🔊 Sound layer — foreground cues + an aging lo-fi bed (records in)
+- 🚧 Multi-track (**AUTOREVERSE**) · hosted replays · `npx foley` (npm publish pending)
 
 ## License
 
-MIT. The tape is yours.
+MIT — see [LICENSE](LICENSE). The tape is yours. Bundled audio under the deck is third-party CC0; per-track provenance in [`sound/records/LICENSES.md`](sound/records/LICENSES.md).

@@ -432,7 +432,7 @@ test('59 针嗒真身（复核庭探针法典化）：静默唱片+全床静音�
   const eng = buildEngine(ctx, sp, {
     repoKey: 'golden-tick', records: [{ name: 'silent', x: new Float32Array(SRC * DUR), sr: SRC, lufs: -20, seconds: DUR }],
   });
-  for (const n of ['l1', 'crackle', 'l2', 's2', 's3', 'hiss', 'fg']) eng.setMute(n, true); // 唱片链不静音
+  for (const n of ['l1', 'crackle', 'l2', 's2', 's3', 'hiss', 'fg'] as const) eng.setMute(n, true); // 唱片链不静音
   const track: TrackRow[] = [[0, 0.5, 0.5, 0.5, 0, 1, 0.2, 0], [9000, 0.5, 0.5, 0.5, 0, 3, 0.2, 0]];
   eng.startTransport(0.05, 1, track, 12000, 0);
   eng.scheduleGridUntil(12);
@@ -471,7 +471,7 @@ test('60 hiss 采样率不变性（M2.4 §A.2 漂修执法）：44.1k/48k 带内
   const bandAt = (sr: number) => {
     const ctx = new OfflineCtx(sr);
     const eng = buildEngine(ctx, sp, { repoKey: 'golden-sr' });
-    for (const n of ['l1', 'crackle', 'l2', 's2', 's3', 'fg', 'record']) eng.setMute(n, true); // 唯 hiss 在场
+    for (const n of ['l1', 'crackle', 'l2', 's2', 's3', 'fg', 'record'] as const) eng.setMute(n, true); // 唯 hiss 在场
     const track: TrackRow[] = [[0, 0.5, 0.9, 0.5, 0, 4, 0.2, 0], [9000, 0.5, 0.9, 0.5, 0, 4, 0.2, 0]];
     eng.startTransport(0.05, 1, track, 10000, 0);
     eng.scheduleGridUntil(10);

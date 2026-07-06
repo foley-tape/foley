@@ -11,3 +11,6 @@ node_modules/
 
 # Releases 打包产物（scripts/pack-records.mjs 出件，上传后即弃——重媒体不入库 §0.5）
 dist-records/
+
+# M-T2 62MB 接带已迁 Releases（§B.3）——本地保留、指纹见 docs/records/mt2/stage/RELEASES-MANIFEST.md
+docs/records/mt2/stage/*.mp4

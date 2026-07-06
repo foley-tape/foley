@@ -17,7 +17,10 @@
     "test": "node --test \"golden/**/*.test.ts\"",
     "runs": "node cli/index.ts runs",
     "ear": "node cli/index.ts ear",
-    "hunt": "node cli/index.ts hunt"
+    "hunt": "node cli/index.ts hunt",
+    "sync:readme": "node scripts/sync-readme.mjs",
+    "check:media": "node scripts/check-heavy-media.mjs",
+    "prepublishOnly": "node scripts/sync-readme.mjs --check && npm test"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",

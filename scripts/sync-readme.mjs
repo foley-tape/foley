@@ -1,6 +1,8 @@
 #!/usr/bin/env node
-// README 测试数注入（M2.4 §B.2 元数据真话批）：数 golden 测试定义，写进 README 的
-// <!--test-count-->…<!--/test-count--> 标记之间——真话由脚本维护，不再手写（冷读 #12：README「38」对不上实数）。
+// README 数字注入（M2.4 §B.2 ＋ M2.5 §A.1 元数据真话批）：把「测试数」与「版本号」写进 README 标记之间，
+// 真话由脚本维护、不再手写（冷读 #12：README「38」对不上实数；§A.1：版本号等一切数字改脚本注入）。
+//   <!--test-count-->…<!--/test-count-->   ← golden 的 test()/it() 定义数
+//   <!--version-->…<!--/version-->         ← package.json version
 //
 //   node scripts/sync-readme.mjs          # 就地更新 README.md / README.zh.md
 //   node scripts/sync-readme.mjs --check   # 只校验：过期则打印差额并 exit 1（发布闸/CI 用）
@@ -24,26 +26,36 @@ function countGoldenTests() {
   return n;
 }
 
-const count = countGoldenTests();
+const version = JSON.parse(readFileSync(join(repoRoot, 'package.json'), 'utf8')).version;
+// 每个注入点：标记名 → 权威值
+const INJECT = [
+  ['test-count', String(countGoldenTests())],
+  ['version', String(version)],
+];
 const check = process.argv.includes('--check');
-const MARK = /(<!--test-count-->)(.*?)(<!--\/test-count-->)/s;
 let stale = false;
 
 for (const f of ['README.md', 'README.zh.md']) {
   const p = join(repoRoot, f);
   let src;
   try { src = readFileSync(p, 'utf8'); } catch { continue; }
-  if (!MARK.test(src)) continue;
-  const next = src.replace(MARK, `$1${count}$3`);
-  if (next === src) continue;
-  stale = true;
-  if (check) console.error(`${f}: 测试数过期（应为 ${count}）——运行 npm run sync:readme`);
-  else { writeFileSync(p, next); console.log(`${f}: 测试数 → ${count}`); }
+  let next = src;
+  for (const [name, val] of INJECT) {
+    const re = new RegExp(`(<!--${name}-->)(.*?)(<!--/${name}-->)`, 's');
+    if (!re.test(next)) continue;
+    const after = next.replace(re, `$1${val}$3`);
+    if (after !== next) {
+      stale = true;
+      if (check) console.error(`${f}: ${name} 过期（应为 ${val}）——运行 npm run sync:readme`);
+      next = after;
+    }
+  }
+  if (!check && next !== src) { writeFileSync(p, next); console.log(`${f}: 已同步（${INJECT.map(([k, v]) => `${k}=${v}`).join('、')}）`); }
 }
 
 if (check) {
   if (stale) process.exit(1);
-  console.log(`README 测试数与实数一致（${count}）`);
+  console.log(`README 数字与实数一致（${INJECT.map(([k, v]) => `${k}=${v}`).join('、')}）`);
 } else {
-  console.log(`golden 测试定义：${count}`);
+  console.log(`注入：${INJECT.map(([k, v]) => `${k}=${v}`).join('、')}`);
 }

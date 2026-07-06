@@ -14,7 +14,7 @@
 | 看每轮干成了什么（交接归档） | [`docs/records/README.md`](docs/records/README.md) ← 先看这页索引 |
 | 查某道施工令原文 | [`docs/orders/`](docs/orders/) |
 | 看三轨现在的状态 | 根目录 [`FEEDBACK-FIX.md`](FEEDBACK-FIX.md) / [`FEEDBACK-SOUND.md`](FEEDBACK-SOUND.md) / [`FEEDBACK-STAGE.md`](FEEDBACK-STAGE.md) |
-| 开机看舞台 | `node stage/serve.mjs` → http://127.0.0.1:4173/ （live 直播；`?tape=storm` 看回放） |
+| 开机看舞台 | `npx foley`（起播磁带机，尾随最近会话）→ http://127.0.0.1:4173/ ；音频经 `npx foley records` 明示取回 |
 
 ## 根目录每样东西是什么（一行一件）
 

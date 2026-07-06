@@ -1,9 +1,9 @@
 # Foley
 
-**A lo-fi tape instrument for your coding agents.**
+**A lo-fi tape instrument that plays your coding agents.**
 <sub>First deck: TAPE·ZERO · [中文说明](README.zh.md)</sub>
 
-![The deck during a storm — ink climbing, needle in the red](docs/assets/still-4-deck-storm.png)
+![Foley in eight seconds — the machine wakes from sleep, ink climbs into a storm, the record skips on a stuck loop, and the session ends with the tape slowing to rest](docs/assets/hero.gif)
 
 Your agent works for minutes at a time. You get two options: stare at scrolling logs, or walk away and worry.
 
@@ -13,24 +13,20 @@ Glance at it from across the room and you know which kind of day it is: smooth s
 
 ## Quickstart
 
-> `npx foley` isn't published yet — the package is still private (see **Status**). Run from source:
-
 ```bash
-git clone https://github.com/foley-tape/foley && cd foley
-npm install                 # Node >= 23.6 (the CLI runs TypeScript directly)
-node stage/serve.mjs        # → http://127.0.0.1:4173
-                            #   /             the deck, live on your most recent session
-                            #   /?tape=storm  a bundled demo reel
+npx foley
 ```
 
-Or work a past session from the terminal:
+Foley finds your most recent Claude Code session and plays it — the tape deck comes up in your browser, live on `http://127.0.0.1:4173`. No account, no telemetry, fully offline. The deck plays its own ambient bed by default; run `npx foley records` to swap in the real factory music — an explicit, hash-verified download that is the only network call Foley ever makes.
+
+Drive a past session from the terminal instead:
 
 ```bash
-node cli/index.ts scan               # list recent Claude Code sessions
-node cli/index.ts replay <tape>      # → REPORT.md + curve.csv + moments.csv (an analysis, not playback)
+npx foley scan            # list recent Claude Code sessions
+npx foley replay <tape>   # a past session → REPORT.md + curve.csv + moments.csv (analysis, not playback)
 ```
 
-No account, no telemetry, fully offline — nothing leaves your machine. (CLI output is currently Chinese; the deck itself is wordless.)
+From source: `git clone https://github.com/foley-tape/foley && cd foley && npm install` (Node ≥ 23.6), then `npx foley`.
 
 ## What you're looking at
 
@@ -51,6 +47,12 @@ Two layers. **Foreground cues** mark the moments — a **pluck** for work, a **c
 
 **Under them** runs a continuous lo-fi bed: a record supplies the music, the machine supplies the information, and *the tape itself ages* as tension rises — hiss thickens, wow deepens, highs dull — clearing again when the trouble passes. Rain stopping isn't a chime; it's the room going quiet. See the [sensory design whitepaper](docs/canon/TAPE0_WHITEPAPER_SENSES_v1.md).
 
+## Records
+
+The music is real, and the rule is simple: **factory records must be human-made.** The first pressing is [HoliznaCC0](https://freemusicarchive.org/music/holiznacc0/)'s *Public Domain Lofi* — three tracks (*Saturation*, *Still Life*, *Warm Fuzz*), released CC0, human-made (Free Music Archive's own field reads "AI generated? No"). The machine ages them and skips the needle across them; it never wrote them.
+
+Records ship via GitHub Releases, not the npm package — `npx foley records` fetches them on explicit confirmation, verifying each by hash. Want a different shelf? The [record-hunting guide](docs/records-guide.md) keeps human-made CC0 crates up front and any AI-generated ones clearly labelled in their own aisle.
+
 ## House rules
 
 A few laws this machine lives by:
@@ -63,7 +65,7 @@ A few laws this machine lives by:
 
 ## Privacy
 
-Foley reads your local session logs and **distills** them into event skeletons — verbs, timings, sizes, hashed targets. Tool inputs and conversation text are never stored; a failed step keeps only a **redacted error class** — credentials, paths, tokens, and emails scrubbed to placeholders — for clustering. Zero telemetry, fully offline. A `--redact` mode produces a minimized shareable form (adversarially red-teamed, with a standing privacy gate in the test suite; still, don't share tapes you haven't reviewed).
+Foley reads your local session logs and **distills** them into event skeletons — verbs, timings, sizes, hashed targets. Tool inputs and conversation text are never stored; a failed step keeps only a **redacted error class** — credentials, paths, tokens, and emails scrubbed to placeholders — for clustering. **Zero telemetry, and the machine never reaches the network on its own**: the single network call it can ever make is the optional, hash-verified download of the factory records — and only when you run `npx foley records` and confirm. A `--redact` mode produces a minimized shareable form (adversarially red-teamed, with a standing privacy gate in the test suite; still, don't share tapes you haven't reviewed).
 
 ## Why "Foley"
 
@@ -71,11 +73,18 @@ In the 1930s, Jack Foley watched the picture and performed its sounds by hand �
 
 ## Status
 
-- ✅ Engine sealed (`v0.1.0`) — deterministic, calibrated on real session tapes, <!--test-count-->95<!--/test-count--> golden tests
+- ✅ Engine sealed (`v<!--version-->0.1.0<!--/version-->`) — deterministic, calibrated on real session tapes, <!--test-count-->95<!--/test-count--> golden tests
 - ✅ The deck — needle, recorder, lamps, reels, counter — live or replay
-- ✅ Trailer export — tear a highlight strip to an mp4 (with sound)
-- 🔊 Sound layer — foreground cues + an aging lo-fi bed (records in)
-- 🚧 Multi-track (**AUTOREVERSE**) · hosted replays · `npx foley` (npm publish pending)
+- ✅ Sound — foreground cues + an aging lo-fi bed over human-made CC0 records
+- ✅ Trailer export — DUB a highlight strip to a local MP4 (WebCodecs, ~9× realtime)
+- 🚧 Planned — multi-track (**AUTOREVERSE**) · hosted replays · more agent adapters · auto-tuning on your own tapes
+
+## Honest limits
+
+- **Claude Code only, for now.** The adapter layer is thin — one place understands the log format; more agents are planned, and PRs are welcome.
+- **Export needs a Chromium browser.** Video/audio encoding rides WebCodecs; viewing works everywhere, the page degrades honestly where it can't encode.
+- **Tension is calibrated on n=1.** The constants were tuned on the author's own session tapes; yours may feel different — auto-tuning on your own library is on the roadmap.
+- **The CLI speaks Chinese, the deck is wordless.** The panel has no text by design; the command-line tool's own messages are currently Chinese only.
 
 ## License
 

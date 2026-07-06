@@ -212,16 +212,16 @@ export class FilmPrinter {
     ctx.fillStyle = 'rgba(14,9,4,0.13)'; ctx.fillRect(cx0, cy0, chartR.w, chartR.h); // .glass 压烟层
     ctx.restore();
 
-    // 轴：与台上 render 同一套数（theta/wobble 由 ReelDeck 亲算，此处读回执笔）
+    // 轴：与台上 render 同一套数（theta/卡拍编舞由 ReelDeck.thetaAt 亲算，此处读回执笔）
     for (let i = 0; i < 2; i++) {
-      const el = i === 0 ? S.rig.reelL : S.rig.reelR;
       const r = S.rig.deck.reels[i];
+      const theta = S.rig.deck.thetaAt(i, tau); // 卡碟同槽前冲-弹回照走（hero 跳针可见）
       const wob = (S.rig.deck.wow || 0) * 1.6;
       const wx = wob * Math.cos(r.theta * 1.7), wy = wob * Math.sin(r.theta * 2.3);
       const rr = S.reelRects[i];
       ctx.save();
       ctx.translate(mRect.x + rr.x + 150 + wx, mRect.y + rr.y + 150 + wy);
-      ctx.rotate(r.theta); // 与台上 render 同式（deg = theta·180/π 的弧度原值）
+      ctx.rotate(theta);
       ctx.drawImage(plates.reelImgs[i], -150, -150, 300, 300);
       ctx.restore();
     }
@@ -326,7 +326,9 @@ export class FilmPrinter {
         S.rig.lamps.onPacket(pkt, false);
         S.rig.pairN.push(pkt, false);
         while (S.ei < S.sched.events.length && S.sched.events[S.ei].dubT <= S.gridT) {
-          S.rig.lamps.onMoment(S.sched.events[S.ei].m); S.ei++;
+          S.rig.lamps.onMoment(S.sched.events[S.ei].m);
+          S.rig.deck.onMoment(S.sched.events[S.ei].m); // 卡碟/脱卡入轴（hero keepStuck 路）
+          S.ei++;
         }
         // 布景灯档目标（画布形的 room 着装）
         const [wd, ww] = W_DIM[pkt.weather] ?? W_DIM.CLEAR;

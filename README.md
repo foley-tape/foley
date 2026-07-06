@@ -3,7 +3,7 @@
 **A lo-fi tape instrument for your coding agents.**
 <sub>First deck: TAPE·ZERO · [中文说明](README.zh.md)</sub>
 
-![The deck during a storm — ink climbing, needle in the red](docs/assets/still-4-deck-storm.png)
+![Foley in eight seconds — the machine wakes from sleep, ink climbs into a storm, the record skips on a stuck loop, and the session ends with the tape slowing to rest](docs/assets/hero.gif)
 
 Your agent works for minutes at a time. You get two options: stare at scrolling logs, or walk away and worry.
 

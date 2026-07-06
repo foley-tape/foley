@@ -1,0 +1,89 @@
+{
+  "kind": "foley-hero/M2.5",
+  "tape": "storm",
+  "tapeHash": "650107fcc28d6884",
+  "editorial": "工具箱 §6 beats：睡醒→风暴→跳针→DONE 滑停（非时序拼接如实声明）",
+  "record": "still-life（HoliznaCC0《Public Domain Lofi》，人类制造·CC0，catalog idx 1）",
+  "segments": [
+    {
+      "role": "SLEEP",
+      "t0": 1897800,
+      "t1": 1901300,
+      "speed": 1
+    },
+    {
+      "role": "STORM",
+      "t0": 949000,
+      "t1": 952000,
+      "speed": 1
+    },
+    {
+      "role": "SKIP",
+      "t0": 944000,
+      "t1": 947200,
+      "speed": 1
+    },
+    {
+      "role": "CLOSE",
+      "t0": 3966200,
+      "t1": 3969400,
+      "speed": 1
+    }
+  ],
+  "film": {
+    "codec": "avc1.4d0034",
+    "container": "mp4",
+    "preset": "1080p30",
+    "frames": 501,
+    "contentMs": 12900,
+    "filmMs": 16670,
+    "wallMs": 2083,
+    "realtimeX": 8,
+    "audio": {
+      "codec": "mp4a.40.2",
+      "sampleRate": 48000,
+      "channels": 1,
+      "bitrate": 128000,
+      "durationSec": 16.67,
+      "source": "machine+foley（接带音 PCM 内含，sound/renderCuts 供货）",
+      "withRecord": true,
+      "records": [
+        {
+          "name": "still-life",
+          "fnv": "e3083d17",
+          "license": "CC0-1.0",
+          "source": "https://freemusicarchive.org/music/holiznacc0/public-domain-lofi/still-life-lofi-chill-nostalgic/"
+        }
+      ]
+    },
+    "sync": {
+      "videoMs": 16700,
+      "audioMs": 16670,
+      "deltaMs": 30,
+      "frameBudgetMs": 33.3
+    },
+    "pixelDeterminism": "cuts/调度严格确定；像素不保证跨机逐字节（确定性诚实条款）",
+    "files": {
+      "video": "runs/dubs/foley-dub-hero-storm-2026-07-06.mp4",
+      "poster": "runs/dubs/foley-dub-hero-storm-2026-07-06.poster.png"
+    }
+  },
+  "audio": {
+    "codec": "mp4a.40.2",
+    "sampleRate": 48000,
+    "channels": 1,
+    "bitrate": 128000,
+    "durationSec": 16.67,
+    "source": "machine+foley（接带音 PCM 内含，sound/renderCuts 供货）",
+    "withRecord": true,
+    "records": [
+      {
+        "name": "still-life",
+        "fnv": "e3083d17",
+        "license": "CC0-1.0",
+        "source": "https://freemusicarchive.org/music/holiznacc0/public-domain-lofi/still-life-lofi-chill-nostalgic/"
+      }
+    ]
+  },
+  "createdAt": "2026-07-06T13:13:11.448Z"
+}

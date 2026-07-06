@@ -105,17 +105,23 @@ export class ReelDeck {
     }
   }
 
+  // 显示转角（含卡拍编舞）——台上 render 与胶印合成器同吃这一支（M2.5 同源抽取）
+  thetaAt(i, now) {
+    const r = this.reels[i];
+    if (this.stuck && this.stuckTheta) {
+      // 同一道槽：前冲—啪嗒弹回—再冲。收带盘只挣扎一半。
+      const f = (now % STUCK_PERIOD) / STUCK_PERIOD;
+      const swing = STUCK_SWING * (i === 0 ? 1 : 0.5);
+      const jerk = f < 0.62 ? (f / 0.62) : Math.max(0, 1 - (f - 0.62) / 0.12);
+      return this.stuckTheta[i] + swing * jerk;
+    }
+    return r.theta;
+  }
+
   render(now) {
     for (let i = 0; i < 2; i++) {
       const r = this.reels[i];
-      let theta = r.theta;
-      if (this.stuck && this.stuckTheta) {
-        // 同一道槽：前冲—啪嗒弹回—再冲。收带盘只挣扎一半。
-        const f = (now % STUCK_PERIOD) / STUCK_PERIOD;
-        const swing = STUCK_SWING * (i === 0 ? 1 : 0.5);
-        const jerk = f < 0.62 ? (f / 0.62) : Math.max(0, 1 - (f - 0.62) / 0.12);
-        theta = this.stuckTheta[i] + swing * jerk;
-      }
+      const theta = this.thetaAt(i, now);
       const deg = (theta * 180) / Math.PI;
       // 走带不稳的轴心抖：肉眼可见，但不越过"微醺"
       const wob = (this.wow || 0) * 1.6;

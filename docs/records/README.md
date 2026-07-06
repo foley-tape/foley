@@ -18,6 +18,8 @@
 | `m22/` | M2.2 治理六裁＋昨日的卷（9fb3e82） | stage/（FEEDBACK@M2.2 快照/live 定妆照） |
 | `mt1/` | M-T1 剪刀与纸（0c3813c） | stage/（交付件/五带纸条 PNG+meta/撕纸仪式屏录/影子首采/**旁路复核@M-T1**/FEEDBACK@M-T1） |
 | `mt2/` | M2.3 四修＋M-T2 复制机（4fdd585） | stage/（交付件/真接带 mp4×3＋PEAK 海报帧/GIF 首证/渲染速度影子/FEEDBACK@M2.3） |
+| `mt3/` | M2.4 §C M-T3 音画合龙＋定妆照（be619bb+cf043e7，候庭） | stage/（交付件/指纹/AV 影子/歇场尾帧/live定妆照@M2.4 两帧+视频指纹/FEEDBACK@M2.4C） |
+| `m25/` | M2.5 §B 发布物料 | stage/（示范带审计@M2.5/demo站构建纪要/hero 主片 meta+海报帧+指纹/FEEDBACK@M2.5B） |
 | `sound-r1/` | 声音相 EAR 升级 | 致架构师升级报告（EAR-1…4 台账另见 FEEDBACK-FIX） |
 | `sound-r3/` | SOUND-R3 唱机改造（97f558a） | FEEDBACK-SOUND@SOUND-R3 快照 ＋ EAR_MACHINE@SOUND-R3（机器耳 v3 首份三哈希报告）＋ **复核庭@SOUND-R3**（通过，放行实听） |
 | `sound-r4/` | SOUND-R4 平移与落仓（M2.4 §A） | FEEDBACK-SOUND@SOUND-R4 快照 ＋ EAR_MACHINE@SOUND-R4（平移后 8ac2c5c6 首份报告，G7 −20.78） |

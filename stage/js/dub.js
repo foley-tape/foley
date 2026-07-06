@@ -71,7 +71,7 @@ function splitAtFolds(tape, segments) {
 // —— dub 时刻表的可执行形（M-T2 抽取）：台上演出与胶印离线渲染同吃这一份 ——
 // 铁律③的机器形：导出是回放的另一种消费者。此类只做调度与包变换，无 DOM、无钟。
 export class DubSchedule {
-  constructor(srcTape, segments) {
+  constructor(srcTape, segments, opts = {}) {
     this.tape = srcTape;
     this.canonical = segments;               // cuts 正典形（doc/meta 用，金件之源）
     this.segs = splitAtFolds(srcTape, segments); // 剖后执行形（调度/音轨用）
@@ -81,10 +81,12 @@ export class DubSchedule {
     this.durMs = acc;
     // 段内 moments 映射到 dub 轴——卡碟态不进演出（M2.3 §1.4 转录姿态）：
     // dub 是机器誊录自己剪好的带，不是重活一遍会话；卷轴只表达走带速度。
+    // 例外（M2.5 §B.2 hero）：发布素材按工具箱 §6 明令要"一记跳针"——keepStuck 放行
+    // （hero 不是 dub 产品，是这台机器播放时的写真；跳针是播放的真话）。
     this.events = [];
     for (let i = 0; i < this.segs.length; i++) {
       for (const m of srcTape.moments) {
-        if (m.special === 'STUCK_LOOP' || m.special === 'STUCK_CLEARED') continue;
+        if (!opts.keepStuck && (m.special === 'STUCK_LOOP' || m.special === 'STUCK_CLEARED')) continue;
         if (m.stageT >= this.segs[i].t0 && m.stageT < this.segs[i].t1) {
           this.events.push({ dubT: this.starts[i] + (m.stageT - this.segs[i].t0) / this.segs[i].speed, m });
         }
@@ -147,7 +149,50 @@ export class DubController {
     this.done = new Promise(r => { this._doneResolve = r; });
     this._wireDom();
     this._resizeOverlay();
-    if (this.auto) setTimeout(() => this.press(), 900);
+    this.hero = q.get('hero'); // 'main'|'gif'（M2.5 §B.2 发布素材管线，不走提议/撕纸）
+    if (this.hero) setTimeout(() => this._heroRun().catch(e => { console.warn('[hero]', e); this._doneResolve?.({ error: String(e) }); }), 600);
+    else if (this.auto) setTimeout(() => this.press(), 900);
+  }
+
+  // ———————— hero 发布素材（M2.5 §B.2，工具箱 §6 剪辑指导） ————————
+  // 段表=stage/hero-cuts.json（剪辑指导的版本化执行形；非时序拼接如实入 meta）；
+  // keepStuck 放行跳针（播放写真非 dub 产品）；音轨带出厂 CC0 唱片（授权卫生 (a) 款）。
+  async _heroRun() {
+    const spec = await fetch('hero-cuts.json').then(r => r.json());
+    const src = await this._sourceTape();
+    const tapeHash = await sha16(src.curveText + '\n' + src.momentsText);
+    await this._loadParams();
+    const kind = this.hero === 'gif' ? 'gif' : 'main';
+    const segs = spec[kind].segments;
+    const sched = new DubSchedule(src.tape, segs, { keepStuck: true });
+    this.doc = { version: 1, tape: src.name, tapeHash, paramsHash: this.paramsHash, targetS: 0, segments: segs, axis: 'tape-stage' };
+    if (!this.printer) this.printer = new FilmPrinter();
+    this.state = 'printing';
+    const up = async (blob, k) => {
+      const r = await fetch(`/dub/save-bin?tape=hero-${encodeURIComponent(src.name)}&kind=${k}`, { method: 'POST', headers: dubHeaders(), body: blob });
+      return r.ok ? (await r.json()).saved : null;
+    };
+    let out;
+    if (kind === 'gif') {
+      const g = await this.printer.printGif({ sched, srcTape: src.tape, seconds: spec.gif.seconds ?? 8, w: 960, fps: 15 });
+      out = { kind, saved: { gif: await up(g.blob, 'gif') } };
+    } else {
+      const audio = await this._fetchAudio(sched, { withRecord: true, recordIndex: spec.main.recordIndex ?? 0 });
+      const res = await this.printer.print({ sched, srcTape: src.tape, presetName: '1080p30', audio });
+      const files = { video: await up(res.blob, res.stats.container), poster: await up(res.posterBlob, 'poster.png') };
+      const meta = {
+        kind: 'foley-hero/M2.5', tape: src.name, tapeHash,
+        editorial: '工具箱 §6 beats：睡醒→风暴→跳针→DONE 滑停（非时序拼接如实声明）',
+        record: spec.main.recordNote,
+        segments: segs, film: { ...res.stats, files }, audio: res.stats.audio,
+        createdAt: new Date().toISOString(),
+      };
+      files.meta = await up(new Blob([JSON.stringify(meta, null, 2) + '\n']), 'meta.json');
+      out = { kind, saved: files, stats: res.stats };
+    }
+    this.state = 'resting';
+    if (this._doneResolve) { this._doneResolve(out); this._doneResolve = null; }
+    return out;
   }
 
   // ———————————————————————— 面板接线 ————————————————————————
@@ -529,12 +574,16 @@ export class DubController {
     }
   }
 
-  // 音轨（M-T3）：剖后子段以原始相对 ms 递给声侧；WAV PCM16 mono 解回浮点
-  async _fetchAudio(sched) {
+  // 音轨（M-T3）：剖后子段以原始相对 ms 递给声侧；WAV PCM16 mono 解回浮点。
+  // audioOpts.withRecord（M2.5 hero）：dub 授权卫生 (a) 款——内置 CC0 出厂唱片入轨，meta 记来源
+  async _fetchAudio(sched, audioOpts = {}) {
     if (this.mode !== 'replay') return null; // live 无生带：无声出片注明
     const res = await fetch('/dub/render-audio', {
       method: 'POST', headers: dubHeaders({ 'content-type': 'application/json' }),
-      body: JSON.stringify({ tape: this.doc.tape, segments: sched.rawRelSegments() }),
+      body: JSON.stringify({
+        tape: this.doc.tape, segments: sched.rawRelSegments(),
+        withRecord: !!audioOpts.withRecord, recordIndex: audioOpts.recordIndex ?? 0,
+      }),
     });
     if (!res.ok) throw new Error(`${res.status} ${(await res.text()).slice(0, 120)}`);
     const meta = JSON.parse(decodeURIComponent(res.headers.get('x-dub-audio-meta') ?? '%7B%7D'));

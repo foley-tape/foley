@@ -2,6 +2,39 @@
 
 ---
 
+# M2.5 §B · 发布物料（demo 页＋hero 双版本＋README 换图）
+
+**合入 main 哈希：候合并后补。** 交付：demo 站（`node stage/tools/demo-build.mjs` 一令构建，RELEASE §A.5 直挂 Pages）＋hero 主片/GIF/次片（`runs/hero-m25/`，Releases 待挂）＋README hero 位已换。
+
+## §B.1 demo 页（示范带过审入页）
+
+| 项 | 状态 |
+|---|---|
+| 前置审计 | ✔ **NIGHT 隐私回归 5/5＋两文件列级零自由文本**（39k 行 curve 全数值/枚举；moments 动词/结局/特情枚举＋hex）；记录 `docs/records/m25/stage/示范带审计@M2.5.md` |
+| 只读舞台＋声桥一体 | ✔ `stage/demo.html`＋`demo-boot.js`＋`soundbridge.js`：视觉走既有模块；声桥**直吃 sound/core.js＋graph.js 纯 ESM**（单一事实源，零私造）；分类映射镜像自 cli/rendercuts（正典在 probe）——**提请 Track-SOUND**：分类器提为 sound/ 浏览器出口，三处镜像归一 |
+| 电源仪式 | ✔ 横幅 "This is a recording — run `npx foley` to hear your own."＋POWER 一按声画同启（浏览器音频的一次人手落在开机键上）；页脚署名 Still Life · HoliznaCC0（人类制造·CC0，血统条款）＋repo 链 |
+| 橱窗纪律 | ✔ 无 serve/无写盘/无导出（vendor 不随站）；DUB 组收起；唱片随站一张（工厂缓存拷入，哈希在构建纪要）；取不到唱片落房间层（产品语义同款诚实） |
+| 冒烟 | ✔ 无头 Chrome：POWER→PLAYING、AudioContext running、transport 起、Still Life 装盘、画走零 pageerror；截图在册 |
+| 已知界限 | 画声折叠常数不齐（400/1500）跨大接带漂 ~1.1s/道（轴主归一记案在册）；demo 默认 920s 起、首道大接带在 172s 后 |
+
+## §B.2 hero（工具箱 §6 剪辑指导）
+
+| 件 | 实况 |
+|---|---|
+| 主片 MP4 有声 | ✔ **16.7s**（12–18s 窗内）avc1.4d0034＋**AAC**（唱片 Still Life 入轨=授权卫生 (a) 款）；弧=睡醒(真实 IDLE→WORKING 1897.8s 一镜)→风暴(T=0.91 针红区)→**跳针**(944.3s 簇：keepStuck 放行＋recordStuck 啃唱片针嗒实测 −17.5dB)→DONE 滑停(3969.4s 落针纸停＋尾静默 −inf)；同步 Δ30ms ≤1 帧；8× 实时 |
+| 弧的两处如实变通 | ①"和弦＋绿宝石一闪"→DONE 绿常亮＋终止式：五带 fixtures 零 RESOLVE 样本（storm 脱卡皆 expiry 无声）——发布素材不摆拍；②非时序拼接（风暴 949s 在跳针 944s 前按弧序排）——段表如实入 meta，`stage/hero-cuts.json` 版本化 |
+| GIF 无声 | ✔ 8.4s／960×540／**12.1MB**（≤8s 容差内、720p 内、<15MB）静态颗粒法 |
+| 次片 | ✔ hero-dub-ritual-8s.mp4（按键→齿孔→撕→落台一镜） |
+| 静帧 | 沿用 README 既有 deck-storm 海报＋loupe 微距（工具箱指名件）；另有 hero 海报帧（PEAK 取帧）入档 |
+| README 换图 | ✔ hero 位（行 6）换 `docs/assets/hero.gif`；旧静帧文件保留 |
+| keepStuck 例外记案 | DubSchedule 增 opts.keepStuck（默认 false=转录姿态不变；仅 hero 发布素材放行跳针——工具箱明令，候追认） |
+
+## §B.3 妈妈测试·真人一测
+
+材料就绪（M-T3 有声接带＋本轮 hero 主片皆可用），候船长择人、一句转述入档。
+
+---
+
 # M2.4 §C · M-T3 音画合龙（候庭）
 
 **合入 main 哈希：be619bb（主件）＋df76648（安全批吸收补）**（已推 origin/main；本行为合并后记账小提交）。交付件 `docs/records/mt3/stage/交付-M-T3合龙.md`（指纹/影子/meta/海报/歇场尾帧同夹）。**重媒体归档策（§0.5）首执行：仓存指纹不存重媒体**——三支视频留 `runs/dubs-mt3/` 本地＋Releases 待挂（挂载归 RELEASE §B.3）。

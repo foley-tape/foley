@@ -1,0 +1,22 @@
+{
+  "_source": "M2.5 发布工具箱 §6 剪辑指导的执行形（架构师明令 beats；素材诚实：storm 真带，段表如实，非时序拼接声明在 meta）。跳针簇实测 944.3–947.3s（expiry 脱卡，无 RESOLVE 和弦——弧尾以 DONE 绿常亮+唱片滑停替代'和弦+一闪'，缘由：五带 fixtures 零 RESOLVE 样本，发布素材不摆拍）。",
+  "main": {
+    "recordIndex": 1,
+    "recordNote": "still-life（HoliznaCC0《Public Domain Lofi》，人类制造·CC0，catalog idx 1）",
+    "segments": [
+      { "role": "SLEEP", "t0": 1897800, "t1": 1901300, "speed": 1 },
+      { "role": "STORM", "t0": 949000, "t1": 952000, "speed": 1 },
+      { "role": "SKIP", "t0": 944000, "t1": 947200, "speed": 1 },
+      { "role": "CLOSE", "t0": 3966200, "t1": 3969400, "speed": 1 }
+    ]
+  },
+  "gif": {
+    "seconds": 8,
+    "segments": [
+      { "role": "SLEEP", "t0": 1899300, "t1": 1901300, "speed": 1 },
+      { "role": "STORM", "t0": 949000, "t1": 951000, "speed": 1 },
+      { "role": "SKIP", "t0": 944600, "t1": 946800, "speed": 1 },
+      { "role": "CLOSE", "t0": 3967600, "t1": 3969400, "speed": 1 }
+    ]
+  }
+}

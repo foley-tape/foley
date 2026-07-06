@@ -40,7 +40,7 @@ function safeStem(s, fallback) {
   const c = String(s ?? fallback).replace(/[^\w.-]/g, '_').replace(/\.{2,}/g, '_').replace(/^[.\-]+/, '');
   return c || fallback;
 }
-const KIND_OK = new Set(['mp4', 'webm', 'gif', 'png', 'poster.png']); // save-bin 扩展名白名单
+const KIND_OK = new Set(['mp4', 'webm', 'gif', 'png', 'poster.png', 'meta.json']); // save-bin 扩展名白名单（meta.json：hero 记账，M2.5）
 
 const MIME = {
   '.html': 'text/html; charset=utf-8',
@@ -158,7 +158,7 @@ createServer(async (req, res) => {
     req.on('data', d => { size += d.length; if (size > 1e6) req.destroy(); else body += d; });
     req.on('end', async () => {
       try {
-        const { tape, segments } = JSON.parse(body);
+        const { tape, segments, withRecord, recordIndex } = JSON.parse(body);
         if (!AUDIO_TAPES.has(tape)) { res.writeHead(404); res.end('该带无生带（日带/live 音轨候适配）'); return; }
         if (!Array.isArray(segments) || segments.length === 0 || segments.length > 64
           || !segments.every(s => Number.isFinite(s.t0) && Number.isFinite(s.t1) && Number.isFinite(s.speed) && s.t1 > s.t0 && s.speed >= 1)) {
@@ -170,8 +170,10 @@ createServer(async (req, res) => {
           t0: Math.round(s.t0), t1: Math.round(s.t1), speed: Math.round(s.speed),
         }));
         await writeFile(join(tmp, 'cuts.json'), JSON.stringify({ segments: clean }));
+        // withRecord（M2.5 hero）：出厂 CC0 唱片入轨（授权卫生 (a) 款，renderCuts meta 记来源）
+        const extra = withRecord ? ['--with-record', '--record-index', String(Math.max(0, Math.min(15, Math.round(Number(recordIndex) || 0))))] : [];
         const child = spawn('node', ['cli/index.ts', 'render-cuts',
-          join(repoRoot, 'tapes', `${tape}.tape.jsonl`), join(tmp, 'cuts.json'), '--out', tmp],
+          join(repoRoot, 'tapes', `${tape}.tape.jsonl`), join(tmp, 'cuts.json'), '--out', tmp, ...extra],
           { cwd: repoRoot, stdio: ['ignore', 'pipe', 'pipe'] });
         let errBuf = '';
         child.stderr.on('data', d => { errBuf += d; });

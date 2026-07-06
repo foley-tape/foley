@@ -42,7 +42,8 @@ export function parseMoments(text) {
     const line = lines[i];
     if (!line) continue;
     const c = line.split(',');
-    out.push({ t: +c[0], seq: +c[2], verb: c[3], outcome: c[4], special: c[7] || null });
+    // tags/slot（M2.5 demo 声桥要喂前景分类与音阶度）：hex/枚举位，列审计在册
+    out.push({ t: +c[0], seq: +c[2], verb: c[3], outcome: c[4], special: c[7] || null, tags: c[6] || '', slot: c[11] || '' });
   }
   return out;
 }

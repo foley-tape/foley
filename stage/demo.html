@@ -1,0 +1,162 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Foley — a lo-fi tape instrument that plays your coding agents</title>
+<link rel="stylesheet" href="css/stage.css">
+<style>
+  /* demo 是橱窗不是车间（M2.5 §B.1）：无写盘无导出；DUB 组收起 */
+  #dub-group { display: none; }
+  #demo-banner {
+    position: fixed; left: 0; right: 0; top: 0; z-index: 200;
+    display: flex; align-items: center; justify-content: center; gap: 18px;
+    padding: 10px 16px;
+    background: rgba(10, 8, 5, 0.78); backdrop-filter: blur(2px);
+    color: #C9B998; font: 13px/1.5 "Univers", "Neue Haas Grotesk", "Helvetica Neue", Helvetica, Arial, sans-serif;
+    letter-spacing: 0.02em;
+  }
+  #demo-banner .tagline { opacity: 0.85; }
+  #power {
+    border: 0; cursor: pointer; border-radius: 5px; padding: 7px 18px;
+    background: linear-gradient(168deg, #DCCEA6 0%, #B3A077 45%, #8A784F 100%);
+    color: #2E2517; font: 600 12px/1 inherit; letter-spacing: 0.22em; text-indent: 0.22em;
+    box-shadow: 0 2px 4px rgba(15, 9, 3, 0.55), inset 0 1px 0 rgba(255, 250, 235, 0.4);
+  }
+  #power:active { transform: translateY(1px); }
+  #power[data-on] { filter: brightness(0.88); box-shadow: inset 0 2px 5px rgba(25, 15, 5, 0.45); }
+  #demo-credit {
+    position: fixed; left: 0; right: 0; bottom: 0; z-index: 200;
+    text-align: center; padding: 8px 14px;
+    color: rgba(201, 185, 152, 0.75); font: 11px/1.6 ui-monospace, Menlo, monospace;
+    background: linear-gradient(180deg, transparent, rgba(8, 6, 4, 0.72) 40%);
+  }
+  #demo-credit a { color: #C9B998; }
+</style>
+</head>
+<body>
+<div id="demo-banner">
+  <span class="tagline">This is a recording — run <code>npx foley</code> to hear your own.</span>
+  <button id="power">POWER</button>
+</div>
+
+<div id="room">
+  <div id="machine">
+    <div id="deck">
+      <div class="reel" id="reel-l"></div>
+      <div class="reel" id="reel-r"></div>
+      <div id="tapeband"></div>
+      <i class="guide" style="left: calc(59vw - 64px)"></i>
+      <i class="guide" style="left: calc(59vw + 58px)"></i>
+      <div id="counter-housing" title=""><i class="slot"></i></div>
+      <div id="loupe">
+        <div class="loupe-glass">
+          <div class="wheel"></div><div class="wheel"></div><div class="wheel"></div><div class="wheel"></div>
+        </div>
+      </div>
+    </div>
+    <div id="panel">
+      <i class="screw" style="left:6%;  top:14px; --slot:23deg"></i>
+      <i class="screw" style="left:38%; top:14px; --slot:118deg"></i>
+      <i class="screw" style="left:70%; top:14px; --slot:74deg"></i>
+      <i class="screw" style="left:6%;  bottom:14px; --slot:161deg"></i>
+      <i class="screw" style="left:38%; bottom:14px; --slot:9deg"></i>
+      <i class="screw" style="left:70%; bottom:14px; --slot:96deg"></i>
+
+      <div id="cluster">
+        <section class="block">
+          <div class="bezel vu-bezel">
+            <svg id="vu-svg" viewBox="0 0 300 200">
+              <defs>
+                <radialGradient id="backlight" cx="50%" cy="92%" r="95%">
+                  <stop offset="0%" stop-color="#F8EDD3"/>
+                  <stop offset="55%" stop-color="#F2E6CC"/>
+                  <stop offset="100%" stop-color="#DECDA6"/>
+                </radialGradient>
+                <linearGradient id="vu-glass" x1="0" y1="0" x2="1" y2="1">
+                  <stop offset="0"   stop-color="#FFF6E0" stop-opacity="0.10"/>
+                  <stop offset="0.28" stop-color="#FFF6E0" stop-opacity="0.02"/>
+                  <stop offset="0.6" stop-color="#140D06" stop-opacity="0.16"/>
+                  <stop offset="1"   stop-color="#140D06" stop-opacity="0.34"/>
+                </linearGradient>
+                <linearGradient id="vu-streak" x1="0" y1="0" x2="1" y2="1">
+                  <stop offset="0.32" stop-color="#FFF6E0" stop-opacity="0"/>
+                  <stop offset="0.44" stop-color="#FFF6E0" stop-opacity="0.07"/>
+                  <stop offset="0.52" stop-color="#FFF6E0" stop-opacity="0"/>
+                </linearGradient>
+              </defs>
+              <rect x="6" y="6" width="288" height="188" rx="7" fill="url(#backlight)"/>
+              <g id="ticks"></g>
+              <text class="dial-mark" x="150" y="118" text-anchor="middle">VU</text>
+              <g id="needle-group" transform="rotate(-47 150 168)">
+                <polygon points="148.5,168 150,46 151.5,168" fill="#241A10"/>
+                <circle cx="150" cy="168" r="7.5" fill="#241A10"/>
+                <circle cx="150" cy="168" r="2.6" fill="#5A4A34"/>
+              </g>
+              <rect x="6" y="6" width="288" height="188" rx="7" fill="url(#vu-glass)"/>
+              <rect x="6" y="6" width="288" height="188" rx="7" fill="url(#vu-streak)"/>
+            </svg>
+          </div>
+          <div class="silk">Tension</div>
+        </section>
+
+        <section class="block">
+          <div class="bezel chart-bezel">
+            <canvas id="chart-canvas"></canvas>
+            <div class="paper-shade"></div>
+            <canvas id="dub-overlay"></canvas>
+            <div class="glass"></div>
+          </div>
+          <div class="silk">Recorder</div>
+        </section>
+
+        <section class="block block-lamps">
+          <div class="tube-housing">
+            <div id="amber-tube" style="--lit:0">
+              <i class="filament"></i>
+              <i class="hotcore"></i>
+            </div>
+          </div>
+          <div class="silk">Ask</div>
+          <div class="gem-row">
+            <span class="gem-cell">
+              <i class="gem emerald" id="emerald" style="--lit:0"></i>
+              <span class="silk small">Done</span>
+            </span>
+            <span class="gem-cell">
+              <i class="gem pilot" id="pilot" style="--lit:0.5"></i>
+              <span class="silk small">Main</span>
+            </span>
+          </div>
+        </section>
+      </div>
+
+      <div id="brand" class="silk">Tape · Zero</div>
+
+      <div id="dub-group">
+        <div id="dub-lengths">
+          <button class="len-tab" data-s="30" style="width:18px"></button>
+          <button class="len-tab" data-s="45" data-on style="width:27px"></button>
+          <button class="len-tab" data-s="60" style="width:36px"></button>
+          <button class="len-tab" data-s="90" style="width:54px"></button>
+        </div>
+        <button id="dub-key">DUB</button>
+      </div>
+    </div>
+    <div id="walnut-rail"></div>
+  </div>
+
+  <div id="keylight"></div>
+  <div id="vignette"></div>
+  <div id="grain"></div>
+  <canvas id="lens"></canvas>
+</div>
+
+<div id="demo-credit">
+  a real storm session, replayed · factory record: “Still Life” by HoliznaCC0 (human-made, CC0) ·
+  <a href="https://github.com/foley-tape/foley" rel="noopener">github.com/foley-tape/foley</a>
+</div>
+
+<script type="module" src="js/demo-boot.js"></script>
+</body>
+</html>

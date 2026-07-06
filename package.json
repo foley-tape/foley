@@ -5,6 +5,30 @@
   "description": "A lo-fi tape instrument for your coding agents. 纯本地、零遥测。First deck: TAPE·ZERO.",
   "type": "module",
   "license": "MIT",
+  "repository": { "type": "git", "url": "git+https://github.com/foley-tape/foley.git" },
+  "homepage": "https://github.com/foley-tape/foley#readme",
+  "files": [
+    "cli",
+    "engine",
+    "adapters",
+    "protocol",
+    "sound",
+    "!sound/records/*.mp3",
+    "!sound/assets/*.wav",
+    "stage",
+    "!stage/tools",
+    "!stage/fixtures/busy.*",
+    "!stage/fixtures/jam.*",
+    "!stage/fixtures/smooth.*",
+    "!stage/fixtures/silence.*",
+    "params.json",
+    "verdict.json",
+    "sweep.json",
+    "sound-params.json",
+    "README.md",
+    "README.zh.md",
+    "LICENSE"
+  ],
   "engines": {
     "node": ">=23.6"
   },
@@ -26,12 +50,11 @@
     "@types/node": "^22.0.0",
     "typescript": "^5.6.0"
   },
-  "main": "index.js",
   "dependencies": {
     "undici-types": "^6.21.0"
   },
-  "keywords": [],
-  "author": "",
+  "keywords": ["cli", "claude", "coding-agent", "tape", "observability", "lo-fi", "tui", "session-replay"],
+  "author": "foley-tape",
   "bin": {
     "foley": "cli/index.ts"
   }

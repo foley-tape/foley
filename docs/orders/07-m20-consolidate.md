@@ -1,3 +1,4 @@
+<!-- 原名：TAPE0_ORDER_M20.md ｜ ARCHIVE-1 编年迁移，正文未改 -->
 # TAPE-0 施工令 · M2.0 收摄与接线
 
 > 双轨分工：§1 归 Track-FIX（管 root/cli/docs 围栏）；§2 归 Track-STAGE。§0 为两轨共同追认。

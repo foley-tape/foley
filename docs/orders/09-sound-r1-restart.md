@@ -1,3 +1,4 @@
+<!-- 原名：FOLEY_ORDER_SOUND_R1.md ｜ ARCHIVE-1 编年迁移，正文未改 -->
 # FOLEY 施工令 · SOUND-R1 声音相重启（全新会话专用·自包含）
 
 > 阅读对象：**全新会话**的施工方（Track-SOUND）。你没有历史记忆，本文即全部上下文。

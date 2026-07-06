@@ -1,3 +1,4 @@
+<!-- 原名：TAPE0_ORDER_M18_DUAL.md ｜ ARCHIVE-1 编年迁移，正文未改 -->
 # TAPE-0 施工令 · M1.8 双轨令（修复即封版 × 琥珀通电）
 
 > 本令开启**双轨并行**。终端一 = Track-FIX（修复→封版→live→声音）；终端二 = Track-STAGE（琥珀舞台）。

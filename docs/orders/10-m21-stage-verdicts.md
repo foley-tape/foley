@@ -1,3 +1,4 @@
+<!-- 原名：FOLEY_ORDER_M21.md ｜ ARCHIVE-1 编年迁移，正文未改 -->
 # FOLEY 施工令 · M2.1 舞台复盘裁决 ＋ M-S4 ＋ 总务移交
 
 > 阅读对象：Track-STAGE（原终端，记忆延续）。围栏本轮扩编：`stage/**` ＋ **`docs/**`、README、scripts/**（总务授权，见 §3）**。

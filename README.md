@@ -45,13 +45,13 @@ From source: `git clone https://github.com/foley-tape/foley && cd foley && npm i
 
 Two layers. **Foreground cues** mark the moments — a **pluck** for work, a **chord** for resolution, a **needle-skip** for a jam, and a few more — success high, failure low, so you hear a session's register without looking.
 
-**Under them** runs a continuous lo-fi bed: a record supplies the music, the machine supplies the information, and *the tape itself ages* as tension rises — hiss thickens, wow deepens, highs dull — clearing again when the trouble passes. Rain stopping isn't a chime; it's the room going quiet. See the [sensory design whitepaper](docs/canon/TAPE0_WHITEPAPER_SENSES_v1.md).
+**Under them** runs a continuous lo-fi bed: a record supplies the music, the machine supplies the information, and *the tape itself ages* as tension rises — hiss thickens, wow deepens, highs dull — clearing again when the trouble passes. Rain stopping isn't a chime; it's the room going quiet. See the [sensory design whitepaper](docs/canon/TAPE0_WHITEPAPER_SENSES.md).
 
 ## Records
 
 The music is real, and the rule is simple: **factory records must be human-made.** The first pressing is [HoliznaCC0](https://freemusicarchive.org/music/holiznacc0/)'s *Public Domain Lofi* — three tracks (*Saturation*, *Still Life*, *Warm Fuzz*), released CC0, human-made (Free Music Archive's own field reads "AI generated? No"). The machine ages them and skips the needle across them; it never wrote them.
 
-Records ship via GitHub Releases, not the npm package — `npx foley records` fetches them on explicit confirmation, verifying each by hash. Want a different shelf? The [record-hunting guide](docs/records-guide.md) keeps human-made CC0 crates up front and any AI-generated ones clearly labelled in their own aisle.
+Records ship via GitHub Releases, not the npm package — `npx foley records` fetches them on explicit confirmation, verifying each by hash. Want a different shelf? The [record-hunting guide](docs/guide/records-guide.md) keeps human-made CC0 crates up front and any AI-generated ones clearly labelled in their own aisle.
 
 ## House rules
 
@@ -70,6 +70,8 @@ Foley reads your local session logs and **distills** them into event skeletons �
 ## Why "Foley"
 
 In the 1930s, Jack Foley watched the picture and performed its sounds by hand — footsteps, rustles, weather — live, in sync, with physical objects. This machine does the same job for invisible labor: it watches your agent's session and performs its sounds in tape.
+
+The whole build is on the record — every order, round archive, and audit, mapped in [docs/](docs/README.md).
 
 ## Status
 

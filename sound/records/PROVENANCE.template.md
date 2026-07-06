@@ -22,4 +22,4 @@
 ## 沿革注记
 
 - R3 出厂四盘（open-lofi，Suno v5 AI 生成·CC0）依 M2.4 §0.1 血统条款**不入厂机**，
-  退厂入 `docs/records-guide.md` AI 明示区；其在厂期间的授权留痕见 `LICENSES.md`（沿革保留，诚实历史）。
+  退厂入 `docs/guide/records-guide.md` AI 明示区；其在厂期间的授权留痕见 `LICENSES.md`（沿革保留，诚实历史）。

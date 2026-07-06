@@ -49,7 +49,7 @@
 **AI 生成 Suno v5**·CC0，作者 btahir）依血统条款退厂：授权判读当时成立且留痕不改（原登记全文见
 git 97f558a:sound/records/LICENSES.md；CC0 快照 `LICENSE-CC0-snapshot-2026-07-06.txt` 系 open-lofi
 LICENSE 采集件，沿革保留）；open-lofi 目录（含 seasonal-weather 27 首天气候选）移居
-`docs/records-guide.md` AI 明示区，用户自治上架自便。
+`docs/guide/records-guide.md` AI 明示区，用户自治上架自便。
 
 ## dub 授权卫生（R3 §5 沿革）
 预告片音轨默认**不含唱片**；唱片进 dub 仅限本目录内置 CC0 唱片或用户对自备唱片显式确认

@@ -41,4 +41,4 @@
 - 选曲法自 SOUND-R4 起：**船长实听为终裁**（同专辑其余曲目船长判"打击乐多、鼓点密集、听起来一般"——暂时舍弃）；
   BPM 72–85 窗降为参考代理（无耳初筛用），歧义与出窗如实入档不粉饰。
 - R3 出厂四盘（open-lofi，AI 生成·CC0）依血统条款退厂（2026-07-06）：文件出仓（git 历史 97f558a 永存），
-  授权留痕 `LICENSES.md` 沿革段；open-lofi 目录移居 `docs/records-guide.md` AI 明示区。
+  授权留痕 `LICENSES.md` 沿革段；open-lofi 目录移居 `docs/guide/records-guide.md` AI 明示区。

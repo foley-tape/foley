@@ -1,0 +1,2 @@
+{"type":"assistant","timestamp":12345,"message":{"role":"assistant","content":"not-an-array"}}
+{"type":"user","message":{"content":[{"type":"tool_result","tool_use_id":null,"is_error":"yes"}]}}

@@ -1,5 +1,5 @@
 {
-  "_pipeline": "M2.4 §A.4 落仓管道（候船长终裁名单，names 空=管道待料）。落仓日流程：①船长名单曲目入 sound/records/（暂存）→ ②每曲 PROVENANCE 三件套（照 PROVENANCE.template.md，血统条款：必须人类制造）→ ③node sound/records/prep-records.mjs 实测 bpm/lufs/fnv 重写 catalog.json → ④node scripts/pack-records.mjs --repo <owner/repo> --tag <releaseTag> 出 dist-records/（sha256+清单条目）→ ⑤GitHub Release 挂资产 → ⑥清单条目粘回本文件 records[] → ⑦repo 内 mp3 移除（§0.3 唱片不进 tarball；catalog/manifest/PROVENANCE 指纹留仓）→ ⑧AI 旧盘退厂入淘碟指南 AI 区。取回端：node cli/index.ts records fetch（§0.2 明示征询：URL/体积/SHA-256 直呈，同意才取，验哈希落盘 ~/.foley/records/factory/；拒绝走房间层）。",
+  "_pipeline": "M2.4 §A.4 落仓管道（候船长终裁名单，names 空=管道待料）。落仓日流程：①船长名单曲目入 sound/records/（暂存）→ ②每曲 PROVENANCE 三件套（照 PROVENANCE.template.md，血统条款：必须人类制造）→ ③node sound/records/prep-records.mjs 实测 bpm/lufs/fnv 重写 catalog.json → ④node scripts/pack-records.mjs --repo <owner/repo> --tag <releaseTag> 出 dist-records/（sha256+清单条目）→ ⑤GitHub Release 挂资产 → ⑥清单条目粘回本文件 records[] → ⑦repo 内 mp3 移除（§0.3 唱片不进 tarball；catalog/manifest/PROVENANCE 指纹留仓）→ ⑧AI 旧盘退厂入淘碟指南 AI 区。M2.5 §C 终形：assets[]=床音织体同清单同征询（缺件退 fallback 合成织体）。取回端：node cli/index.ts records fetch（§0.2 明示征询：URL/体积/SHA-256 直呈，同意才取，验哈希落盘 ~/.foley/records/factory/；拒绝走房间层）。",
   "releaseTag": "records-v1",
   "records": [
     {
@@ -25,6 +25,32 @@
       "sha256": "974ffd083b09aecbe60412f3376db07fb241adbbb0abf89698a22229a2de02c6",
       "url": "https://github.com/foley-tape/foley/releases/download/records-v1/warm-fuzz.mp3",
       "provenance": "PROVENANCE.md#warm-fuzz"
+    }
+  ],
+  "assets": [
+    {
+      "name": "l1-roomtone",
+      "file": "l1-roomtone.wav",
+      "bytes": 1017644,
+      "sha256": "7067f0b7066dae279bfd4b7fa7b551904502de646c15b803487e0b89fb27c59a",
+      "url": "https://github.com/foley-tape/foley/releases/download/records-v1/l1-roomtone.wav",
+      "provenance": "sound/assets/LICENSES.md"
+    },
+    {
+      "name": "l1-filmstatic",
+      "file": "l1-filmstatic.wav",
+      "bytes": 812844,
+      "sha256": "18750e77904d3e7ce9b0302d2bb341ea44acdcc765de55d585f7f7ad6787b5c2",
+      "url": "https://github.com/foley-tape/foley/releases/download/records-v1/l1-filmstatic.wav",
+      "provenance": "sound/assets/LICENSES.md"
+    },
+    {
+      "name": "l1-crackle",
+      "file": "l1-crackle.wav",
+      "bytes": 1171244,
+      "sha256": "413cd877cf9153412ce51d7b1b76abdf1a906833e73c3ca50df3a03b38606d25",
+      "url": "https://github.com/foley-tape/foley/releases/download/records-v1/l1-crackle.wav",
+      "provenance": "sound/assets/LICENSES.md"
     }
   ]
 }

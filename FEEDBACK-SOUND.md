@@ -1,4 +1,19 @@
-# FEEDBACK-SOUND —— 声音相台账（Track-SOUND：SOUND-R1 重启 → EAR-5~11 战役 → SOUND-R2 床的重做 → SOUND-R3 唱机改造 → SOUND-R4 平移与落仓）
+# FEEDBACK-SOUND —— 声音相台账（Track-SOUND：SOUND-R1 重启 → EAR-5~11 战役 → SOUND-R2 床的重做 → SOUND-R3 唱机改造 → SOUND-R4 平移与落仓 → M2.5 §C 发布终包）
+
+## M2.5 §C 交付（发布物料轮·SOUND 轻装，2026-07-06，合并哈希候回填）
+
+**结论一句话**：出厂音频 Releases 终包配齐——**唱片×3＋床音织体×3 一体清单**（records.manifest.json 扩 assets[] 段；`records-v1` 七件挂齐含 SHASUMS）；**回环互证六件四维全符**（Release 下载字节↔manifest↔SHASUMS↔字节数）；权威哈希表 `docs/launch/RELEASES-AUDIO-MANIFEST.md`（mt2 范式：全表程序化生成不手抄＋镜像日重挂四步→拆闸③纯机械）；取件机双轨化（唱片落 ~/.foley/records/factory/、床音落 ~/.foley/assets/factory/；assets-node 加 vendored→factory→缺件退 fallback 织体三段解析，缺件演练实跑：警示+跳过+装载余件+复位全通）；淘碟指南终稿（艺术家致谢段：HoliznaCC0 照署＋床音三作者＋船长【槽】×2——致谢措辞/委托首版）。npm test 105/105；GATE"records-fetch＋assets-node 征询下载"句自此为真（发布红线兑现）。
+
+**要点与修正**：
+- 征询文案口径：《FOLEY 发布工具箱》不在仓库案头——**文案以 §0.2 原文＋GATE 现文对齐**；工具箱如有出入一句话即改（候架构师裁）。
+- 手抄之罪自首（当场抓修）：权威表初稿 wav 三行 sha256 尾段系我手补（源输出只有 16 字符截断）——缺件演练时征询打印的真哈希与表不符暴露之；全表改为**单源程序化生成**（manifest→表），并把"不手抄"写进表底戒条。哈希类文档自此一律脚本出，不过人手。
+- 床音纳入征询取件超出 §C.1"唱片"字面：GATE 已写"assets-node 征询下载"而机制不存在（每句话为真红线）＋床音在我围栏（sound/assets）——判"补真"非加戏；缺件时 fallback 合成织体同构顶上（R2 退路沿革），npx 三路秒级起播不受阻。
+- 共享设施申报：cli/index.ts usage 一行改"出厂音频（唱片+床音织体）"（§A 同文件并发施工中，只动此一行）。
+
+**候船长**：淘碟指南【槽】×2（致谢措辞定稿／委托首版信息）。**候 §A**：镜像日按 RELEASES-AUDIO-MANIFEST 四步重挂＋冒烟矩阵三路验证。
+
+---
+
 
 ## SOUND-R4 交付（M2.4 §A「平移与落仓」，2026-07-06，e774c89）
 

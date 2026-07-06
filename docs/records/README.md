@@ -16,5 +16,6 @@
 | `m20/` | M2.0 收摄与接线 | README_DRAFT 底稿 ＋ stage/（M-S3 live 接线：FEEDBACK/手记/**舞台复盘**/验证件） |
 | `m21/` | M2.1 裁决＋M-S4＋总务 | stage/（FEEDBACK/手记/性格照重拍/静帧/影子指标首轮实测） |
 | `sound-r1/` | 声音相 EAR 升级 | 致架构师升级报告（EAR-1…4 台账另见 FEEDBACK-FIX） |
+| `sound-r3/` | SOUND-R3 唱机改造（97f558a） | FEEDBACK-SOUND@SOUND-R3 快照 ＋ EAR_MACHINE@SOUND-R3（机器耳 v3 首份三哈希报告） |
 
 **未晋升说明**（M2.1 桌面清空时的取舍，均可由带子＋对应分支复现）：m1.5/1.6/1.7 交接夹中的 `曲线-*` 逐带 CSV 与 m1.6 `探针` HTML 为跑批产物，按晋升规则未入仓，随桌面清空删除；唯 storm 证据卷因系旧引擎不可复现之证据，整卷晋升 `m15/`。

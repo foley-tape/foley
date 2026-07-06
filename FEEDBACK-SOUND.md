@@ -1,6 +1,6 @@
 # FEEDBACK-SOUND —— 声音相台账（Track-SOUND：SOUND-R1 重启 → EAR-5~11 战役 → SOUND-R2 床的重做 → SOUND-R3 唱机改造 → SOUND-R4 平移与落仓 → M2.5 §C 发布终包）
 
-## M2.5 §C 交付（发布物料轮·SOUND 轻装，2026-07-06，合并哈希候回填）
+## M2.5 §C 交付（发布物料轮·SOUND 轻装，2026-07-06，d384870）
 
 **结论一句话**：出厂音频 Releases 终包配齐——**唱片×3＋床音织体×3 一体清单**（records.manifest.json 扩 assets[] 段；`records-v1` 七件挂齐含 SHASUMS）；**回环互证六件四维全符**（Release 下载字节↔manifest↔SHASUMS↔字节数）；权威哈希表 `docs/launch/RELEASES-AUDIO-MANIFEST.md`（mt2 范式：全表程序化生成不手抄＋镜像日重挂四步→拆闸③纯机械）；取件机双轨化（唱片落 ~/.foley/records/factory/、床音落 ~/.foley/assets/factory/；assets-node 加 vendored→factory→缺件退 fallback 织体三段解析，缺件演练实跑：警示+跳过+装载余件+复位全通）；淘碟指南终稿（艺术家致谢段：HoliznaCC0 照署＋床音三作者＋船长【槽】×2——致谢措辞/委托首版）。npm test 105/105；GATE"records-fetch＋assets-node 征询下载"句自此为真（发布红线兑现）。
 

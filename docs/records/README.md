@@ -15,6 +15,9 @@
 | `m19/` | M1.9 双轨（v1-live × M-S2） | FEEDBACK-FIX 快照 ＋ STAGE（性格照×5 底片/静帧/手记） |
 | `m20/` | M2.0 收摄与接线 | README_DRAFT 底稿 ＋ stage/（M-S3 live 接线：FEEDBACK/手记/**舞台复盘**/验证件） |
 | `m21/` | M2.1 裁决＋M-S4＋总务 | stage/（FEEDBACK/手记/性格照重拍/静帧/影子指标首轮实测） |
+| `m22/` | M2.2 治理六裁＋昨日的卷（9fb3e82） | stage/（FEEDBACK@M2.2 快照/live 定妆照） |
+| `mt1/` | M-T1 剪刀与纸（0c3813c） | stage/（交付件/五带纸条 PNG+meta/撕纸仪式屏录/影子首采/**旁路复核@M-T1**/FEEDBACK@M-T1） |
+| `mt2/` | M2.3 四修＋M-T2 复制机（4fdd585） | stage/（交付件/真接带 mp4×3＋PEAK 海报帧/GIF 首证/渲染速度影子/FEEDBACK@M2.3） |
 | `sound-r1/` | 声音相 EAR 升级 | 致架构师升级报告（EAR-1…4 台账另见 FEEDBACK-FIX） |
 | `sound-r3/` | SOUND-R3 唱机改造（97f558a） | FEEDBACK-SOUND@SOUND-R3 快照 ＋ EAR_MACHINE@SOUND-R3（机器耳 v3 首份三哈希报告） |
 

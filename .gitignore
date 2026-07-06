@@ -18,3 +18,9 @@ sound/records/*.mp3
 
 # M-T2 62MB 接带已迁 Releases（§B.3）——本地保留、指纹见 docs/records/mt2/stage/RELEASES-MANIFEST.md
 docs/records/mt2/stage/*.mp4
+
+# ARCHIVE-1：性格照/定妆照/仪式屏录已迁 Releases media-archive-v1——指纹见各夹 RELEASES-MANIFEST.md
+docs/records/m19/性格照/portrait-*.mp4
+docs/records/m21/stage/性格照/portrait-*.mp4
+docs/records/m22/stage/*.mp4
+docs/records/mt1/stage/*.mp4

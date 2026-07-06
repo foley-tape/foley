@@ -4,7 +4,7 @@
 
 # M2.5 §B · 发布物料（demo 页＋hero 双版本＋README 换图）
 
-**合入 main 哈希：候合并后补。** 交付：demo 站（`node stage/tools/demo-build.mjs` 一令构建，RELEASE §A.5 直挂 Pages）＋hero 主片/GIF/次片（`runs/hero-m25/`，Releases 待挂）＋README hero 位已换。
+**合入 main 哈希：b870214（主件）＋794b3e4（README 改道件）**（已推 origin/main；本行为合并后记账小提交）。交付：demo 站（`node stage/tools/demo-build.mjs` 一令构建，RELEASE §A.5 直挂 Pages）＋hero 主片/GIF/次片（`runs/hero-m25/`，Releases 待挂）＋README hero 位已换（见下"置件正名"）。金测试 105/105。
 
 ## §B.1 demo 页（示范带过审入页）
 
@@ -26,7 +26,7 @@
 | GIF 无声 | ✔ 8.4s／960×540／**12.1MB**（≤8s 容差内、720p 内、<15MB）静态颗粒法 |
 | 次片 | ✔ hero-dub-ritual-8s.mp4（按键→齿孔→撕→落台一镜） |
 | 静帧 | 沿用 README 既有 deck-storm 海报＋loupe 微距（工具箱指名件）；另有 hero 海报帧（PEAK 取帧）入档 |
-| README 换图 | ✔ hero 位（行 6）换 `docs/assets/hero.gif`；旧静帧文件保留 |
+| README 换图（置件正名） | ✔ `docs/assets/hero.gif` 随本轮入库；**hero 行本身以置件形式落 RELEASE 真话批工作树**（其批基于旧版上下文正在 tape0 进行，硬合必撞——一行手植其树、随其提交入库，M-T3 置件先例的镜像，此行即正名申报）；旧静帧文件保留 |
 | keepStuck 例外记案 | DubSchedule 增 opts.keepStuck（默认 false=转录姿态不变；仅 hero 发布素材放行跳针——工具箱明令，候追认） |
 
 ## §B.3 妈妈测试·真人一测

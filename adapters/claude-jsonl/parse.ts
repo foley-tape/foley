@@ -93,10 +93,12 @@ export function fnv1a(s: string): string {
 }
 
 /** 归一化错误首行：抹凭据/路径/hex/token/数字，供 sig 稳定聚类。截断 60（§3.2）。
- *  M1.8-F④ 补刀（B-2）：内联凭据/短口令/相对·Windows 路径/疑似令牌 → SECRET。宁可过抹——errClass 只为聚类。 */
+ *  M1.8-F④ 补刀（B-2）：内联凭据/短口令/相对·Windows 路径/疑似令牌 → SECRET。宁可过抹——errClass 只为聚类。
+ *  NIGHT-2 A1 补刀：邮箱 → EMAIL（PII，errClass 是默认带唯一输出派生字段，「outputs never stored」以此兑现）。 */
 export function normErr(text: string): string {
   const first = (text.split('\n')[0] ?? '').toLowerCase();
   return first
+    .replace(/[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}/g, 'EMAIL')           // 邮箱 PII（居首：防后续规则切碎漏抹）
     .replace(/-[pp]\S+/g, 'SECRET')                                       // -pSECRET 内联凭据（已小写）
     .replace(/\S*[=:]\S{3,}/g, 'SECRET')                                  // key=val / key:val 内联（含短口令、URL）
     .replace(/[a-z]:\\[\\\S]*/g, 'PATH')                                  // Windows 路径 c:\...

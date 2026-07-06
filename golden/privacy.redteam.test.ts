@@ -93,3 +93,23 @@ test('隐私·默认带 normErr：内联凭据/含数字令牌/URL 抹为 SECRET
   assert.ok(!blob.includes('48213765'), '默认带 errClass 不应含 PIN 明文');
   assert.ok(!blob.includes('hunterpass'), '默认带 errClass 不应含 -p 内联凭据');
 });
+
+test('隐私·默认带 normErr：邮箱 PII 抹为 EMAIL（NIGHT-2 A1）', () => {
+  // 邮箱是 PII 而非凭据，此前各规则全漏（无 =:、@ 切碎长 token）。README「outputs never stored」
+  // 的兑现点就在 errClass（默认带唯一输出派生字段），故邮箱向量常设在册。
+  const EMAILS = ['alice.smith@example.com', 'Bob_Jones+dev@Corp-Mail.example.ORG', 'x@sub.foo-bar.co.uk'];
+  const raw = [
+    A('e1', 'Bash', { command: 'git push' }, '2026-06-01T10:00:00.000Z'),
+    U('e1', true, `remote rejected: author ${EMAILS[0]} not allowed`, '2026-06-01T10:00:01.000Z'),
+    A('e2', 'Bash', { command: 'mail send' }, '2026-06-01T10:00:02.000Z'),
+    U('e2', true, `SMTP 550 无此收件人 ${EMAILS[1]} cc ${EMAILS[2]}`, '2026-06-01T10:00:03.000Z'),
+  ].join('\n') + '\n';
+  const d = distillTape(raw, params);
+  const blob = d.records.filter((r) => r.errClass).map((r) => r.errClass!).join(' || ');
+  for (const em of EMAILS) {
+    assert.ok(!blob.toLowerCase().includes(em.toLowerCase()), `默认带 errClass 不应含邮箱 "${em}"：${blob}`);
+    const local = em.split('@')[0]!.toLowerCase();
+    assert.ok(!blob.includes(`${local}@`), `邮箱局部 "${local}@" 不应存活：${blob}`);
+  }
+  assert.ok(blob.includes('EMAIL'), `邮箱应被抹为 EMAIL 占位：${blob}`);
+});

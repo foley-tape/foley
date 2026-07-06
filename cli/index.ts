@@ -1,3 +1,4 @@
+#!/usr/bin/env node
 // cli 入口 —— distill / scan / replay / live / probe / hunt。
 // v0 范围梯：M0 = distill/scan；replay = M1；probe = M2；live/hunt = v1（M1.9）。
 

@@ -1,12 +1,12 @@
 {
   "name": "foley",
-  "version": "0.0.0",
+  "version": "0.1.0",
   "private": true,
   "description": "A lo-fi tape instrument for your coding agents. 纯本地、零遥测。First deck: TAPE·ZERO.",
   "type": "module",
   "license": "MIT",
   "engines": {
-    "node": ">=20"
+    "node": ">=23.6"
   },
   "scripts": {
     "scan": "node cli/index.ts scan",

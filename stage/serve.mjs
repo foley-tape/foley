@@ -7,7 +7,7 @@
 // 中继与钟都不依赖标签页可见性——藏页照走（M2.0 §2 验证件二）。
 import { createServer } from 'node:http';
 import { readFile, writeFile, mkdir, mkdtemp, rm } from 'node:fs/promises';
-import { existsSync, readdirSync, statSync } from 'node:fs';
+import { existsSync, readdirSync, statSync, readFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { join, extname, normalize, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -58,6 +58,41 @@ const MIME = {
   '.mp3': 'audio/mpeg',
   '.wav': 'audio/wav',
 };
+
+// ── B4 factory 缓存回退（M2.6 丙·乙-②：打包态出厂唱片/床音回退位）──
+// npm 包 files 白名单排除 sound/records/*.mp3 与 sound/assets/*.wav（真身走 Releases，见 package.json）。
+// 用户经 `foley records fetch` 明示同意后落 ~/.foley/{records,assets}/factory/（与 records-fetch.ts 同位）。
+// serve 静态根只见 repo；打包态 mp3/wav 缺件 → 页面声桥一律 404（B4：dev 被 vendored 掩蔽故此前漏网）。
+// 修：/records/**、/sound/assets/** 于 repo 缺件时回退 factory 缓存——沿用既有 Host/DoS 闸，另加三重闸：
+//   ① 只读（readFile）；② 路径已 normalize＋decodeURIComponent（DoS 闸内，穿越序列此前已折叠出前缀）；
+//   ③ 文件名**白名单**（catalog/manifest 之 file 字段的确切扁平名）＋落盘目录 fence 前缀校验。
+//   白名单是命门：factory 目录用户可写，只有清单在册的扁平文件名才放行——挡任意读、穿越、投毒件。
+const RECORDS_FACTORY = join(homedir(), '.foley', 'records', 'factory');
+const ASSETS_FACTORY = join(homedir(), '.foley', 'assets', 'factory');
+function loadAudioWhitelist() {
+  const rec = new Set(), ast = new Set();
+  try {
+    const c = JSON.parse(readFileSync(join(repoRoot, 'sound', 'records', 'catalog.json'), 'utf8'));
+    for (const r of c.records ?? []) if (typeof r.file === 'string') rec.add(r.file);
+  } catch { /* 清单缺 → records 白名单空（fail-closed：factory 一件不供） */ }
+  try {
+    const m = JSON.parse(readFileSync(join(repoRoot, 'sound', 'assets', 'manifest.json'), 'utf8'));
+    for (const a of m.assets ?? []) if (typeof a.file === 'string') ast.add(a.file);
+  } catch { /* 同上 */ }
+  return { rec, ast };
+}
+const AUDIO_WL = loadAudioWhitelist();
+// 打包态回退候选：仅白名单内的扁平文件名，映到对应 factory 目录（其自身即 fence）。非白/穿越/空 → null。
+function factoryFallback(p) {
+  if (p.startsWith('/records/')) {
+    const base = p.slice('/records/'.length);
+    if (AUDIO_WL.rec.has(base)) return { file: join(RECORDS_FACTORY, base), fence: RECORDS_FACTORY };
+  } else if (p.startsWith('/sound/assets/')) {
+    const base = p.slice('/sound/assets/'.length);
+    if (AUDIO_WL.ast.has(base)) return { file: join(ASSETS_FACTORY, base), fence: ASSETS_FACTORY };
+  }
+  return null;
+}
 
 // ── G8 空盘自举（M2.6 热修·前置静音雷）──
 // bare 起播（live 默认）时若最近会话**缺席或已歇场**，机器只能诚实地播「沉睡」：针零、纸平、无声——
@@ -301,6 +336,19 @@ createServer(async (req, res) => {
     res.writeHead(200, { 'content-type': MIME[extname(file)] ?? 'application/octet-stream' });
     res.end(body);
   } catch {
+    // B4 打包态回退：repo 缺件时，白名单内的出厂唱片/床音改从 ~/.foley factory 缓存供出（只读＋fence 前缀闸）。
+    const fb = factoryFallback(path);
+    if (fb) {
+      const ffence = fb.fence.endsWith('/') ? fb.fence : fb.fence + '/';
+      if (fb.file.startsWith(ffence)) {
+        try {
+          const body = await readFile(fb.file);
+          res.writeHead(200, { 'content-type': MIME[extname(fb.file)] ?? 'application/octet-stream' });
+          res.end(body);
+          return;
+        } catch { /* factory 亦缺 → 落 404 */ }
+      }
+    }
     res.writeHead(404); res.end('not found');
   }
 }).listen(port, '127.0.0.1', () => { // §0.6.② 三闸各司其职（乙-F5 订正措辞）：绑定断 LAN／Origin 断跨源写／Host 校验断 rebind 读

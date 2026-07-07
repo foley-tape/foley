@@ -144,6 +144,7 @@ export class DubController {
     this._perf = null; this._tear = null; this._sel = null;
     this._savedReplay = null; this._lastNow = performance.now();
     this._stripCanvas = null; this._restEl = null;
+    this._cardJob = null;    // 收工卡工单（轨乙①）：在场时演出自撕、不胶印、落盘走 /card/save
     this._gatedMoments = []; // 演出期间欠下的真 moments（卡碟语义有状态，恢复时补喂）
     this._doneResolve = null;
     this.done = new Promise(r => { this._doneResolve = r; });
@@ -352,7 +353,7 @@ export class DubController {
     this._perf = null;
     this.state = 'armed';
     this._fadeDeadline = performance.now() + FADE_AFTER_MS;
-    if (this.auto) setTimeout(() => this._autoTear(), 250);
+    if (this.auto || this._cardJob) setTimeout(() => this._autoTear(), 250); // 收工卡：机器自撕（三号手令·丁裁定的自动落卡）
   }
 
   _cancelPerformance() {
@@ -376,6 +377,7 @@ export class DubController {
     this.keyEl.classList.remove('latched');
     this._resumeFeed();
     this.state = 'idle';
+    if (this._doneResolve) { this._doneResolve(null); this._doneResolve = null; } // 被撤演的等待者（cutCard 等）放行
   }
   noteMoment(m) { if (this._gatedMoments.length < 512) this._gatedMoments.push(m); }
   _resumeFeed() {
@@ -525,7 +527,7 @@ export class DubController {
     // 撕开→进入渲染（设计案 §2.3/§2.4）：胶印期间台上做转录戏——
     // 双轴快穿、计数轮飞转，进度由机器的动作陈述，无进度条无数字。
     let filmRes = null;
-    if (this.filmOn && typeof VideoEncoder !== 'undefined') {
+    if (this.filmOn && !this._cardJob && typeof VideoEncoder !== 'undefined') { // 收工卡只出纸条，不胶印
       try { filmRes = await this._print(); }
       catch (err) { console.warn('[dub] 胶印不成（纸条照旧）：', err.message ?? err); }
     }
@@ -632,6 +634,47 @@ export class DubController {
     this._cardEl = el;
   }
 
+  // ———————— 收工卡（轨乙①）：serve 备好的纸 → 台上誊录 → 自撕成卡 ————————
+  // 与 ?dub=auto 同一条演出/撕纸/合成流水线，差异仅三处：素材=/cards/<sid>（脱敏蒸馏→引擎回放的纸）；
+  // 不胶印；落盘走 /card/save（后卡替前卡）。誊录 8×（纸空间法：墨迹与 1× 逐像素同种）。
+  // 无戏可剪（会话过短/全程歇场）也要 skip 销账——工单不许永远待撕。
+  async cutCard(sid) {
+    if (this.state !== 'idle' && this.state !== 'resting') throw new Error('台上有戏，此卡下回再撕');
+    if (this._restEl) { this._restEl.remove(); this._restEl = null; }
+    if (this._cardEl) { this._cardEl.remove(); this._cardEl = null; }
+    const [c, m] = await Promise.all([
+      fetch(`/cards/${sid}/curve.csv`).then(r => { if (!r.ok) throw new Error(`curve ${r.status}`); return r.text(); }),
+      fetch(`/cards/${sid}/moments.csv`).then(r => (r.ok ? r.text() : 't\n')),
+    ]);
+    await this._loadParams();
+    const name = `session-${sid.slice(0, 8)}`;
+    const tape = buildTape(name, c, m);
+    const tapeHash = await sha16(c + '\n' + m);
+    const cuts = proposeCuts(tape, this.params, this.targetS);
+    if (cuts.segments.length === 0) {
+      await fetch('/card/save', {
+        method: 'POST', headers: dubHeaders({ 'content-type': 'application/json' }),
+        body: JSON.stringify({ sid, skip: '无戏可剪（会话过短或全程歇场）' }),
+      }).catch(() => { /* 销不了账留待下班 */ });
+      return null;
+    }
+    this.cuts = cuts;
+    this.doc = cutsDocument({ tapeName: name, tapeHash, paramsHash: this.paramsHash, targetS: this.targetS, segments: cuts.segments });
+    this.doc.axis = 'tape-stage';
+    this._cardJob = { sid };
+    this.keyEl.classList.add('latched');
+    const prevClock = this.dubClock;
+    this.dubClock = Math.max(prevClock, 8);
+    this.done = new Promise(r => { this._doneResolve = r; });
+    try {
+      this._startPerformance(tape);
+      return await this.done;
+    } finally {
+      this.dubClock = prevClock;
+      this._cardJob = null;
+    }
+  }
+
   // GIF 次级出口（自动化/发布物料用；≤8s，静态颗粒单帧化法）
   async gif() {
     if (!this.doc) throw new Error('无 cuts 可出 GIF');
@@ -680,6 +723,27 @@ export class DubController {
   async _saveDub(filmRes = null) {
     const c = this._stripCanvas;
     if (!c || !this.doc) return null;
+    if (this._cardJob) {
+      // 收工卡（轨乙①）：落 /card/save，覆盖写＝后卡替前卡。meta 同 G7 纪律：
+      // 不落墙钟，段值全为带内相对 ms（素材本就是默认脱敏蒸馏带的回放）。
+      const meta = {
+        version: this.doc.version,
+        kind: 'foley-card/session-end',
+        tape: this.doc.tape,
+        tapeHash: this.doc.tapeHash,
+        paramsHash: this.doc.paramsHash,
+        targetS: this.doc.targetS,
+        axis: this.doc.axis ?? 'tape-stage',
+        segments: this.doc.segments,
+      };
+      const png = c.toDataURL('image/png').split(',')[1];
+      const res = await fetch('/card/save', {
+        method: 'POST', headers: dubHeaders({ 'content-type': 'application/json' }),
+        body: JSON.stringify({ sid: this._cardJob.sid, png, meta }),
+      });
+      if (!res.ok) throw new Error(`card save ${res.status}`);
+      return await res.json();
+    }
     // 先传胶片与海报（拿到落盘名），meta 才好把 files 记全
     let filmFiles = null;
     if (filmRes) {

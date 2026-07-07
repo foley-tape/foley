@@ -26,9 +26,10 @@ describe('G8 · 空盘自举（正门必须活）', () => {
   before(async () => {
     emptyDir = mkdtempSync(join(tmpdir(), 'g8-empty-'));
     base = `http://127.0.0.1:${port}`;
-    // 注意：不带 --replay-only（自举闸只在 live 意图下武装）；空 FOLEY_PROJECTS = 空盘机器
+    // 注意：不带 --replay-only（自举闸只在 live 意图下武装）；空 FOLEY_PROJECTS = 空盘机器。
+    // FOLEY_HOME 同指空沙箱：live 态 serve 兼卡片值守（轨乙①），测试不许尾随真 ~/.foley/spool
     proc = spawn('node', [join(repoRoot, 'stage', 'serve.mjs'), String(port)],
-      { cwd: repoRoot, stdio: ['ignore', 'pipe', 'pipe'], env: { ...process.env, FOLEY_PROJECTS: emptyDir } });
+      { cwd: repoRoot, stdio: ['ignore', 'pipe', 'pipe'], env: { ...process.env, FOLEY_PROJECTS: emptyDir, FOLEY_HOME: emptyDir } });
     await new Promise<void>((resolve, reject) => {
       const to = setTimeout(() => reject(new Error('serve 启动超时')), 8000);
       proc!.stdout!.on('data', (d) => { if (String(d).includes('stage @')) { clearTimeout(to); resolve(); } });

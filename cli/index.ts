@@ -21,8 +21,9 @@ import { runRecordsFetch } from './records-fetch.ts';
 const cmd = process.argv[2];
 
 function usage(): void {
-  console.error('用法: foley            起播磁带机（尾随你最近的 Claude Code 会话，浏览器里现出唱机）');
-  console.error('      foley <命令>     命令行工具：');
+  console.error('用法: foley [端口] [--no-open] [--replay-only]   起播磁带机（尾随你最近的 Claude Code 会话，浏览器里现出唱机）');
+  console.error('                     裸命令即正门；端口/旗标直接透传（play/deck 为同义子命令）');
+  console.error('      foley <命令>   命令行工具：');
   console.error('  distill 原始 JSONL → 蒸馏带 .tape.jsonl（§3，唯一读原始处；默认脱敏，--raw 原始带勿外传）');
   console.error('  scan    扫描 ~/.claude/projects，提名标准带候选（体检按 episode）');
   console.error('  replay  离线跑蒸馏带 → REPORT.md（判定表/占空比/拐点）[--hz 10|20]');
@@ -34,10 +35,13 @@ function usage(): void {
   console.error('  records 出厂音频（唱片+床音织体）：首启明示征询下载（哈希校验；拒绝照常起播——房间层/合成织体退路）');
 }
 
-// 无参 / play / deck：起播磁带机（hero 命令）——stage/serve.mjs 尾随最近会话＋供出唱机页。
+// 无参 / play / deck / 端口 / 旗标：起播磁带机（hero 命令）——stage/serve.mjs 尾随最近会话＋供出唱机页。
 // 参数透传（端口/--replay-only/--raw 等）。stage 零依赖、绑 127.0.0.1、运行时零外网。
-if (!cmd || cmd === 'play' || cmd === 'deck') {
-  const rest = process.argv.slice(3);
+// B2（三号手令·丙）：首参为端口或旗标时同样走正门——注释所许即参数面所许，`foley 4180 --no-open` 直达。
+const isHelp = cmd === 'help' || cmd === '--help' || cmd === '-h';
+const isDeck = !isHelp && (!cmd || cmd === 'play' || cmd === 'deck' || /^\d+$/.test(cmd) || cmd.startsWith('-'));
+if (isDeck) {
+  const rest = process.argv.slice(cmd === 'play' || cmd === 'deck' ? 3 : 2);
   const pkgRoot = dirname(dirname(fileURLToPath(import.meta.url)));
   const serve = join(pkgRoot, 'stage', 'serve.mjs');
   const child = spawn(process.execPath, [serve, ...rest], { stdio: 'inherit' });

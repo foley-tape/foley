@@ -27,6 +27,10 @@ const rawPath = rawIdx >= 0 ? args[rawIdx + 1] : null;
 //    故拿不到令牌 → 写盘端点拒。与 ② 绑 127.0.0.1（断局域网面）、① 落盘名白名单三闸叠加。
 const DUB_TOKEN = randomBytes(18).toString('base64url');
 const ORIGIN_OK = new Set([`http://localhost:${port}`, `http://127.0.0.1:${port}`]);
+// ④ Host 白名单（M2.6 P1-④/乙-F5）：绑定 127.0.0.1 只断局域网，DNS-rebinding 恰好解析回 127.0.0.1——
+//    rebind 的**写**面由 Origin 白名单挡，**读**面（GET 全部端点）此前零校验。此闸一处兜全：
+//    Host 非 {localhost,127.0.0.1}:port 一律 403（缺省拒），读写皆过此门。
+const HOST_OK = new Set([`localhost:${port}`, `127.0.0.1:${port}`]);
 
 // 同源 + 令牌双闸（W-1＋§0.6.③，一律缺省拒）：Origin 若在场必须白名单内；令牌必须逐启动匹配。
 function writeAuthed(req) {
@@ -94,7 +98,11 @@ function startLive() {
 }
 
 createServer(async (req, res) => {
-  const url = new URL(req.url, 'http://localhost');
+  // Host 白名单闸（P1-④）：先于一切路由（含静态读面与 F1 崩点），非白即 403。
+  if (!HOST_OK.has(String(req.headers.host ?? ''))) { res.writeHead(403); res.end('forbidden host'); return; }
+  let url;
+  try { url = new URL(req.url, 'http://localhost'); }
+  catch { res.writeHead(400); res.end('bad url'); return; }
   // 今晨的纸：当前 live 产物流快照（curve 含追赶全史；页面铺纸后按 t 去重接 SSE）
   if (url.pathname === '/today/curve.csv' || url.pathname === '/today/moments.csv') {
     if (!liveOutDir) { res.writeHead(404); res.end(); return; }
@@ -237,7 +245,11 @@ createServer(async (req, res) => {
     req.on('close', () => clients.delete(res));
     return;
   }
-  let path = normalize(decodeURIComponent(url.pathname));
+  // P1-②/乙-F1：decodeURIComponent 遇畸形 %-序列（/%zz、裸 /%）同步抛 URIError——
+  // 曾在一切 try 之外，异步处理器内抛 = unhandled rejection = 进程终止（单请求 DoS）。包死返 400。
+  let path;
+  try { path = normalize(decodeURIComponent(url.pathname)); }
+  catch { res.writeHead(400); res.end('bad path'); return; }
   if (path === '/' || path === '\\') path = '/index.html';
   const file = join(root, path);
   if (!file.startsWith(root)) { res.writeHead(403); res.end(); return; }
@@ -252,10 +264,12 @@ createServer(async (req, res) => {
   } catch {
     res.writeHead(404); res.end('not found');
   }
-}).listen(port, '127.0.0.1', () => { // §0.6.② 只绑回环：断局域网/DNS-rebinding 直写面（两轨同刀，措辞取安全批原文）
+}).listen(port, '127.0.0.1', () => { // §0.6.② 三闸各司其职（乙-F5 订正措辞）：绑定断 LAN／Origin 断跨源写／Host 校验断 rebind 读
   console.log(`stage @ http://127.0.0.1:${port}/${replayOnly ? '?tape=storm（replay-only）' : '（live 默认；?tape=storm 走 replay）'}`);
 });
 
 if (!replayOnly) startLive();
+// P1-② 纵深兜底：任何漏网的未捕获 rejection 只记日志不崩进程（防 F1 同类"异步处理器内同步抛"再打断 live 广播/在制 dub）。
+process.on('unhandledRejection', (err) => { console.error('[serve] 未处理 rejection（兜底不崩）：', err); });
 process.on('SIGINT', () => { liveChild?.kill('SIGINT'); process.exit(0); });
 process.on('SIGTERM', () => { liveChild?.kill('SIGTERM'); process.exit(0); });

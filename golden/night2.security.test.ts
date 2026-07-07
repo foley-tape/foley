@@ -2,10 +2,14 @@
 // 来源：audit/night2 分支 repro/{xss_tape_param,normErr_probe}.mjs + malicious/hugeline + C3 写盘鉴权向量。
 // 覆盖：C1 DOM-XSS sink（X-1）、C2 巨型单行崩溃（长度守卫）、A1 邮箱/凭据 PII、C3 写盘鉴权（W-1＋令牌）、
 //       §0.6.①④ save-bin 参数白名单。与金测试同跑。
+// M2.6 增补（双盲终审 AUDIT_FINAL_BOARD）：F1 畸形 %-路径 DoS、F5 GET 面 Host 白名单——
+// 红队验收对应 repro：serve_dos_malformed_percent.sh／rebinding 读面探针（audit/final-乙）。
 import { test, describe, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { spawn, type ChildProcess } from 'node:child_process';
 import { readFileSync, rmSync, readdirSync } from 'node:fs';
+import { request as httpRequest } from 'node:http';
+import { connect } from 'node:net';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import { normErr, targetHashOf } from '../adapters/claude-jsonl/parse.ts';
@@ -156,5 +160,41 @@ describe('C3 · serve 写盘鉴权（W-1＋令牌＋§0.6.①④）', () => {
     const j = await r.json() as { saved: string };
     assert.ok(!j.saved.includes('..'), `tape 穿越序列应被折叠：${j.saved}`);
     assert.match(j.saved, /^runs\/dubs\/foley-dub-.*sectest_x-.*\.png$/, `应留在 runs/dubs：${j.saved}`);
+  });
+
+  // ── M2.6 P1-②/乙-F1：畸形 %-路径曾令 decodeURIComponent 在 try 外同步抛 → unhandled rejection → 进程终止。
+  //    修后：400 且进程存活（后续请求照常）。裸 /% 走原始 socket 保真（fetch 会拒不合法 URL）。──
+  test('F1 · /%zz 畸形 %-序列 → 400，进程存活', async () => {
+    const r = await fetch(base + '/%zz');
+    assert.equal(r.status, 400);
+    assert.equal((await fetch(base + '/')).status, 200, '单请求不得打崩 serve——后续请求应照常服务');
+  });
+
+  test('F1 · 裸 /% → 4xx，进程存活', async () => {
+    const status = await new Promise<number>((resolve, reject) => {
+      const s = connect(port, '127.0.0.1', () => s.write(`GET /% HTTP/1.1\r\nHost: 127.0.0.1:${port}\r\nConnection: close\r\n\r\n`));
+      let buf = '';
+      s.on('data', (d) => { buf += d; });
+      s.on('end', () => {
+        const m = buf.match(/^HTTP\/1\.[01] (\d{3})/);
+        if (m) resolve(Number(m[1])); else reject(new Error(`无状态行：${buf.slice(0, 80)}`));
+      });
+      s.on('error', reject);
+    });
+    assert.ok(status >= 400 && status < 500, `裸 /% 应 4xx，实得 ${status}`);
+    assert.equal((await fetch(base + '/')).status, 200);
+  });
+
+  // ── M2.6 P1-④/乙-F5：绑定 127.0.0.1 只断局域网；DNS-rebinding 恰解析回 127.0.0.1，读面须 Host 白名单。
+  //    fetch 禁改 Host，走 node:http 保真。──
+  test('F5 · Host 非白名单（rebind 读面）→ 403；白名单 Host → 200', async () => {
+    const hostStatus = (host: string): Promise<number> => new Promise((resolve, reject) => {
+      const rq = httpRequest({ host: '127.0.0.1', port, path: '/', headers: { host } }, (rs) => { rs.resume(); resolve(rs.statusCode ?? 0); });
+      rq.on('error', reject); rq.end();
+    });
+    assert.equal(await hostStatus(`evil.example:${port}`), 403, 'rebind 形态的 Host 应被拒');
+    assert.equal(await hostStatus('evil.example'), 403, '无端口形态同样拒');
+    assert.equal(await hostStatus(`127.0.0.1:${port}`), 200);
+    assert.equal(await hostStatus(`localhost:${port}`), 200);
   });
 });

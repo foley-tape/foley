@@ -92,8 +92,8 @@ export function loadDistilled(path: string): DistillResult {
   return parseDistilled(readFileSync(path, 'utf8'));
 }
 
-/** 蒸馏并写盘 .tape.jsonl。redact=true 产全脱敏分享带。 */
-export function writeDistilled(rawPath: string, outPath: string, params: Params, redact = false): DistillResult {
+/** 蒸馏并写盘 .tape.jsonl。默认全脱敏（M2.6 G7：默认形态即安全形态）；redact=false 产原始带（仅限本机调试）。 */
+export function writeDistilled(rawPath: string, outPath: string, params: Params, redact = true): DistillResult {
   const d0 = distillFile(rawPath, params);
   const d = redact ? redactResult(d0) : d0;
   writeFileSync(outPath, serializeTape(d), 'utf8');

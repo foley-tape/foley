@@ -23,7 +23,7 @@ const cmd = process.argv[2];
 function usage(): void {
   console.error('用法: foley            起播磁带机（尾随你最近的 Claude Code 会话，浏览器里现出唱机）');
   console.error('      foley <命令>     命令行工具：');
-  console.error('  distill 原始 JSONL → 蒸馏带 .tape.jsonl（§3，唯一读原始处）');
+  console.error('  distill 原始 JSONL → 蒸馏带 .tape.jsonl（§3，唯一读原始处；默认脱敏，--raw 原始带勿外传）');
   console.error('  scan    扫描 ~/.claude/projects，提名标准带候选（体检按 episode）');
   console.error('  replay  离线跑蒸馏带 → REPORT.md（判定表/占空比/拐点）[--hz 10|20]');
   console.error('  live    尾随生长中的原始 JSONL，20Hz 广播（M1.9 §1.1，bounded）');

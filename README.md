@@ -65,7 +65,9 @@ A few laws this machine lives by:
 
 ## Privacy
 
-Foley reads your local session logs and **distills** them into event skeletons — verbs, timings, sizes, hashed targets. Tool inputs and conversation text are never stored; a failed step keeps only a **redacted error class** — credentials, paths, tokens, and emails scrubbed to placeholders — for clustering. **Zero telemetry, and the machine never reaches the network on its own**: the single network call it can ever make is the optional, hash-verified download of the factory records — and only when you run `npx foley records` and confirm. A `--redact` mode produces a minimized shareable form (adversarially red-teamed, with a standing privacy gate in the test suite; still, don't share tapes you haven't reviewed).
+Foley reads your local session logs and **distills** them into event skeletons — verbs, timings, sizes, hashed targets. Tool inputs and conversation text are never stored; a failed step keeps only a **redacted error class** — credentials, paths, tokens, and emails scrubbed to placeholders — for clustering. **Zero telemetry, and the machine never reaches the network on its own**: the single network call it can ever make is the optional, hash-verified download of the factory records — and only when you run `npx foley records` and confirm.
+
+Distilled tapes are **redacted by default**: timestamps become relative offsets (no calendar or clock fingerprint), non-builtin tool names and error classes become salted hashes, and the source file is never fingerprinted (adversarially red-teamed, with a standing privacy gate in the test suite). Exported MP4s carry no wall-clock metadata either — container creation times are zeroed, and dub sidecars record no dates. A `--raw` switch keeps absolute times and plaintext tool names for local debugging; it warns loudly, and you shouldn't share what it produces.
 
 ## Why "Foley"
 
@@ -75,7 +77,7 @@ The whole build is on the record — every order, round archive, and audit, mapp
 
 ## Status
 
-- ✅ Engine sealed (`v<!--version-->0.1.0<!--/version-->`) — deterministic, calibrated on real session tapes, <!--test-count-->95<!--/test-count--> golden tests
+- ✅ Engine sealed (`v<!--version-->0.1.0<!--/version-->`) — deterministic, calibrated on real session tapes, <!--test-count-->103<!--/test-count--> golden tests
 - ✅ The deck — needle, recorder, lamps, reels, counter — live or replay
 - ✅ Sound — foreground cues + an aging lo-fi bed over human-made CC0 records
 - ✅ Trailer export — DUB a highlight strip to a local MP4 (WebCodecs, ~9× realtime)

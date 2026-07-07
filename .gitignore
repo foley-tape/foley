@@ -1,9 +1,18 @@
-# 隐私：标准带与汇报产物永不入库（含密钥风险）
-tapes/
+# 隐私（M2.6 G7/甲-2 修订）：原始蒸馏带与汇报产物永不入库（含密钥风险）。
+# 五卷标准带以**脱敏合成骨架**入库（G7 同一把尺：时间相对化＋非内建工具名加盐哈希＋
+# sourceHash=redacted）——clean clone npm test 必须全绿（甲-2）；原始真身在 tapes/raw/，永不入 git。
+# 注意规则次序：负号白名单必须排在 tapes/* 与 *.tape.jsonl 之后才生效。
+tapes/*
 runs/
 
-# 校准数据不入 git
+# 校准数据不入 git（仅下方五卷脱敏骨架＋README 白名单除外）
 *.tape.jsonl
+!tapes/README.md
+!tapes/storm.tape.jsonl
+!tapes/smooth.tape.jsonl
+!tapes/busy.tape.jsonl
+!tapes/jam.tape.jsonl
+!tapes/silence.tape.jsonl
 
 node_modules/
 *.log

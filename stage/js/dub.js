@@ -180,12 +180,13 @@ export class DubController {
       const audio = await this._fetchAudio(sched, { withRecord: true, recordIndex: spec.main.recordIndex ?? 0 });
       const res = await this.printer.print({ sched, srcTape: src.tape, presetName: '1080p30', audio });
       const files = { video: await up(res.blob, res.stats.container), poster: await up(res.posterBlob, 'poster.png') };
+      // G7 脱敏闸（M2.6 P1-①/乙-F3）：meta 不落墙钟——createdAt（出片时刻=工时指纹）抹除；
+      // 片内时间全为相对 ms（segments/film.stats 本就相对轴）。
       const meta = {
         kind: 'foley-hero/M2.5', tape: src.name, tapeHash,
         editorial: '工具箱 §6 beats：睡醒→风暴→跳针→DONE 滑停（非时序拼接如实声明）',
         record: spec.main.recordNote,
         segments: segs, film: { ...res.stats, files }, audio: res.stats.audio,
-        createdAt: new Date().toISOString(),
       };
       files.meta = await up(new Blob([JSON.stringify(meta, null, 2) + '\n']), 'meta.json');
       out = { kind, saved: files, stats: res.stats };
@@ -691,6 +692,9 @@ export class DubController {
         poster: await up(filmRes.posterBlob, 'poster.png'),
       };
     }
+    // G7 脱敏闸（M2.6 P1-①/乙-F3）：meta 不落墙钟——createdAt（出片时刻）与 liveEpoch（当日开工时刻）
+    // 皆为工时指纹，抹除。liveEpoch 的在场消费（直流轴段折回原始 t，见上 _print 路径）用的是内存里的
+    // this.doc.liveEpoch，不靠落盘 meta；落盘后段值已是带内相对 ms，无需锚回墙钟。
     const meta = {
       version: this.doc.version,
       kind: filmRes ? 'foley-dub/M-T2-film' : 'foley-dub/M-T1-paper',
@@ -699,12 +703,10 @@ export class DubController {
       paramsHash: this.doc.paramsHash,
       targetS: this.doc.targetS,
       axis: this.doc.axis ?? 'tape-stage', // 轴口径：tape-stage=折叠轴｜live-stage=直流轴（M2.3 §1.5）
-      ...(this.doc.liveEpoch != null ? { liveEpoch: this.doc.liveEpoch } : {}),
       segments: this.doc.segments,
       ...(filmRes ? { film: { ...filmRes.stats, files: filmFiles } } : {}),
       // audio: 段（M2.4 §C.1）：编码/来源；无声出片时如实记 none+缘由
       ...(filmRes ? { audio: filmRes.stats.audio } : {}),
-      createdAt: new Date().toISOString(),
     };
     const png = c.toDataURL('image/png').split(',')[1];
     const res = await fetch('/dub/save', {

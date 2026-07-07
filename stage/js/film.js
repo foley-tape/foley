@@ -19,6 +19,7 @@ import { ChartRecorder, PacketPair, Lamps } from './instruments.js';
 import { ReelDeck } from './deck.js';
 import { Muxer as Mp4Muxer, ArrayBufferTarget as Mp4Target } from '../vendor/mp4-muxer.mjs';
 import { Muxer as WebmMuxer, ArrayBufferTarget as WebmTarget } from '../vendor/webm-muxer.mjs';
+import { scrubMp4Dates } from './mp4scrub.js';
 
 const FPS = 30;
 const FRAME_MS = 1000 / FPS;
@@ -503,6 +504,9 @@ export class FilmPrinter {
       };
     }
     muxer.finalize();
+    // G7 脱敏闸（M2.6 P1-①/乙-F2）：vendored muxer 把出片墙钟写进 mvhd/tkhd/mdhd——
+    // finalize 后原位钉 0（对齐仓库 demo 已抹口径）。webm-muxer 不写墙钟（已核），无需处理。
+    if (isAvc) scrubMp4Dates(new Uint8Array(target.buffer));
     const wallMs = performance.now() - wall0;
     S.rig.rig.remove();
 

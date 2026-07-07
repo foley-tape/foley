@@ -1,4 +1,19 @@
-# FEEDBACK-SOUND —— 声音相台账（Track-SOUND：SOUND-R1 重启 → EAR-5~11 战役 → SOUND-R2 床的重做 → SOUND-R3 唱机改造 → SOUND-R4 平移与落仓 → M2.5 §C 发布终包）
+# FEEDBACK-SOUND —— 声音相台账（Track-SOUND：SOUND-R1 重启 → EAR-5~11 战役 → SOUND-R2 床的重做 → SOUND-R3 唱机改造 → SOUND-R4 平移与落仓 → M2.5 §C 发布终包 → 轨甲·主水管）
+
+## 轨甲交付（三轨并进·live 流式出声，2026-07-07，代码锚 e7e28d7，branch track/a-live 候审计庭签章合入）
+
+**结论一句话**：命门接通——**live 模式手势后 0.25s 出声**（RECON B3 时代=永死寂），"整带上桥"残骸拆除，声桥降为总线普通订阅者（push 进 instruments，与画面平级同吃一路 feedRaw）；回放=磁带喂同一根总线，渲染器对模式全盲；**graph/core 引擎与 serve 零改动**（好资产原封＋避让轨丙 B4 手术台）；金测试 **121/121**（116 在库全绿＋5 新 LIVE 门——命门 RMS 机器代理首次入回归门）；浏览器三形态实证（dev 0.25s／唱片热装真上桥 Still Life peak 0.142／npm 打包纯合成 0.25s）。全档证据＋复跑手册＝`audit/a-live/REPORT.md`。
+
+**要点**：
+- **新件**：`sound/livebridge.js` 流式大脑（纯逻辑、时钟可注入——金测试离线同真；行帐=音频钟轴、1s 前瞻窗、test-RUN 押后让位同刻 RESOLVE、DONE 滑停后非 DONE 相到达=唱片复活重落针）；`stage/js/soundbridge.js` 重铸为浏览器薄壳（手势开机/资产 3s 帽退合成/analyser 机器代理 `rms()`/唱片异步热装 ≤90s 免刷新）。
+- **耳膜修真**（offline.ts 一处）：再停不复活——已死源不因更晚 stop() 在"先排程后渲染"里复活出直流（recStopAll 对滑停残源补刀即此型，金 LIVE-3 执法）。浏览器语义对齐，在库 116 条零扰。
+- **兵器申报（候架构师复裁）**：Tone.js 未启用——增补二三条理由在库引擎原生具备（音频钟锚/内建量化/前瞻窗），引 Tone 必致双钟或浏览器侧废弃已定标乐器（与 003 令好资产保护清单物理冲突）；接线面已收窄至单一渲染器文件，若复裁必须 Tone 可换芯不动总线。详 REPORT §三。
+- **机器代理**：`sb.rms()` 内建（audit/a-live/repro/live-rms.mjs 浏览器级＋golden LIVE-1 离线级）——与审计庭戊-2 RMS 常设回归仪同口径；1× 长跑仪 long-run.mjs 实跑 **600s/300 采样 soundRatio=1.0（零死寂）、行帐 8162 有界、声画收包比 avRatio=0.9973（同源同钟两本账差 0.27%）、零页错**。
+- **已知限制五条**（回放暂停不停机/倍速下 STUCK 按墙钟 2.5s/live repoKey 恒定候美学轮/replay seed 改 mode 值/热装退场 ≤1s 过渡）——REPORT §四。
+
+**候**：①轨丙 B4 合入后 rebase，复跑姊妹条款双形态（`foley records` 下载后 deck 真放出厂唱片——record 路径与热装已先证于 vendored 位形态）；②审计庭本 worktree 真实验收＋真人录音（人耳终审）；③`.worktreeinclude`（增补一.3）全场未落地，报请架构师定归属。
+
+---
 
 ## M2.5 §C 交付（发布物料轮·SOUND 轻装，2026-07-06，d384870）
 

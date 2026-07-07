@@ -36,13 +36,21 @@ export class SoundBridge {
     const spRaw = await fetch('../sound-params.json').then(r => r.json());
     const sp = resolveSoundParams(spRaw);
 
-    // L1 织体资产（manifest 定标 → graph 数据驱动归一）
-    const manifest = await fetch('../sound/assets/manifest.json').then(r => r.json());
-    const assets = {};
-    for (const a of manifest.assets) {
-      const buf = await fetch(`../sound/assets/${a.file}`).then(r => r.arrayBuffer());
-      const ab = await ctx.decodeAudioData(buf);
-      assets[a.name] = { x: ab.getChannelData(0), sr: ab.sampleRate, rmsDb: a.rmsDb };
+    // L1 织体资产（manifest 定标 → graph 数据驱动归一）。
+    // G8 热修：npm 装包不含 wav（走 Releases）——资产缺席不许炸桥，落 graph 侧合成织体退路
+    // （M2.4 §C「结构不因资产缺席而变」；架构师已裁合成退路为开箱声）。
+    let assets = null;
+    try {
+      const manifest = await fetch('../sound/assets/manifest.json').then((r) => { if (!r.ok) throw new Error(String(r.status)); return r.json(); });
+      const got = {};
+      for (const a of manifest.assets) {
+        const buf = await fetch(`../sound/assets/${a.file}`).then((r) => { if (!r.ok) throw new Error(`${a.file} ${r.status}`); return r.arrayBuffer(); });
+        const ab = await ctx.decodeAudioData(buf);
+        got[a.name] = { x: ab.getChannelData(0), sr: ab.sampleRate, rmsDb: a.rmsDb };
+      }
+      assets = got;
+    } catch (err) {
+      console.warn('[sound] 织体资产缺席，落合成退路（不哑）：', err.message ?? err);
     }
 
     // 出厂唱片（随站一张；取不到→房间层，honest fallback）

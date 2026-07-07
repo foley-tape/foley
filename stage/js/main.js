@@ -5,6 +5,7 @@ import { VuMeter, ChartRecorder, Lamps } from './instruments.js';
 import { ReelDeck, Counter } from './deck.js';
 import { mountLens } from './lens.js';
 import { DubController } from './dub.js';
+import { SoundBridge } from './soundbridge.js';
 
 const params = new URLSearchParams(location.search);
 const mode = params.get('mode') || (params.get('tape') ? 'replay' : 'live');
@@ -112,6 +113,20 @@ async function boot() {
     if (speed > 0) replayer.speed = speed;
     if (params.get('paused') !== '1') replayer.play();
     else replayer.seek(replayer.stageT); // 停机取景也要先上一包
+
+    // G8 开箱有声（M2.6 热修·前置静音雷）：回放模式首次手势解锁声桥（浏览器手势律），
+    // 与视觉同起点（replayer.stageT）。此前正页从未接声——soundbridge 只在 demo 页服役，
+    // `npx foley` 点破天也无声。声桥自带诚实退路（唱片缺→房间层，织体缺→合成）。
+    // ?sound=0 关；live 流式声部件属 Track-SOUND 候界面（G8 范围=零配置开箱回放有声）。
+    if (params.get('sound') !== '0') {
+      let sb = null;
+      window.addEventListener('pointerdown', () => {
+        if (sb) return;
+        sb = new SoundBridge();
+        sb.start(tape, replayer.stageT).then(() => { if (window.__stage) window.__stage.sound = sb; })
+          .catch((err) => { sb = null; console.warn('[sound] 声桥未起（视觉照走，下次点击再试）：', err); });
+      });
+    }
   }
 
   // DUB 剪辑机构（M-T1）：预览与导出同吃 cuts 时刻表；机器提议，人来撕

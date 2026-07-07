@@ -77,7 +77,7 @@ The whole build is on the record — every order, round archive, and audit, mapp
 
 ## Status
 
-- ✅ Engine sealed (`v<!--version-->0.1.0<!--/version-->`) — deterministic, calibrated on real session tapes, <!--test-count-->103<!--/test-count--> golden tests
+- ✅ Engine sealed (`v<!--version-->0.1.0<!--/version-->`) — deterministic, calibrated on real session tapes, <!--test-count-->106<!--/test-count--> golden tests
 - ✅ The deck — needle, recorder, lamps, reels, counter — live or replay
 - ✅ Sound — foreground cues + an aging lo-fi bed over human-made CC0 records
 - ✅ Trailer export — DUB a highlight strip to a local MP4 (WebCodecs, ~9× realtime)

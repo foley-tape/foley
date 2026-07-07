@@ -7,7 +7,8 @@
 // 中继与钟都不依赖标签页可见性——藏页照走（M2.0 §2 验证件二）。
 import { createServer } from 'node:http';
 import { readFile, writeFile, mkdir, mkdtemp, rm } from 'node:fs/promises';
-import { existsSync } from 'node:fs';
+import { existsSync, readdirSync, statSync } from 'node:fs';
+import { homedir } from 'node:os';
 import { join, extname, normalize, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { spawn } from 'node:child_process';
@@ -54,7 +55,31 @@ const MIME = {
   '.csv': 'text/csv; charset=utf-8',
   '.svg': 'image/svg+xml',
   '.json': 'application/json',
+  '.mp3': 'audio/mpeg',
+  '.wav': 'audio/wav',
 };
+
+// ── G8 空盘自举（M2.6 热修·前置静音雷）──
+// bare 起播（live 默认）时若最近会话**缺席或已歇场**，机器只能诚实地播「沉睡」：针零、纸平、无声——
+// 开箱第一分钟成死机观感。裁：正门（裸 `/`，无 query）302 落厂演示卷 `?tape=storm&speed=8`
+// （URL 明示演示带＋倍速，素材诚实；live 视图 `/?mode=live` 照旧可达）。带任何 query 尊重来意。
+// FOLEY_PROJECTS 供测试/CI 指别处会话根。
+const FRESH_MS = 15 * 60 * 1000;
+function newestJsonlMtime(dir) {
+  let best = -1, entries;
+  try { entries = readdirSync(dir, { recursive: true }); } catch { return -1; }
+  for (const e of entries) {
+    if (typeof e !== 'string' || !e.endsWith('.jsonl')) continue;
+    try { const m = statSync(join(dir, e)).mtimeMs; if (m > best) best = m; } catch { /* 消失即略 */ }
+  }
+  return best;
+}
+let demoBoot = false;
+if (!replayOnly && !rawPath) {
+  const newest = newestJsonlMtime(process.env.FOLEY_PROJECTS ?? join(homedir(), '.claude', 'projects'));
+  demoBoot = newest < 0 || Date.now() - newest > FRESH_MS;
+  if (demoBoot) console.log(`[boot] 最近会话${newest < 0 ? '缺席' : '已歇场(>15min)'} → 正门上厂演示卷 storm@8×（live 视图 /?mode=live 照旧）`);
+}
 
 // ---- live 中继：child stdout NDJSON → SSE 扇出（写出即丢，bounded 纪律同源）----
 const clients = new Set();
@@ -76,7 +101,9 @@ function startLive() {
   liveOutDir = join(repoRoot, 'runs', `live-${localDate()}`);
   // 注：cli live --out 为截断写（'w'）——同日重启 serve 时靠追赶全史重建当日卷；
   // 多会话拼一日的追加/混流语义归 Track-FIX，已在 FEEDBACK 记案候预告片轮。
-  const liveArgs = ['cli/index.ts', 'live', ...(rawPath ? [rawPath] : ['--latest']), '--out', liveOutDir];
+  const liveArgs = ['cli/index.ts', 'live',
+    ...(rawPath ? [rawPath] : ['--latest', ...(process.env.FOLEY_PROJECTS ? [process.env.FOLEY_PROJECTS] : [])]),
+    '--out', liveOutDir];
   liveChild = spawn('node', liveArgs, { cwd: repoRoot, stdio: ['ignore', 'pipe', 'pipe'] });
   liveChild.stderr.on('data', d => process.stderr.write(`[live] ${d}`));
   let buf = '';
@@ -103,6 +130,10 @@ createServer(async (req, res) => {
   let url;
   try { url = new URL(req.url, 'http://localhost'); }
   catch { res.writeHead(400); res.end('bad url'); return; }
+  // G8 空盘自举：只拦「裸正门」（无 query）；?tape/?mode=live 等来意一律尊重
+  if (demoBoot && url.pathname === '/' && !url.search) {
+    res.writeHead(302, { location: '/?tape=storm&speed=8' }); res.end(); return;
+  }
   // 今晨的纸：当前 live 产物流快照（curve 含追赶全史；页面铺纸后按 t 去重接 SSE）
   if (url.pathname === '/today/curve.csv' || url.pathname === '/today/moments.csv') {
     if (!liveOutDir) { res.writeHead(404); res.end(); return; }
@@ -251,8 +282,16 @@ createServer(async (req, res) => {
   try { path = normalize(decodeURIComponent(url.pathname)); }
   catch { res.writeHead(400); res.end('bad path'); return; }
   if (path === '/' || path === '\\') path = '/index.html';
-  const file = join(root, path);
-  if (!file.startsWith(root)) { res.writeHead(403); res.end(); return; }
+  // G8 声资产挂载（M2.6 热修）：页面以「../sound/**、../records/**、../sound-params.json」相对路径讨声
+  // （与 Pages/demo 站同一路径形状），serve 静态根却在 stage/——此前一律 404，正页声桥被物理断粮。
+  // 这里把三条路映到仓库真身：只读、扩展名走 MIME 表、normalize 后仍以 startsWith 闸防穿越。
+  let file, fenceRoot;
+  if (path === '/sound-params.json') { file = join(repoRoot, 'sound-params.json'); fenceRoot = repoRoot; }
+  else if (path.startsWith('/sound/')) { file = join(repoRoot, path); fenceRoot = join(repoRoot, 'sound'); }
+  else if (path.startsWith('/records/')) { file = join(repoRoot, 'sound', path); fenceRoot = join(repoRoot, 'sound', 'records'); }
+  else { file = join(root, path); fenceRoot = root; }
+  const fence = fenceRoot.endsWith('/') ? fenceRoot : fenceRoot + '/';
+  if (!file.startsWith(fence)) { res.writeHead(403); res.end(); return; }
   try {
     let body = await readFile(file);
     if (extname(file) === '.html') {

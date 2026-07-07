@@ -12,6 +12,7 @@ import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import { distillFile, redactResult, serializeTape, parseDistilled } from '../adapters/claude-jsonl/distill.ts';
+import type { DistillResult } from '../adapters/claude-jsonl/parse.ts';
 import { resolveParams } from '../engine/params.ts';
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -39,9 +40,9 @@ describe('脱敏契约 v1 · 金夹具冻结', () => {
     const a = parseDistilled(serializeTape(redactResult(distillFile(rawFixture, params), 'SALT-A')));
     const b = parseDistilled(serializeTape(redactResult(distillFile(rawFixture, params), 'SALT-B')));
     // 自定义工具哈希、sig、targetHash、errClass 均须随盐变（字典反演的堵点）
-    const custom = (d) => d.records.find((r) => r.tool && /^t[0-9a-f]+$/.test(r.tool))?.tool;
+    const custom = (d: DistillResult) => d.records.find((r) => r.tool && /^t[0-9a-f]+$/.test(r.tool))?.tool;
     assert.notEqual(custom(a), custom(b), '自定义工具名哈希须随盐变');
-    const fail = (d) => d.records.find((r) => r.errClass)?.errClass;
+    const fail = (d: DistillResult) => d.records.find((r) => r.errClass)?.errClass;
     assert.notEqual(fail(a), fail(b), 'errClass 聚类哈希须随盐变');
   });
 

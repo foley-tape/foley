@@ -53,8 +53,10 @@ async function boot() {
   // 回放倍速下机器不陪着快进打盹。
   const room = document.getElementById('room');
   let idleSince = null;
+  let lastPktSeen = null; // 声桥手势晚到时的起点状态（开机即从真态起，不等下一包）
   // 喂包本体：dub 演出直调它（预告片的房间戏剧照走）；常规喂包经闸门（下）
   const feedRaw = (pkt, isFirst) => {
+    lastPktSeen = pkt;
     room.dataset.phase = pkt.phase;
     room.dataset.weather = pkt.weather;
     if (pkt.phase === 'IDLE') {
@@ -113,20 +115,26 @@ async function boot() {
     if (speed > 0) replayer.speed = speed;
     if (params.get('paused') !== '1') replayer.play();
     else replayer.seek(replayer.stageT); // 停机取景也要先上一包
+  }
 
-    // G8 开箱有声（M2.6 热修·前置静音雷）：回放模式首次手势解锁声桥（浏览器手势律），
-    // 与视觉同起点（replayer.stageT）。此前正页从未接声——soundbridge 只在 demo 页服役，
-    // `npx foley` 点破天也无声。声桥自带诚实退路（唱片缺→房间层，织体缺→合成）。
-    // ?sound=0 关；live 流式声部件属 Track-SOUND 候界面（G8 范围=零配置开箱回放有声）。
-    if (params.get('sound') !== '0') {
-      let sb = null;
-      window.addEventListener('pointerdown', () => {
-        if (sb) return;
-        sb = new SoundBridge();
-        sb.start(tape, replayer.stageT).then(() => { if (window.__stage) window.__stage.sound = sb; })
-          .catch((err) => { sb = null; console.warn('[sound] 声桥未起（视觉照走，下次点击再试）：', err); });
-      });
-    }
+  // 声桥（轨甲·总线一元论，G8 开箱有声沿革升级）：live 与回放共用同一次 pointerdown 开机仪式
+  // （浏览器手势律），桥作为总线普通订阅者 push 进 instruments——与画面平级吃同一路 feedRaw，
+  // 对模式全盲；回放=磁带喂同一根总线，live=实流喂同一根总线（静音病结构性根除，RECON B3 销案）。
+  // 自带诚实退路（唱片缺→房间层，织体缺→合成）；?sound=0 关。
+  if (params.get('sound') !== '0') {
+    let sb = null;
+    window.addEventListener('pointerdown', () => {
+      if (sb) return;
+      sb = new SoundBridge({ repoKey: mode === 'live' ? 'live:default' : `demo:${tapeName}`, seed: mode });
+      const born = sb;
+      instruments.push(sb);
+      sb.start(lastPktSeen).then(() => { if (window.__stage) window.__stage.sound = born; })
+        .catch((err) => {
+          instruments.splice(instruments.indexOf(born), 1);
+          sb = null;
+          console.warn('[sound] 声桥未起（视觉照走，下次点击再试）：', err);
+        });
+    });
   }
 
   // DUB 剪辑机构（M-T1）：预览与导出同吃 cuts 时刻表；机器提议，人来撕

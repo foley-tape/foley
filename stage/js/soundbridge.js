@@ -1,137 +1,129 @@
-// demo 声桥（M2.5 §B.1）：sound/core.js＋graph.js 纯 ESM 直吃——引擎与映射律的单一事实源，
-// 舞台侧零合成、零参数私造（只读消费，写权在 Track-SOUND）。
+// 声桥（轨甲重铸·总线一元论）：浏览器薄壳——手势开机、取资产、建引擎、挂机器代理（analyser）。
+// 流式大脑在 sound/livebridge.js（纯逻辑、时钟可注入，金测试离线同真）；本壳只做浏览器专属事：
+// AudioContext、fetch、定时泵、唱片异步热装。
 //
-// 唱片随站：出厂 CC0 一张（Still Life · HoliznaCC0，血统条款署名于页脚与本注）；
-// 取不到唱片时按产品语义落房间层（L1 织体照常，音乐缺席，机器不撒谎）。
+// 一元论形制：本桥是总线的**普通订阅者**（onPacket/onMoment/render 与器件同鸭型，main.js 把它
+// push 进 instruments）——live 实流与磁带回放喂的是同一根总线，桥对模式全盲。
+// "整带上桥"（旧 start(tape) 吃完整 curve 一次性 buildTrack）已拆除：live 无完整带可给，
+// 那个形状正是静音病的病灶（RECON B3 双证）。
 //
-// 前景分类映射（soundClassOf）镜像自 cli/rendercuts.ts（其自 cli/probe.ts——probe 侧仍是正典）。
-// 已提请 Track-SOUND：把分类器提为 sound/ 浏览器可用出口，三处镜像归一（FEEDBACK 记案）。
-import { resolveSoundParams, buildTrack, degreeOf } from '../../sound/core.js';
+// 第一分钟出声（零外网依赖）：引擎起播即有房间层（资产缺席→graph 合成织体退路，结构不变）；
+// 唱片是**增强**不是前提——异步取、到即热装（`foley records` 下载完成后 90s 内自动上桥，
+// 免刷新页）。一切 fetch 都对着 localhost serve；零静默外网红线照守（白皮书 §2.0）。
+//
+// 唱片随站血统：出厂 CC0（catalog.json 机读清单＋LICENSES.md 逐条溯源）；取不到→房间层，
+// 机器不撒谎（honest fallback）。
+import { resolveSoundParams } from '../../sound/core.js';
 import { buildEngine } from '../../sound/graph.js';
-import { PHASES, WEATHERS, unfoldStageT } from './replay.js';
+import { createLiveBridge } from '../../sound/livebridge.js';
 
-function soundClassOf(m, resolveTimes) {
-  if (m.special === 'STUCK_LOOP') return 7;
-  if (m.special === 'RESOLVE') return 6;
-  if (m.special === 'DONE') return 9;
-  if (m.special) return null;
-  if (m.verb === 'ASK') return 8;
-  if (m.outcome === 'FAIL') return 1;
-  if (m.outcome !== 'OK') return null;
-  switch (m.verb) {
-    case 'WRITE': return 0;
-    case 'READ': return 2;
-    case 'RUN': return (m.tags || '').includes('test') && resolveTimes.has(m.t) ? null : 3;
-    case 'SAVE': return 4;
-    case 'SPAWN': return 5;
-    default: return null;
-  }
+const ASSET_FETCH_CAP_MS = 3000;   // 织体资产取件帽：超时按缺席走合成退路（起声不许被粮道拖死）
+const RECORD_RETRY_MS = 90000;     // 唱片缺席重试节拍（等 `foley records` 落盘；localhost 轻拍）
+const RECORD_RETRY_MAX = 10;
+const PUMP_MS = 250;               // 大脑泵：押后窗放行＋前瞻窗兜底（藏页节流下包流仍是主武装）
+
+function withTimeout(p, ms) {
+  return Promise.race([p, new Promise((_, rej) => setTimeout(() => rej(new Error(`超时 ${ms}ms`)), ms))]);
 }
 
 export class SoundBridge {
-  async start(tape, atStageMs) {
+  constructor(opts = {}) {
+    this.repoKey = opts.repoKey || 'live:default';
+    this.seed = opts.seed || 'live';
+    this._records = [];   // 引擎闭包共享此引用：热装=push 后 setRecord（graph 装盘律原样）
+    this._bridge = null;
+  }
+
+  /** 开机仪式（用户手势内调用）：起引擎、上钟、开泵。resolve 即有声（房间层）；唱片后到后加入。 */
+  async start(firstPkt) {
     const ctx = new (window.AudioContext || window.webkitAudioContext)();
     if (ctx.state === 'suspended') await ctx.resume();
+    this.ctx = ctx;
 
     const spRaw = await fetch('../sound-params.json').then(r => r.json());
     const sp = resolveSoundParams(spRaw);
+    this.sp = sp;
 
-    // L1 织体资产（manifest 定标 → graph 数据驱动归一）。
-    // G8 热修：npm 装包不含 wav（走 Releases）——资产缺席不许炸桥，落 graph 侧合成织体退路
-    // （M2.4 §C「结构不因资产缺席而变」；架构师已裁合成退路为开箱声）。
+    // L1 织体资产（manifest 定标 → graph 数据驱动归一）；缺席/超时不炸桥——合成织体同构顶上
     let assets = null;
     try {
-      const manifest = await fetch('../sound/assets/manifest.json').then((r) => { if (!r.ok) throw new Error(String(r.status)); return r.json(); });
-      const got = {};
-      for (const a of manifest.assets) {
-        const buf = await fetch(`../sound/assets/${a.file}`).then((r) => { if (!r.ok) throw new Error(`${a.file} ${r.status}`); return r.arrayBuffer(); });
-        const ab = await ctx.decodeAudioData(buf);
-        got[a.name] = { x: ab.getChannelData(0), sr: ab.sampleRate, rmsDb: a.rmsDb };
-      }
-      assets = got;
+      assets = await withTimeout((async () => {
+        const manifest = await fetch('../sound/assets/manifest.json').then((r) => { if (!r.ok) throw new Error(String(r.status)); return r.json(); });
+        const got = {};
+        for (const a of manifest.assets) {
+          const buf = await fetch(`../sound/assets/${a.file}`).then((r) => { if (!r.ok) throw new Error(`${a.file} ${r.status}`); return r.arrayBuffer(); });
+          const ab = await ctx.decodeAudioData(buf);
+          got[a.name] = { x: ab.getChannelData(0), sr: ab.sampleRate, rmsDb: a.rmsDb };
+        }
+        return got;
+      })(), ASSET_FETCH_CAP_MS);
     } catch (err) {
       console.warn('[sound] 织体资产缺席，落合成退路（不哑）：', err.message ?? err);
     }
 
-    // 出厂唱片（随站一张；取不到→房间层，honest fallback）
-    let records = null, recordIndex = 0;
+    const eng = buildEngine(ctx, sp, { repoKey: this.repoKey, seed: this.seed, assets, records: this._records, recordIndex: 0 });
+    this.engine = eng;
+
+    // 机器代理（DECREE-003 丁-轨甲验收增补）：master 旁挂 AnalyserNode——回归仪测实际渲染波形，
+    // 不是账本（门规：账本永不作发声证明）。人耳终审权不因此让渡。
+    this.analyser = ctx.createAnalyser();
+    this.analyser.fftSize = 2048;
+    eng.nodes.master.connect(this.analyser);
+
+    this._bridge = createLiveBridge(eng, sp);
+    if (firstPkt) this._bridge.onPacket(firstPkt);
+    this._timer = setInterval(() => this._bridge.pump(), PUMP_MS);
+
+    this._mountRecord(0); // 异步热装，不 await：起声在前，唱片在后（架构方针原文）
+    return this;
+  }
+
+  /** 唱片装载（异步；缺席按节拍重试——等 `foley records`/B4 粮道通了自动上桥）。 */
+  async _mountRecord(attempt) {
     try {
-      const catalog = await fetch('../sound/records/catalog.json').then(r => r.json());
+      const catalog = await fetch('../sound/records/catalog.json').then(r => { if (!r.ok) throw new Error(String(r.status)); return r.json(); });
       const rec = catalog.records.find(r => r.name === 'still-life') ?? catalog.records[0];
-      const buf = await fetch(`../records/${rec.file}`).then(r => { if (!r.ok) throw new Error(String(r.status)); return r.arrayBuffer(); });
-      const ab = await ctx.decodeAudioData(buf);
-      // 单声道混合（probe 同法）
+      const buf = await fetch(`../records/${rec.file}`).then(r => { if (!r.ok) throw new Error(`${rec.file} ${r.status}`); return r.arrayBuffer(); });
+      const ab = await this.ctx.decodeAudioData(buf);
       const n = ab.length, x = new Float32Array(n);
       for (let c = 0; c < ab.numberOfChannels; c++) {
         const d = ab.getChannelData(c);
         for (let i = 0; i < n; i++) x[i] += d[i] / ab.numberOfChannels;
       }
-      records = [{ name: rec.name, title: rec.title, x, sr: ab.sampleRate, seconds: ab.duration, lufs: rec.lufs, bpmMeasured: rec.bpmMeasured }];
+      this._records.push({ name: rec.name, title: rec.title, x, sr: ab.sampleRate, seconds: ab.duration, lufs: rec.lufs, bpmMeasured: rec.bpmMeasured });
+      this.engine.setRecord(0);
       this.record = rec;
+      console.log(`[sound] 唱片上桥：${rec.title}（${rec.name}）`);
     } catch (err) {
-      console.warn('[demo] 唱片缺席，落房间层：', err.message ?? err);
-    }
-
-    // snaps（曲线数组 → 声侧包形）→ 压缩轴 track（声侧折叠律 cap=1500，known-limit：
-    // 与舞台折叠帽 400 不齐，跨大接带处画声漂移 ~1.1s/道——轴主归一记案在册）
-    const c = tape.curve;
-    const snaps = new Array(c.n);
-    for (let i = 0; i < c.n; i++) {
-      snaps[i] = {
-        t: c.t[i], needle: c.needle[i], T: c.T[i], A: c.A[i],
-        weather: WEATHERS[c.weather[i]], phase: PHASES[c.phase[i]],
-        wow: c.wow[i], pendingAsk: c.pendingAsk[i] === 1,
-      };
-    }
-    const { track, comp, t0 } = buildTrack(snaps);
-    const durMs = track.length ? track[track.length - 1][0] : 0;
-    const pmOf = (rawT) => { // 原始 t → 压缩轴（二分 + 步内线性）
-      let lo = 0, hi = c.n - 1;
-      if (rawT <= c.t[0]) return 0;
-      if (rawT >= c.t[hi]) return comp[hi];
-      while (hi - lo > 1) { const mid = (lo + hi) >> 1; if (c.t[mid] <= rawT) lo = mid; else hi = mid; }
-      const span = c.t[lo + 1] - c.t[lo];
-      const f = span > 0 ? (rawT - c.t[lo]) / span : 0;
-      return comp[lo] + f * (comp[lo + 1] - comp[lo]);
-    };
-
-    // 前景事件 → 压缩轴（RESOLVE 双发语义：ok 型脱卡有和弦，expiry 无声）
-    const resolveTimes = new Set(tape.moments.filter(m => m.special === 'RESOLVE').map(m => m.t));
-    const events = [];
-    for (const m of tape.moments) {
-      const cls = soundClassOf(m, resolveTimes);
-      if (cls === null) continue;
-      events.push({ pm: pmOf(m.t), cls, deg: degreeOf(m.slot, sp), vel: cls === 7 ? 2.5 : 0.5 });
-    }
-    events.sort((a, b) => a.pm - b.pm);
-
-    // 起播：与视觉同起点（舞台 ms → 原始 t → 压缩轴；反折叠走 replay.js 同源出口）
-    const startRaw = unfoldStageT(tape, atStageMs);
-    const startPm = pmOf(startRaw);
-    const eng = buildEngine(ctx, sp, { repoKey: 'demo:storm', seed: 'demo', assets, records, recordIndex });
-    const audio0 = ctx.currentTime + 0.12;
-    eng.startTransport(audio0, 1, track, durMs, startPm);
-
-    // 排程窗：床网格与前景事件都排到"当下+30s"，10s 一续（probe 同律）
-    let ei = 0;
-    while (ei < events.length && events[ei].pm < startPm) ei++;
-    const horizon = () => {
-      const elapsed = ctx.currentTime - audio0;
-      eng.scheduleGridUntil(elapsed + 30);
-      const pmMax = startPm + (elapsed + 30) * 1000;
-      while (ei < events.length && events[ei].pm <= pmMax) {
-        const e = events[ei++];
-        eng.trigger(e.cls, audio0 + (e.pm - startPm) / 1000, e.deg, e.vel);
+      if (attempt + 1 < RECORD_RETRY_MAX) {
+        this._recordRetry = setTimeout(() => this._mountRecord(attempt + 1), RECORD_RETRY_MS);
+      } else {
+        console.warn('[sound] 唱片缺席，落房间层（honest fallback）：', err.message ?? err);
       }
-    };
-    horizon();
-    this._timer = setInterval(horizon, 10000);
-    this.engine = eng; this.ctx = ctx;
-    return this;
+    }
   }
+
+  // ---- 总线订阅面（与器件同鸭型；start 未毕时到的包如实丢弃——下一包 50ms 后就来） ----
+  onPacket(pkt) { this._bridge && this._bridge.onPacket(pkt); }
+  onMoment(m) { this._bridge && this._bridge.onMoment(m); }
+  render() { /* 声不走 rAF：调度在音频钟上（体温法：渲染环是画的事） */ }
+
+  /** 机器代理读数：master 总线当下 RMS（回归仪/repro 脚本消费）。 */
+  rms() {
+    if (!this.analyser) return 0;
+    const buf = new Float32Array(this.analyser.fftSize);
+    this.analyser.getFloatTimeDomainData(buf);
+    let e = 0;
+    for (let i = 0; i < buf.length; i++) e += buf[i] * buf[i];
+    return Math.sqrt(e / buf.length);
+  }
+
+  get recordInfo() { return this.engine ? this.engine.recordInfo : null; }
+  stats() { return this._bridge ? this._bridge.stats() : null; }
 
   stop() {
     if (this._timer) clearInterval(this._timer);
+    if (this._recordRetry) clearTimeout(this._recordRetry);
     this.engine?.stop(this.ctx.currentTime + 0.1);
   }
 }

@@ -1,7 +1,7 @@
 // demo 点火（M2.5 §B.1）：只读舞台＋内置示范带（真实 storm 蒸馏带，审计过审入页）。
 // 橱窗不是车间：无 live、无 DUB、无写盘、无 HUD；唯一交互=POWER（声音的既有仪式：
 // 浏览器音频本就要一次人手，开机键正是那次人手该落的地方）。
-import { loadTape, Replayer } from './replay.js';
+import { loadTape, Replayer, sampleAt } from './replay.js';
 import { VuMeter, ChartRecorder, Lamps } from './instruments.js';
 import { ReelDeck, Counter } from './deck.js';
 import { mountLens } from './lens.js';
@@ -62,8 +62,11 @@ async function boot() {
 
   replayer.seek(SEEK_S * 1000); // 停机取景：先上一包，机器带妆待命
 
-  // POWER：一次人手，声画同启（素材诚实：画与声吃同一卷带）
-  const bridge = new SoundBridge();
+  // POWER：一次人手，声画同启（总线一元论：声桥是回放总线的普通订阅者——画与声吃
+  // 同一路包流，橱窗与正页同一条代码路径；唱片异步上桥，先房间层后音乐）
+  const bridge = new SoundBridge({ repoKey: 'demo:storm', seed: 'demo' });
+  replayer.onPacket.push(pkt => bridge.onPacket(pkt));
+  replayer.onMoment.push(m => bridge.onMoment(m));
   const powerBtn = document.getElementById('power');
   let on = false;
   powerBtn.addEventListener('click', async () => {
@@ -72,7 +75,7 @@ async function boot() {
     powerBtn.setAttribute('data-on', '');
     powerBtn.textContent = 'PLAYING';
     try {
-      await bridge.start(tape, SEEK_S * 1000);
+      await bridge.start(sampleAt(tape, SEEK_S * 1000));
     } catch (err) {
       console.warn('[demo] 声桥未起（画照走）：', err.message ?? err);
       powerBtn.textContent = 'SILENT';

@@ -177,7 +177,8 @@ class OscillatorNode extends OfflineNode {
   private stopAt = Infinity;
   constructor(ctx: OfflineCtx) { super(ctx); this.frequency = new OfflineParam(ctx, 440, -ctx.sampleRate / 2, ctx.sampleRate / 2); }
   start(t?: number): void { this.startAt = t ?? this.ctx.currentTime; }
-  stop(t?: number): void { this.stopAt = t ?? this.ctx.currentTime; }
+  // 再停不复活（轨甲 LIVE-3 案，BufferSource 同款）：见 BufferSourceNode.stop 注。
+  stop(t?: number): void { this.stopAt = Math.min(this.stopAt, t ?? this.ctx.currentTime); }
   protected render(bi: number, sf: number, n: number): void {
     const sr = this.ctx.sampleRate;
     const f = this.frequency.computeBlock(bi, sf, n);
@@ -298,7 +299,10 @@ class BufferSourceNode extends OfflineNode {
     this.offsetSec = offsetSec ?? 0;
     if (this.buffer && this.offsetSec > 0) this.pos = this.offsetSec * this.buffer.sampleRate;
   }
-  stop(t?: number): void { this.stopAt = t ?? this.ctx.currentTime; }
+  // 再停不复活（轨甲 LIVE-3 案）：浏览器里到点即死的源不因更晚的 stop() 重新开口；
+  // 离线"先排程后渲染"若按"替换停时"实现，已死源会在 [旧停点,新停点] 间复活出直流——
+  // recStopAll 对滑停残源的补刀 stop 即此型（13.72s 停死的唱片源被 18s 的复活清场重新掀盖）。
+  stop(t?: number): void { this.stopAt = Math.min(this.stopAt, t ?? this.ctx.currentTime); }
   protected render(bi: number, sf: number, n: number): void {
     const sr = this.ctx.sampleRate;
     const d = this.buffer ? this.buffer.data : null;

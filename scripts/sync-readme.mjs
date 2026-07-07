@@ -6,24 +6,33 @@
 //
 //   node scripts/sync-readme.mjs          # 就地更新 README.md / README.zh.md
 //   node scripts/sync-readme.mjs --check   # 只校验：过期则打印差额并 exit 1（发布闸/CI 用）
-import { readFileSync, writeFileSync, readdirSync } from 'node:fs';
+import { readFileSync, writeFileSync } from 'node:fs';
+import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const repoRoot = join(here, '..');
 
-/** 数 golden/*.test.ts 里的 test()/it() 定义（method 调用 .test( 与 submit/edit 等词不计）。 */
+/** 权威测试数＝实跑数（轨乙尾单，三号手令·丙裁定：说谎的自检闸必须修）。
+ *  旧「定义数」口径（grep test()/it()）被 RECON 实证说谎：t.test() 子测试与循环生成的用例
+ *  不进正则，注入 106 而实跑 116，--check 却报「一致」。改为跑与 npm test 同一条命令、
+ *  取 TAP 总结数——慢（~20s）但闸门只认真话；套件红着拒绝取数（红的数不进 README）。 */
 function countGoldenTests() {
-  const dir = join(repoRoot, 'golden');
-  let n = 0;
-  for (const ent of readdirSync(dir, { withFileTypes: true })) {
-    if (!ent.isFile() || !ent.name.endsWith('.test.ts')) continue;
-    const src = readFileSync(join(dir, ent.name), 'utf8');
-    const m = src.match(/(?<![.\w])(?:test|it)\s*\(/g);
-    n += m ? m.length : 0;
+  const r = spawnSync('node', ['--test', 'golden/**/*.test.ts'],
+    { cwd: repoRoot, encoding: 'utf8', maxBuffer: 64e6 });
+  const out = (r.stdout ?? '') + (r.stderr ?? '');
+  const tests = Number(out.match(/\btests (\d+)/)?.[1]);
+  const fail = Number(out.match(/\bfail (\d+)/)?.[1]);
+  if (!Number.isFinite(tests) || !Number.isFinite(fail)) {
+    console.error('实跑取数失败：TAP 总结里解析不到 tests/fail——先修套件再谈注入');
+    process.exit(1);
   }
-  return n;
+  if (fail > 0 || r.status !== 0) {
+    console.error(`套件红着（fail ${fail}，退码 ${r.status}）——红的数不进 README`);
+    process.exit(1);
+  }
+  return tests;
 }
 
 const version = JSON.parse(readFileSync(join(repoRoot, 'package.json'), 'utf8')).version;

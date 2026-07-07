@@ -13,6 +13,21 @@
 
 **候**：①轨丙 B4 合入后 rebase，复跑姊妹条款双形态（`foley records` 下载后 deck 真放出厂唱片——record 路径与热装已先证于 vendored 位形态）；②审计庭本 worktree 真实验收＋真人录音（人耳终审）；③`.worktreeinclude`（增补一.3）全场未落地，报请架构师定归属。
 
+### 己-2 补记（合龙令 004，rebase 新 main＋姊妹条款归档，2026-07-07，锚 d5340a9+87f2928）
+
+**结论**：己-2 执行完毕。`git rebase main`（79137a3，已吸收轨丙 B4 factory 回退＋脱敏契约 v1＋audit/repro）**零冲突**（轨甲/轨丙围栏零文件重叠：sound/stage.js/golden.live-sound/audit.a-live vs serve.mjs/golden.b4+contract/docs.canon/audit.repro）；rebase 后我方代码字节与原提交一致。金测试 **133/133**（128 轨丙后 + 5 LIVE，零回潮）。
+
+**姊妹条款双形态归档补签**（DECREE-003 丁-②"deck 必须真放出厂唱片，干净 worktree 与打包形态双验"）：B4 合入 serve.mjs 后，**两形态皆经 `~/.foley/records/factory/` 回退自动放唱片，无需再手拷 mp3**——
+- 干净 worktree：live/replay 双路 Still Life 真上桥（peak 0.154/0.146，「唱片上桥」×2，首声 0.25s，零页错）→ `audit/a-live/shots-clean/`
+- npm pack（包内 wav/mp3 全缺席）：双路 Still Life 真上桥（peak 0.143/0.157，「唱片上桥」×2）→ `audit/a-live/shots-pack/`
+- 对比 B4 前：打包态曾 `recordInfo=None`（纯合成房间层）；B4×热装合力此为兑现。旧 `shots/`（B4 前 dev 无唱片）、`shots-record/`（手拷 mp3）已删除取代。
+
+**兵器申报改判入册（004 令乙）**：Tone.js 偏离照准立案——目的入宪·手段解绑，保护条优先，Tone 移冰箱备芯，换芯点 `sound/livebridge.js` 记档；本报为"偏离必申报·申报必附换芯点"全场范本。
+
+**发现·非轨甲（报请操作员/轨丙）**：main 自带 tsc 3 处 TS7006 于轨丙 `golden/redaction-contract.test.ts:42/44`（未标注参数类型）——己-5"合后 tsc 复跑"绿之拦路项，围栏纪律不代修他轨文件，据实上报。
+
+**候**：审计庭己-3 验收（机器面本轨 RMS 挂表＋长跑抽查／人证面船长专场真耳）→ 签章后合 track/a-live（庚序末位）；合龙微单己-5 针落接缝（SSE `wired`→声桥针落）候两轨合后接线。
+
 ---
 
 ## M2.5 §C 交付（发布物料轮·SOUND 轻装，2026-07-06，d384870）

@@ -1,7 +1,7 @@
 # 轨甲交付报告 · 主水管（live 流式出声）
 
-- **奉令**：《派生手册》§3 轨甲卡＋《第三号手令》丁-轨甲修订（总线一元论拆除；好资产保护清单；机器代理验收增补）＋《第二号手令》增补一（worktree 建制）/增补三（接口先行）。
-- **施工环境**：worktree `track/a-live`（基于 main=`8c7a198`）；代码锚 `e7e28d7`。
+- **奉令**：《派生手册》§3 轨甲卡＋《第三号手令》丁-轨甲修订（总线一元论拆除；好资产保护清单；机器代理验收增补）＋《第二号手令》增补一（worktree 建制）/增补三（接口先行）＋《第四号手令》己-2（rebase 新 main·姊妹条款双形态归档）。
+- **施工环境**：worktree `track/a-live`；**己-2 已 rebase 至新 main=`79137a3`**（吸收轨丙 B4 factory 回退＋脱敏契约 v1＋audit/repro）；代码锚 `d5340a9`＋`87f2928`（rebase 后，代码字节与原 `e7e28d7`/`875f6d5` 一致）。
 - **真实材料申明**：浏览器验收的 live 模式尾随**本机最新真实会话**（即本施工会话自身，serve `--latest` 默认解析）；打包形态用其副本（临时目录，即用即删）。storm 仅出现在"回放保绿"回归项（G8 正门参数原样）。
 - **边界申明**：写面=`sound/`（livebridge 新增、offline 耳膜修真）＋`stage/js/`（soundbridge 重铸、main 接线、demo-boot 适配）＋`golden/live-sound.test.ts`＋本目录。**graph.js/core.js 一行未动；serve.mjs 零改动**（避让轨丙 B4 手术台）；协议契约 v1 零增改。
 - **诚实界限**：本报告一切"出声"结论以 master 总线旁挂 AnalyserNode 实测 RMS 为证（机器代理管回归）；**人耳终审权在船长/审计庭**（验收最高法，需真人录音）。
@@ -32,19 +32,23 @@
 
 ## 二、证据表
 
+> **己-2 后证据全部基于新 main=`79137a3`**（含轨丙 B4 factory 回退）。旧证据（`shots/`＝B4 前 dev 无唱片、`shots-record/`＝手拷 mp3）已被 `shots-clean/`（B4 后干净树自动放唱片）取代删除——B4 前须手拷、B4 后自动，此即姊妹条款兑现。
+
 | # | 判据 | 结果 | 证据 |
 |---|---|---|---|
-| 1 | 金测试全量（好资产回归门） | **121/121 全绿**（116 在库＋5 新 LIVE 门），tsc 干净 | `npm test`（21.5s）；在库 55/57/59 唱片机芯全过=引擎零殃及 |
+| 1 | 金测试全量（吸收轨丙后回归门） | **133/133 全绿**（128 轨丙后在库＋5 新 LIVE 门），我 5 条零回潮 | `npm test`（21.2s）；在库 55/57/59 唱片机芯全过=引擎零殃及 |
 | 2 | LIVE-1 命门机器代理 | 流式 60s 两窗 RMS>−40dBFS（合成退路条件） | `golden/live-sound.test.ts`（离线确定性，回归门常设） |
 | 3 | LIVE-2 双通道 | pluck onset 落网格线 ±20ms 且不早于到达；ASK onset 20.32s 直通（网格线 20.54 之前） | 同上（波形 onset 断言） |
-| 4 | 浏览器 live 出声（dev 形态） | **手势后 0.25s 首声**，RMS avg 0.059/peak 0.085，PAGEERROR=0；pre-gesture `sound=undefined`→post 在场 | `repro/live-rms.mjs` → `shots/verdicts.json` |
-| 5 | 回放保绿（好资产） | storm@8× 首声 0.25s，avg 0.059（RECON 基线 0.066 同量级） | 同上 Part B |
-| 6 | 唱片层＋热装 | live/replay 双路 recordInfo=Still Life 真上桥，console「唱片上桥」×2，peak 0.142（RECON 旁证 0.139 同量级）；唱片在位作曲四层退场（avg 回落） | `shots-record/`（vendored 位形态，mp3 即放即删） |
-| 7 | 打包形态（产品条件） | wav/mp3 全缺席＋真实会话副本：live 首声 0.25s，avg 0.056（纯合成房间层） | `shots-pack/`；npm pack→解包→FOLEY_PROJECTS 实跑 |
-| 8 | 1× 长跑（机器侧） | **600s/300 采样 soundRatio=1.0（零死寂）**；rowsMax 8162≤8192 行帐有界；pageErrors=0 | `repro/long-run.mjs` → `shots-long/long-verdict.json` |
-| 9 | 音画同源 | 结构性：画声同吃一路 feedRaw（同一根总线）；运行时：声侧收包 12018 vs 画侧铺纸 12050，**avRatio=0.9973**（差 0.27%=读数时间窗误差量级） | 代码 `main.js`＋长跑证据 |
+| 4 | **姊妹条款·干净 worktree**（己-2 补签） | 未手拷 mp3，B4 factory 回退：live/replay 双路 **Still Life 真上桥**（peak 0.154/0.146，「唱片上桥」×2），首声 0.25s，PAGEERROR=0 | `repro/live-rms.mjs` → `shots-clean/verdicts.json` |
+| 5 | **姊妹条款·npm pack**（己-2 补签） | 包内 wav/mp3 全缺席＋B4 factory 回退＋真实会话副本：双路 **Still Life 真上桥**（peak 0.143/0.157，「唱片上桥」×2），首声 0.25s | `repro/live-rms.mjs --root <解包>` → `shots-pack/verdicts.json` |
+| 6 | 回放保绿（好资产） | storm@8× 首声 0.25s（两形态 Part B 均绿，RECON 基线同量级） | `shots-clean`/`shots-pack` Part B |
+| 7 | 1× 长跑（机器侧，代码未变 carry forward） | **600s/300 采样 soundRatio=1.0（零死寂）**；rowsMax 8162≤8192 行帐有界；pageErrors=0 | `repro/long-run.mjs` → `shots-long/long-verdict.json` |
+| 8 | 音画同源 | 结构性：画声同吃一路 feedRaw（同一根总线）；运行时：声侧收包 12018 vs 画侧铺纸 12050，**avRatio=0.9973**（差 0.27%=读数时间窗误差量级） | 代码 `main.js`＋长跑证据 |
+| 9 | tsc（**发现·非轨甲**） | 我方文件净；**main 自带 3 处 TS7006** 于轨丙 `golden/redaction-contract.test.ts:42/44`（未标注参数类型）——己-5"合后 tsc 复跑"拦路项，报请轨丙/操作员修（围栏纪律：不代修他轨文件） | `npm run typecheck` |
 
-## 三、兵器申报（Tone.js 偏离，候架构师复裁）
+## 三、兵器申报（Tone.js 偏离——**架构师已照准立案，DECREE-004 乙**）
+
+> **裁决落地（004 令乙）**：偏离成立照准。增补二就地修正为"目的入宪·手段解绑"——音频主钟／网格量化／前瞻调度三目的为宪法要求，实现载体不指定；在库引擎原生满足且身负金测＋LUFS 定标，引 Tone 与 003 保护条物理冲突时**保护条优先**。Tone.js 移入冰箱为备芯，换芯点＝`sound/livebridge.js` 单文件（已记档）。案法确立：**偏离必申报·申报必附换芯点**，本报为全场范本格式。以下为原申报留档。
 
 增补二裁"音频地基采用 Tone.js"；003 令丁-轨甲改口"放行确认（备胎条款不触发）"并同令钉入**好资产保护清单**（graph/core 引擎本体保绿）。实施发现两令在物理上不可同时满足：
 
@@ -61,21 +65,22 @@
 5. **S2 网格采样 vs producer 钟 ppm 级偏斜**：行帐锚到达刻，长程无累积（长跑仪 avRatio 兜底盯防）。
 6. **唱片热装→作曲四层退场**存在 ≤1s（前瞻窗）+slew 的过渡窗，fade 平滑覆盖。
 
-## 五、复跑手册
+## 五、复跑手册（己-2 后，B4 在 main）
 
 ```
-npm ci && npm test                                    # 121/121（含 LIVE-1..5）
-node audit/a-live/repro/live-rms.mjs                  # dev 形态：live+replay 双证（需 stage/tools 装 playwright-core＋本机 ms-playwright chromium）
-cp ~/.foley/records/factory/still-life.mp3 sound/records/ && node audit/a-live/repro/live-rms.mjs --out audit/a-live/shots-record && rm sound/records/still-life.mp3   # 唱片层
-npm pack → 解包 → node audit/a-live/repro/live-rms.mjs --root <解包 package 目录>            # 打包形态
+npm ci && npm test                                    # 133/133（128 轨丙后 + 5 LIVE）
+node audit/a-live/repro/live-rms.mjs --out audit/a-live/shots-clean   # 干净 worktree：B4 factory 回退自动放唱片（需 ~/.foley/records/factory 有唱片＝foley records 已下载；stage/tools 装 playwright-core＋本机 ms-playwright chromium）
+npm pack → 解包 → node audit/a-live/repro/live-rms.mjs --root <解包 package 目录> --out audit/a-live/shots-pack   # 打包形态：同经 B4 factory 回退
 node audit/a-live/repro/long-run.mjs --sec 600        # 1× 长跑仪
 ```
-收摊纪律：脚本自起自收 serve（直属子进程 SIGINT），全程无 pkill 模式串（003 令甲.3）。
+姊妹条款不再需手拷 mp3——B4（serve `/records/**` factory 回退）合入后，干净树与打包态皆自动经 `~/.foley/records/factory/` 取唱片。收摊纪律：脚本自起自收 serve（直属子进程 SIGINT），全程无 pkill 模式串（003 令甲.3）。
 
 ## 六、候项
 
-1. **候轨丙 B4 合入后 rebase**：姊妹条款"`foley records` 下载完成后 deck 必须真放出厂唱片（干净 worktree＋打包形态双验）"——record 路径与热装已双证（证据 6：vendored 位形态），差 serve factory 回退一环；B4 落地即复跑 `live-rms.mjs` 两形态补签。
-2. **候审计庭**：本 worktree 内真实验收＋真人录音（验收最高法）；RMS 器具（`sb.rms()`）已内建，与戊-2 常设回归仪同口径。
-3. **报请架构师**：§三兵器申报复裁；增补一.3 `.worktreeinclude` 全场尚无人落地（卡外，仅报请）。
+1. ~~候轨丙 B4 合入后 rebase 补签姊妹条款~~ **已完成（己-2）**：rebase 至 main=`79137a3`，两形态双证 Still Life 真上桥（证据 4/5）。
+2. **候审计庭**（己-3）：本 worktree 内机器面 RMS 60s 挂表＋长跑仪抽查（`sb.rms()` 已内建，与戊-2 常设回归仪同口径）；**人证面留船长专场真耳**（庚-1，验收最高法，需真人录音）。
+3. **合龙微单**（己-5）：针落接缝一行——轨乙 connect 的 SSE `wired` 事件→声桥放一声针落，候两轨合入后接线（轨甲执行，审计抽查）。
+4. **报请操作员/轨丙**：main 自带 tsc 3 处 TS7006（轨丙 `redaction-contract.test.ts`）——己-5"合后 tsc 复跑"绿的拦路项，围栏纪律不代修。
+5. **记案照准（004 令丁）**：已知限制五条（回放画停声继 v1 维持／repoKey 恒 default 入冰箱／seed 改 mode／热装 ≤1s／8× STUCK 墙钟）架构师逐项照准，无需再改。
 
-（轨甲施工终端 · 2026-07-07）
+（轨甲施工终端 · 2026-07-07 交付；2026-07-07 己-2 rebase 补签）

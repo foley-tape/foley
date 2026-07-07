@@ -2,6 +2,52 @@
 
 ---
 
+# 轨乙 · 收工吐卡＋新手引导（三号手令·丁-轨乙，完工声明·候审计庭）
+
+**分支 `track/b-cards`（基 main=8c7a198），四提交：d8a66b0（B2）→ d8923d8（主件①②③④）→ 59e1f85（尾单）→ 99717a8（补钉＋验收器）。候审计庭在本 worktree 真实验收后合入 main（合并次序按庚：丙 B4 微 PR → 丙脱敏契约 → 本轨）。**
+
+## 交付对照（三号手令·丁-轨乙 逐条）
+
+| 手令要求 | 状态 |
+|---|---|
+| SessionEnd 自动落卡（勿用 Stop） | ✔ `cli/hook.ts` 只认 SessionEnd；金测试断言 Stop 不落纸 |
+| 默认全落卡唯 resume 除外；clear 落卡 | ✔ serve 消费侧滤 reason（钩子过纸不滤——事实全留，裁决在消费端）；金测试双断言 |
+| 每 session_id 去重，后卡替前卡 | ✔ 工单 Map 后到替前＋`~/.foley/cards/<sid>/` 工位覆盖写；金测试断言二连保存后卡在 |
+| 钩子走文件落盘（否决 HTTP 直喂） | ✔ 即发即忘 append `~/.foley/spool/events.ndjson`；serve 1.5s 尾随。钩子永远退 0、不碰 /dev/tty、零重活、独立入口不背 index.ts 模块图——`sh -c` 全程实测 **84ms** |
+| 默认脱敏（脱敏策略轨丙定，我调用） | ✔ 卡片素材唯一入口＝`cli distill` 默认口径（M2.6 P1-① 已入库的轨丙单一大脑），serve `makeCard` 单点调用、零自造尺。**接缝已单点化：轨丙契约冻结广播后若签名有变，只动这一处** |
+| 引导：检测→征询→分层写 settings.json→针落声 | ✔ `foley connect`＋正门首启征询（TTY 四门全过才开口，15s 不答放行起播）；分层写只增不毁、写前留底 `.foley-bak`、坏档中止原文不动、幂等；hello 走钩子同路自证（spool→serve→SSE `wired`）；针落＝CLI 字面宣告＋afplay 播 l1-crackle（非 TTY 不放声） |
+| 不碰 /dev/tty | ✔ 钩子零终端交互；征询走 CLI 自身 stdin/stdout 且非 TTY 一律不问 |
+| 空转仪表盘 60 秒接线向导 | ✔ 接线签：牛皮吊签挂台面左下（live 且未接线才现；点签收起；SSE wired 到站自退）。器件法自查：面板照旧无字，说明字只住纸上 |
+| 工业按钮 hover 说明（不许现代 UI 味） | ✔ `data-cap` 蚀刻丝印悬停显影（无气泡无底色；DUB 组右对齐防出画；面板零数字维持——铭牌不带读数） |
+| B2 参数面三方一致 | ✔ 裸命令带端口/旗标直达正门（`foley 4181 --no-open` 实测 200）；usage 补参数面教学，play/deck 记同义 |
+| 尾单：README 计数闸 | ✔ sync-readme 改实跑取数（旧口径 106 vs 实跑 116 系 `t.test()` 子测试不进 grep 正则）；套件红着拒取数；--check 对漂移退 1 实证 |
+
+## 边界自查
+
+未触 `sound/` 与 live 声通路（轨甲地盘——针落声页面侧只留了接缝：serve 已广播 SSE `wired`，轨甲声桥上桥后一行接入）；未触脱敏管线本体（轨丙地盘——只调用）；serve 增量全为卡片/引导接线，既有 Host/DoS/写盘三闸零改动、全程在前。$HOME 新读写面按 B4 裁定同款纪律：sid 白名单正则＋文件名白名单双闸、只读、写面同一把 Origin+令牌刀。
+
+## 判据与证据
+
+- **金测试 128/128**（新增 12 条 `golden/cards.test.ts`，全沙箱 FOLEY_HOME/CLAUDE_CONFIG_DIR，不碰真家当；顺手给 g8 测试补了 FOLEY_HOME 隔离——live 态 serve 兼卡片值守后，测试不许尾随真 spool）；tsc 零错。
+- **E2E 验收器已入库**：`node stage/tools/card-e2e.mjs`（素材优先本机最新真实会话，蒸馏默认脱敏后方进卡房）——本轮在**空盘机器**条件（live 子进程退场、SSE 断粮）8/8 过：接线签在场且不压操作件、hover 铭牌显影、card.png 全链落盘、meta 形制＋无墙钟＋泄漏抽查阴性＋src=redacted。静帧 `runs/card-e2e-*/card-rested.png`。
+- **E2E 揪出并修平一颗真雷**（验收条件＝产品条件的现行犯）：新机器无会话时 `/live` 503→SSE 断粮＋开机清账跑在备纸完成前→卡永远不撕。修：卡片值守 15s 工单轮询与 SSE 双保险（99717a8）。
+
+## 已知界限（如实）
+
+1. **钩子命令是绝对路径**：npx 缓存被清则钩子静默失效（铁律①护住会话，不炸）；重跑 `foley connect` 即复位（幂等原位换命令）。npm 正式装包/repo 检出均稳。
+2. **多 serve 共读一 spool**：cursor 竞争谁先读谁消费；卡片工位共享＋页面轮询兜底，卡不丢，但 SSE 通告只从消费方发出。记案候治理轮。
+3. **spool 无界追加**：体量极小（每收工一行），收摊轮转候 v1.1——冰箱。
+4. **无页面开着时**卡片欠账持久在工位，下次开 live 页 15s 内补撕（工单不过期）。
+5. **接线签/CLI 全中文**：与 CLI 语言断层案同源，维持在案。
+6. **真人走查未做**（做的不审）：审计庭请自备新鲜会话按验收线走——接线（connect 征询全流程）→干活→收工拿卡；`card-e2e.mjs` 是机器代理，人证仍归庭。
+
+## 提案（丁-轨乙「细化边界可提案」）
+
+- reason 语义按令执行为：`resume` 不落卡，其余（`clear`/`logout`/`prompt_input_exit`/`bypass_permissions_disabled`/`other`）一律落卡。`bypass_permissions_disabled` 视同收工，如架构师另有裁另改（消费侧一行）。
+- 无戏可剪（会话过短/全歇）走 skip 销账（`card.skip.json`），工单不永久待撕——机器不为空戏摆拍。
+
+---
+
 # M2.5 §B · 发布物料（demo 页＋hero 双版本＋README 换图）
 
 **合入 main 哈希：b870214（主件）＋794b3e4（README 改道件）**（已推 origin/main；本行为合并后记账小提交）。交付：demo 站（`node stage/tools/demo-build.mjs` 一令构建，RELEASE §A.5 直挂 Pages）＋hero 主片/GIF/次片（`runs/hero-m25/`，Releases 待挂）＋README hero 位已换（见下"置件正名"）。金测试 105/105。

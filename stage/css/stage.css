@@ -288,6 +288,8 @@ body {
   pointer-events: none;
 }
 [data-cap]:hover::after { opacity: 0.62; }
+/* DUB 组贴视口右缘：铭牌右对齐向左生长，字不出画（操作件永不出画的姊妹条款） */
+#dub-group [data-cap]::after { left: auto; right: 0; transform: none; }
 
 /* —— 接线签（轨乙③）：牛皮吊签挂在台沿——面板照旧无字，说明字只住在纸上（纸条 FOLEY 边字同源）。
    live 未接线才由 main.js 挂出；点签收起（slip 滑落）。 */

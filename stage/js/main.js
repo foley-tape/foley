@@ -158,8 +158,12 @@ async function boot() {
       } finally { cardBusy = false; }
     };
     const enqueue = (sid) => { if (sid && !cardQ.includes(sid)) { cardQ.push(sid); pump(); } };
-    fetch('/cards/pending').then(r => (r.ok ? r.json() : { pending: [] }))
+    const sweep = () => fetch('/cards/pending').then(r => (r.ok ? r.json() : { pending: [] }))
       .then(j => (j.pending ?? []).forEach(enqueue)).catch(() => { /* 无卡房＝无欠账 */ });
+    sweep();
+    // SSE 与轮询双保险：live 子进程歇着时（新机器无会话）/live 503、SSE 断粮，
+    // 且开机那次清账可能跑在备纸（蒸馏+回放）完成之前——15s 扫一遍工单兜底
+    setInterval(sweep, 15000);
     live.es?.addEventListener('card', e => { try { enqueue(JSON.parse(e.data).sid); } catch { /* 坏包不撕 */ } });
     live.es?.addEventListener('wired', () => dismissWireTag()); // 接线自证到站：接线签退场
     mountWireTagIfUnwired();

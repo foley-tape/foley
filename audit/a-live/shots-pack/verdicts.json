@@ -1,0 +1,146 @@
+{
+  "live": {
+    "mode": "live",
+    "soundPre": "undefined",
+    "firstSoundSec": 0.25110000000149013,
+    "rmsPeak": 0.14267,
+    "rmsAvg": 0.04106,
+    "samples": 41,
+    "series": [
+      [
+        0,
+        0
+      ],
+      [
+        1,
+        0.04804
+      ],
+      [
+        2.01,
+        0.06915
+      ],
+      [
+        3.01,
+        0.01229
+      ],
+      [
+        4.02,
+        0.03554
+      ],
+      [
+        5.02,
+        0.01193
+      ],
+      [
+        6.02,
+        0.01765
+      ],
+      [
+        7.03,
+        0.05754
+      ],
+      [
+        8.03,
+        0.01154
+      ],
+      [
+        9.04,
+        0.01521
+      ],
+      [
+        10.04,
+        0.07519
+      ]
+    ],
+    "recordInfo": {
+      "idx": 0,
+      "name": "still-life",
+      "title": "Still Life",
+      "seconds": 134.83297052154194,
+      "count": 1,
+      "tapeStopped": false
+    },
+    "stats": {
+      "audio0": 0.12580498866213152,
+      "rows": 202,
+      "packets": 202,
+      "moments": 0,
+      "fired": 0,
+      "held": 0
+    },
+    "ctxState": "running",
+    "pass": true
+  },
+  "replay": {
+    "firstSoundSec": 0.2505,
+    "rmsPeak": 0.15729,
+    "rmsAvg": 0.04317,
+    "samples": 41,
+    "series": [
+      [
+        0,
+        0
+      ],
+      [
+        1.01,
+        0.04824
+      ],
+      [
+        2.01,
+        0.0975
+      ],
+      [
+        3.02,
+        0.01323
+      ],
+      [
+        4.02,
+        0.03311
+      ],
+      [
+        5.02,
+        0.01273
+      ],
+      [
+        6.04,
+        0.01768
+      ],
+      [
+        7.04,
+        0.05673
+      ],
+      [
+        8.04,
+        0.0118
+      ],
+      [
+        9.05,
+        0.09143
+      ],
+      [
+        10.05,
+        0.07166
+      ]
+    ],
+    "recordInfo": {
+      "idx": 0,
+      "name": "still-life",
+      "title": "Still Life",
+      "seconds": 134.83297052154194,
+      "count": 1,
+      "tapeStopped": false
+    },
+    "stats": {
+      "audio0": 0.13160997732426302,
+      "rows": 1609,
+      "packets": 1609,
+      "moments": 1,
+      "fired": 1,
+      "held": 0
+    },
+    "ctxState": "running",
+    "pass": true
+  },
+  "consoleErrors": [],
+  "pass": true
+}

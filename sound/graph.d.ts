@@ -61,6 +61,7 @@ export interface SoundEngine {
   scheduleGridUntil(untilSec: number): void;
   trigger(cls: number, atSec: number, deg: number, vel: number): void;
   applyBedNow(pm: number): void;
+  needleDrop(atSec: number): void;
   setMute(name: 'l1' | 'crackle' | 'l2' | 's2' | 's3' | 'hiss' | 'fg' | 'record', on: boolean): void;
   assetsUsed: { body: boolean; air: boolean; crackle: boolean };
   stackInfo: { l2: StackInfo; s3: StackInfo };

@@ -653,6 +653,23 @@ export function buildEngine(ctx, SP, opts) {
     oneOsc('sine', midiToHz(ROOT), at + 0.35, at + 1.3).connect(envG(at + 0.35, 0.24, 0.02, 0.8));
     E.doneSilentUntil = at + 0.35 + SP.bed.doneSilenceSec;
   }
+  /** 落针宣告（己-5 合龙微单：轨乙 connect 自证 SSE wired 到站→一声落针）。
+   *  软"咚"（触点低频三角快降）＋一撮表面噪声涌起（针尖入纹的"呲"）。走前景总线（fgBus，
+   *  与 pluck/page 同族）——接线宣告与唱片在否无关，房间层态也须可闻，故不入唱片链（recG 无盘即哑）；
+   *  隔离板 fg 勾掉则连带静默（announcement 属前景族）。一次性源，非遥测映射、不入回归主流。 */
+  function needleDrop(at) {
+    if (E.mutes.has('fg')) return;
+    // ① 触点低频"咚"：110→52Hz 快降三角，短促软着陆（落针的重量感）
+    const thunk = ctx.createOscillator(); thunk.type = 'triangle';
+    thunk.frequency.setValueAtTime(110, at);
+    thunk.frequency.exponentialRampToValueAtTime(52, at + 0.1);
+    thunk.connect(envG(at, SP.foreground.saveGain * 0.9, 0.006, 0.14));
+    thunk.start(at); thunk.stop(at + 0.2); R.ephemeral(thunk, at + 0.2);
+    // ② 表面噪声涌起：短噪声过带通~1.9k，针入纹的"呲"一下（渐起不爆音）
+    const swell = noiseBurst(at, 0.16);
+    const bp = ctx.createBiquadFilter(); bp.type = 'bandpass'; bp.frequency.value = 1900; bp.Q.value = 0.7;
+    swell.connect(bp); bp.connect(envG(at, SP.foreground.pageGain * 1.1, 0.03, 0.13));
+  }
 
   function habFor(cls, at) {
     if (cls >= 6) return 1;
@@ -769,7 +786,7 @@ export function buildEngine(ctx, SP, opts) {
     recordCount: records.length,
     setRecord,
     recordPosAt: recPosAt,
-    applyBed, startTransport, scheduleGridUntil, trigger, applyBedNow,
+    applyBed, startTransport, scheduleGridUntil, trigger, applyBedNow, needleDrop,
     setMute(name, on) { if (on) E.mutes.add(name); else E.mutes.delete(name); },
     stop(at) {
       R.stopAll(at);

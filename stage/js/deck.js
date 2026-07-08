@@ -164,11 +164,23 @@ export class Counter {
   render() {
     if (!this.loupe.classList.contains('on')) return;
     const v = this.value % 10000;
+    // 棘爪回位律（第五号手令 丁-E4）：停转必须落卡位，永不悬于半格。
+    // 走带中末轮连续滚；一停（计数不再前进），末轮缓落最近卡位——棘爪咬入齿的机械诚实。
+    const moving = Math.abs(v - (this._lastV ?? v)) > 1e-3;
+    this._lastV = v;
     // 末轮连滚，高位轮到位跳（机械计数器的真实做派：低位带高位，进位瞬间才动）
     for (let i = 0; i < 4; i++) {
       const div = Math.pow(10, 3 - i);
       const digitVal = (v / div) % 10;
-      const shown = i === 3 ? digitVal : Math.floor(digitVal) + (digitVal % 1 > 0.9 ? (digitVal % 1 - 0.9) * 10 : 0);
+      let shown;
+      if (i === 3) {
+        const target = moving ? digitVal : Math.round(digitVal); // 停转落最近卡位（含 9→10 回卷位）
+        if (this._low === undefined) this._low = digitVal;
+        this._low = moving ? digitVal : this._low + (target - this._low) * 0.2; // 棘爪缓落
+        shown = this._low;
+      } else {
+        shown = Math.floor(digitVal) + (digitVal % 1 > 0.9 ? (digitVal % 1 - 0.9) * 10 : 0);
+      }
       this.wheels[i].style.transform = `translateY(${(-shown * WHEEL_H).toFixed(1)}px)`;
     }
   }

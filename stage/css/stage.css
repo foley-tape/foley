@@ -525,6 +525,16 @@ body {
   opacity: 0.05;
   mix-blend-mode: overlay;
 }
+/* —— 暗区抖动（第五号手令 丁-E4：时间法"暗区渐变加抖动"条文落地，列违宪修复）——
+   overlay 混合在暗处数学上把颗粒乘没了（≈2·base·grain，base→0 则抖动跌破 1 LSB → 色带复现；
+   暗角与 ASK 琥珀外溢的 banding 即此病）。此层用 screen 混合：暗处才起效、越亮越淡，恰把抖动
+   放在需要处，不雾化中间调。空间抖动足以打散渐变台阶（暗区本就近静）。 */
+#grain-dark {
+  position: absolute; inset: 0; pointer-events: none; z-index: 61;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='160' height='160'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/><feColorMatrix type='saturate' values='0'/></filter><rect width='160' height='160' filter='url(%23n)'/></svg>");
+  opacity: 0.045;
+  mix-blend-mode: screen;
+}
 
 /* —— dev 抽屉（?hud=1）：数字只许活在这里 —— */
 #hud {

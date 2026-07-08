@@ -1,0 +1,18 @@
+{
+  "decree": "FOLEY_DECREE_005 丁-E4 器件诚实（违宪子集）",
+  "A_darkDither": {
+    "off_bandingStd": 0.205,
+    "on_ditheredStd": 1.117,
+    "stdLift": 0.912,
+    "meanLiftLSB": 4.15,
+    "pass": true
+  },
+  "B_pawlReturn": {
+    "movingOffDetent": 0.3,
+    "settledTy": 88,
+    "settledOffDetent": 0,
+    "pass": true
+  },
+  "pageErrors": 0,
+  "PASS": true
+}

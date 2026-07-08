@@ -173,7 +173,10 @@ async function boot() {
     // 且开机那次清账可能跑在备纸（蒸馏+回放）完成之前——15s 扫一遍工单兜底
     setInterval(sweep, 15000);
     live.es?.addEventListener('card', e => { try { enqueue(JSON.parse(e.data).sid); } catch { /* 坏包不撕 */ } });
-    live.es?.addEventListener('wired', () => dismissWireTag()); // 接线自证到站：接线签退场
+    live.es?.addEventListener('wired', () => {
+      dismissWireTag();                       // 接线自证到站：接线签退场（轨乙视觉）
+      window.__stage?.sound?.needleDrop?.();   // 己-5 合龙微单：一声落针宣告（声桥在场才响，轨甲声侧）
+    });
     mountWireTagIfUnwired();
   }
 }

@@ -1,4 +1,18 @@
-# FEEDBACK-SOUND —— 声音相台账（Track-SOUND：SOUND-R1 重启 → EAR-5~11 战役 → SOUND-R2 床的重做 → SOUND-R3 唱机改造 → SOUND-R4 平移与落仓 → M2.5 §C 发布终包 → 轨甲·主水管）
+# FEEDBACK-SOUND —— 声音相台账（Track-SOUND：SOUND-R1 重启 → EAR-5~11 战役 → SOUND-R2 床的重做 → SOUND-R3 唱机改造 → SOUND-R4 平移与落仓 → M2.5 §C 发布终包 → 轨甲·主水管 → 己-5 针落接缝）
+
+## 己-5 针落接缝交付（合龙微单，2026-07-08，branch track/a-seam-needle，基统一 main c49bdc2）
+
+**结论**：合龙微单完成——轨乙 `connect` 自证 SSE `wired` → 轨甲声桥**一声落针**宣告。三段接缝：`foley connect`→spool hello→serve 广播 `wired`（前两段轨乙已在库）→ 页面 `wired` 监听器 `dismissWireTag()`（轨乙视觉）＋ `window.__stage.sound?.needleDrop?.()`（★己-5 声侧接线）。
+
+**实现**：引擎新增 `needleDrop(at)`（graph.js **纯加法**：软"咚" 110→52Hz 三角快降＋表面噪声涌起带通 1.9k；走 **fgBus** 非唱片链——房间层态无唱片也可闻；隔离板 fg 勾掉连带静默；一次性源不入回归主流）＋声桥暴露 `sb.needleDrop()`＋main.js `wired` 监听接线一行＋graph.d.ts 类型面。**既有信号路零改**（好资产保护：graph/core 引擎本体保绿）。
+
+**频率正确**：`hello` 只由 `foley connect`（`--hello`）发一次（SessionEnd 钩子写 `session-end` 非 hello）；具名 SSE 不补发后到客户端——每次接线响一声、只对当时在看的页面，无狂响。
+
+**证据**：全量金测试 **146/146**（含新 LIVE-6：落针出声＋房间层态可闻＋fg mute 静默）＋tsc 干净；端到端 `repro/needle-drop.mjs`——hermetic spool 写 hello→serve 广播真 `wired`→**needleDrop 恰调 1 次**＋事件窗峰 0.042>基线 0.036＋接线签撤除＋零页错（analyser 独立挂 master，读数层与声桥自报分离）。全档 `audit/a-seam/REPORT.md`。
+
+**候**：审计庭抽查（己-5）＋船长真耳（庚-1，落针克制度终审）。
+
+---
 
 ## 轨甲交付（三轨并进·live 流式出声，2026-07-07，代码锚 e7e28d7，branch track/a-live 候审计庭签章合入）
 

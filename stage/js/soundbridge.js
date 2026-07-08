@@ -121,6 +121,13 @@ export class SoundBridge {
   get recordInfo() { return this.engine ? this.engine.recordInfo : null; }
   stats() { return this._bridge ? this._bridge.stats() : null; }
 
+  /** 落针宣告（己-5 合龙微单）：轨乙 connect 自证 SSE `wired` 到站时，声桥放一声落针。
+   *  声桥未起（手势前）时静默——接线签的视觉退场照走（main.js），声侧下次开机自然有底噪。 */
+  needleDrop() {
+    if (!this.engine || !this.ctx) return;
+    this.engine.needleDrop(this.ctx.currentTime + 0.03);
+  }
+
   stop() {
     if (this._timer) clearInterval(this._timer);
     if (this._recordRetry) clearTimeout(this._recordRetry);

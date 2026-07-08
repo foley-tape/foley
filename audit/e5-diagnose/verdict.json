@@ -1,0 +1,17 @@
+{
+  "decree": "FOLEY_DECREE_005 丁-E5 状态可诊·失效注入",
+  "A_kill_serve_lost": {
+    "baseline_live": true,
+    "baselineStatus": "live",
+    "killServe_lost": true,
+    "lostLabel": "\"Signal Lost\"",
+    "pass": true
+  },
+  "B_reconnect_recover": {
+    "reconnect_recovered": true,
+    "recoveredStatus": "live",
+    "pass": true
+  },
+  "pageErrors": 0,
+  "PASS": true
+}

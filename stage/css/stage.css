@@ -67,6 +67,31 @@ body {
   #play-cue .glow, #play-cue .silk { animation: none; opacity: 0.85; }
 }
 
+/* —— 状态可诊·信号灯（第五号手令 丁-E5）：喂食断了机器诚实报态——一枚缓跳灯语＋丝印字。
+   灯组语言，无数字无弹窗；live 时 room 无 data-signal，此层不在场。 */
+#signal-cue {
+  position: absolute; left: 50%; bottom: 17%; transform: translateX(-50%);
+  z-index: 56; pointer-events: none;
+  display: flex; flex-direction: column; align-items: center; gap: 11px;
+  opacity: 0; transition: opacity 0.8s ease;
+}
+#room[data-signal="lost"] #signal-cue,
+#room[data-signal="gone"] #signal-cue { opacity: 1; }
+#signal-cue .beacon {
+  width: 12px; height: 12px; border-radius: 50%;
+  background: #C6502E; box-shadow: 0 0 15px 3px rgba(198, 80, 46, 0.5);
+  animation: signal-beacon 1.9s ease-in-out infinite;
+}
+#signal-cue .label { font-size: 10px; letter-spacing: 0.4em; text-indent: 0.4em; color: #D9B79E; }
+#signal-cue .label::after { content: "Signal Lost"; }
+#room[data-signal="gone"] #signal-cue .label::after { content: "Source Gone"; }
+@keyframes signal-beacon { 0%, 100% { opacity: 0.32; transform: scale(0.82); } 50% { opacity: 1; transform: scale(1.12); } }
+/* 失信号：机器画面稍冷——没进来的东西可画，机器诚实地"没了画面"（不装活）。 */
+#room[data-signal] #machine {
+  filter: brightness(0.82) saturate(0.72) drop-shadow(0 46px 60px rgba(0, 0, 0, 0.85));
+}
+@media (prefers-reduced-motion: reduce) { #signal-cue .beacon { animation: none; opacity: 0.85; } }
+
 /* —— 走带甲板：哑光暗金属，反光极克制 —— */
 #deck {
   position: relative;

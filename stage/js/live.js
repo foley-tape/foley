@@ -23,6 +23,19 @@ export class LiveStream {
     this.gone = false;
     this._buffer = [];      // 铺纸期间的 SSE 暂存
     this._buffering = true;
+    // 状态可诊（第五号手令 丁-E5）：连接健康态 connecting|live|lost|gone。
+    // lost＝服务端不可达/断网（SSE 报错，去抖 1.2s 防瞬断闪烁）或静默看门狗；gone＝live 子进程退出。
+    this.onStatus = [];     // (state)=>void
+    this.status = 'connecting';
+    this._lastRecvAt = 0;
+    this._lostTimer = null;
+    this._watchdog = null;
+  }
+
+  _setStatus(s) {
+    if (s === this.status) return;
+    this.status = s;
+    for (const fn of this.onStatus) fn(s);
   }
 
   _feedState(obj) {
@@ -73,15 +86,29 @@ export class LiveStream {
 
   connect() {
     const es = new EventSource('/live');
+    this._lastRecvAt = performance.now(); // 宽限起点：连上到首包之间不误判静默
     es.onmessage = (e) => {
+      this._lastRecvAt = performance.now();
+      clearTimeout(this._lostTimer);            // 有数据＝信号在，撤销待判丢失
+      if (this.status !== 'gone' && this.status !== 'live') this._setStatus('live');
+      else if (this.status === 'live') { /* 保持 */ }
       let obj;
       try { obj = JSON.parse(e.data); } catch { return; }
       if (this._buffering) { this._buffer.push(obj); return; }
       this._dispatch(obj);
     };
-    es.addEventListener('gone', () => { this.gone = true; });
-    es.onerror = () => { /* EventSource 自动重连；服务器没了由 gone 记账 */ };
+    es.addEventListener('gone', () => { this.gone = true; this._setStatus('gone'); }); // live 子进程退出：源没了
+    es.onerror = () => {
+      // EventSource 自动重连；瞬断不该闪红——去抖 1.2s 未恢复才判信号丢失（serve 亡/断网）
+      if (this.status === 'gone') return;
+      clearTimeout(this._lostTimer);
+      this._lostTimer = setTimeout(() => this._setStatus('lost'), 1200);
+    };
     this.es = es;
+    // 静默看门狗：live 有 20Hz 心跳，>2.5s 无包＝喂食断（子进程挂/卡），也判丢失
+    this._watchdog = setInterval(() => {
+      if (this.status === 'live' && this._lastRecvAt && performance.now() - this._lastRecvAt > 2500) this._setStatus('lost');
+    }, 1000);
   }
 
   _dispatch(obj) {

@@ -103,6 +103,9 @@ async function boot() {
     live = new LiveStream();
     live.onPacket.push(feedPacket);
     live.onMoment.push(feedMoment);
+    // 状态可诊（第五号手令 丁-E5）：连接健康态落 room[data-signal]（灯组语言由 CSS 驱动；无数字、无弹窗）。
+    // live→撤属性（机器照常）；lost/gone→机器诚实报"没信号"，不装死也不假活。
+    live.onStatus.push((s) => { if (s === 'live') delete room.dataset.signal; else room.dataset.signal = s; });
     live.connect();          // 先订流（缓冲）
     await live.prime();      // 再吃今晨的纸
     live.flushBuffer();      // 水位去重后接实时

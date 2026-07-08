@@ -432,12 +432,12 @@ export function buildEngine(ctx, SP, opts) {
     lastGridAt: 0, lastBarAt: 0, lastAskRepeat: -1e9, doneSilentUntil: -1, wxLatch: 0,
     habLog: new Map(),
     mutes: new Set(), // 隔离板：'l1'|'crackle'|'l2'|'s2'|'s3'|'hiss'|'fg'|'record'
-    rec: { idx: -1, meta: null, buf: null, srcs: [], calibLin: 0, posBase: 0, posBaseAt: 0, tapeStopped: false },
+    rec: { idx: -1, meta: null, buf: null, srcs: [], calibLin: 0, posBase: 0, posBaseAt: 0, tapeStopped: false, paused: false, pausePos: 0 },
   };
 
   // ---- 唱片机芯（全排程纪律：离线渲染器无事件循环，一切源的起停在调度刻排定） ----
   /** 唱片在位（作曲四层退场的口径）：有唱片、未被 tape-stop 停死、隔离板未勾掉。 */
-  function recOn() { return !!E.rec.meta && !E.rec.tapeStopped && !E.mutes.has('record'); }
+  function recOn() { return !!E.rec.meta && !E.rec.tapeStopped && !E.rec.paused && !E.mutes.has('record'); }
   /** 读头位置账本（秒，恒速 1 域；wow 微抖均值 1 忽略；卡碟期打转不前进——复走点=卡点）。 */
   function recPosAt(t) { return E.rec.meta ? (E.rec.posBase + Math.max(0, t - E.rec.posBaseAt)) % E.rec.meta.seconds : 0; }
   /** 建一个唱片源（接 wow 调制口+recLP）；一切 start/stop 由调用方排程。buffer 装盘时建一次，多源复用。 */
@@ -524,6 +524,35 @@ export function buildEngine(ctx, SP, opts) {
     R.setDepth(recWowD, 0, at, 0.3, false); // 停转的唱片不再走带不稳（免 rate≈0 时微爬行）
     E.rec.tapeStopped = true;
   }
+  /** 暂停唱片（第五号手令 丙.2 改判：暂停＝唱片随带停；房间常在；恢复＝续播不重建）。
+   *  ——本席四号手令"画停声继 v1 维持"当庭撤销。短促 spin-down 到静默（拨杆的轻微 wow＝delight），
+   *  记住读头位置；床/底噪/呼吸一概不动——存在层独立于此（不变量二）。paused 与 tapeStopped 分道：
+   *  后者遇非 DONE 相自动复活（滑停语义），前者只认 resumeRecord（暂停不该被下一包偷偷叫醒）。 */
+  function pauseRecord(at) {
+    if (E.rec.paused || !recOn() || !E.rec.srcs.length) return;
+    E.rec.pausePos = recPosAt(at);            // 记住读头＝续播点
+    const sec = SP.record.pauseSec ?? 0.28;   // 拨杆 wow：短于 tape-stop 滑停
+    for (const s of E.rec.srcs) {
+      s.playbackRate.cancelScheduledValues(at);
+      s.playbackRate.setValueAtTime(1, at);
+      s.playbackRate.linearRampToValueAtTime(0, at + sec); // 掉速＝下滑的 wow
+      try { s.stop(at + sec + 0.05); } catch (_e) { /* 已停 */ }
+    }
+    R.setDepth(recWowD, 0, at, 0.2, false);
+    E.rec.srcs.length = 0;
+    E.rec.paused = true;
+    recG.gain.cancelScheduledValues(at);
+    recG.gain.setTargetAtTime(0, at, Math.max(sec / 3, 0.05)); // 电平随停（applyRecord 亦已闸 paused）
+  }
+  /** 恢复唱片（续播不重建）：从暂停读头位置重新落针起播；房间层本就没停，续上即可。 */
+  function resumeRecord(at) {
+    if (!E.rec.paused) return;
+    E.rec.paused = false;
+    if (!E.transport || !E.rec.meta) return;
+    recStart(at, E.rec.pausePos);             // 从记住的读头续播（非从头＝续播不重建）
+    recG.gain.cancelScheduledValues(at);
+    recG.gain.setTargetAtTime(E.rec.calibLin, at, 0.06); // 电平回归（下一网格 applyRecord 精修）
+  }
   /** 换曲（HUD/URL）：停当前、装下一张、即刻起播（唱片从头）；电平由下一网格（≤半拍）纠正。 */
   function setRecord(idx, at) {
     const t = at !== undefined ? at : ctx.currentTime;
@@ -571,7 +600,7 @@ export function buildEngine(ctx, SP, opts) {
       else param.setTargetAtTime(v, at, tc);
     };
     // 电平：定标（targetLufs−lufs）×映射目标（trim×duck×关断）；淡入淡出用 rt.fadeSec
-    const g = E.mutes.has('record') || E.rec.tapeStopped ? 0 : rt.gain * E.rec.calibLin;
+    const g = E.mutes.has('record') || E.rec.tapeStopped || E.rec.paused ? 0 : rt.gain * E.rec.calibLin;
     set(recG.gain, g, Math.max(rt.fadeSec / 3, 0.05));
     set(recLP.frequency, rt.lpHz, slow);
     // wow：wowCents → playbackRate 摆幅（2^(c/1200)−1）；tape-stop 后不再抖（recordTapeStop 已排零）
@@ -787,6 +816,8 @@ export function buildEngine(ctx, SP, opts) {
     setRecord,
     recordPosAt: recPosAt,
     applyBed, startTransport, scheduleGridUntil, trigger, applyBedNow, needleDrop,
+    pauseRecord, resumeRecord, // 丙.2：暂停＝唱片随带停（房间常在），恢复＝续播不重建
+    get recordPaused() { return E.rec.paused; },
     setMute(name, on) { if (on) E.mutes.add(name); else E.mutes.delete(name); },
     stop(at) {
       R.stopAll(at);

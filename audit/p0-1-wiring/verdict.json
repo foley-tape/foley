@@ -1,0 +1,30 @@
+{
+  "decree": "FOLEY_DECREE_005 乙 P0-1 接线倒置",
+  "PASS": true,
+  "A_latecomer": {
+    "serverWired": true,
+    "needleCeremony": 1,
+    "wireTag": false,
+    "motionInk": 141120,
+    "stateCount": 164723,
+    "roomPeak": 0.00502,
+    "pageErrors": 0,
+    "pass": true
+  },
+  "B_midsession_connect": {
+    "tagBefore": true,
+    "needleBefore": 0,
+    "tagAfter": false,
+    "needleAfter": 1,
+    "pageErrors": 0,
+    "pass": true
+  },
+  "C_room_unconditional": {
+    "serverWired": false,
+    "roomPeak": 0.01767,
+    "needleDrops": 0,
+    "motionInk": 141120,
+    "pageErrors": 0,
+    "pass": true
+  }
+}

@@ -70,6 +70,9 @@ export interface SoundEngine {
   recordCount: number;
   setRecord(idx: number, at?: number): void;
   recordPosAt(t: number): number;
+  pauseRecord(at: number): void;   // 丙.2：暂停＝唱片随带停（房间常在）
+  resumeRecord(at: number): void;  // 丙.2：恢复＝续播不重建（从暂停读头续）
+  readonly recordPaused: boolean;
   stop(at: number): void;
   hardMute(): void;
   muteMaster(at: number): void;

@@ -22,6 +22,10 @@ const port = Number(args.find(a => /^\d+$/.test(a)) ?? process.env.PORT ?? 4173)
 const replayOnly = args.includes('--replay-only');
 const rawIdx = args.indexOf('--raw');
 const rawPath = rawIdx >= 0 ? args[rawIdx + 1] : null;
+// E1 首光·终端静音化（第五号手令 丁-E1）：默认只两行（监听中＋URL）；机器内务（boot/card/dub/live）
+// 一律归 --verbose（或 FOLEY_VERBOSE=1）。卡片产出的宣告归舞台（SSE 'card'→台上撕卡），不归终端。
+const verbose = args.includes('--verbose') || process.env.FOLEY_VERBOSE === '1';
+const vlog = (...a) => { if (verbose) console.log(...a); };
 
 // ── 写盘鉴权（NIGHT-2 §0.6 安全组合拳；原刀=Track-RELEASE 安全批，M2.4 §C 扩展至换声端点）──
 // ③ 每次启动随机令牌：同源页面经注入的 <meta name="dub-token"> 取用；跨站 JS 读不到同源 DOM/HTML，
@@ -113,7 +117,7 @@ let demoBoot = false;
 if (!replayOnly && !rawPath) {
   const newest = newestJsonlMtime(process.env.FOLEY_PROJECTS ?? join(homedir(), '.claude', 'projects'));
   demoBoot = newest < 0 || Date.now() - newest > FRESH_MS;
-  if (demoBoot) console.log(`[boot] 最近会话${newest < 0 ? '缺席' : '已歇场(>15min)'} → 正门上厂演示卷 storm@8×（live 视图 /?mode=live 照旧）`);
+  if (demoBoot) vlog(`[boot] 最近会话${newest < 0 ? '缺席' : '已歇场(>15min)'} → 正门上厂演示卷 storm@8×（live 视图 /?mode=live 照旧）`);
 }
 
 // ---- live 中继：child stdout NDJSON → SSE 扇出（写出即丢，bounded 纪律同源）----
@@ -149,7 +153,7 @@ function onSpoolLine(line) {
   let e;
   try { e = JSON.parse(line); } catch { return; }
   if (e.kind === 'hello') {
-    console.log('[card] 接线自证 hello 到站——钩子→spool→serve 全线通');
+    vlog('[card] 接线自证 hello 到站——钩子→spool→serve 全线通');
     broadcastEvent('wired', { ok: 1 });
     return;
   }
@@ -196,10 +200,10 @@ async function drainCardJobs() {
       cardJobs.delete(sid);
       try {
         await makeCard(sid, job);
-        broadcastEvent('card', { sid });
-        console.log(`[card] ${sid.slice(0, 8)}… 纸已备好（候台上撕卡）`);
+        broadcastEvent('card', { sid });   // 宣告归舞台：台上撕卡（不喧哗终端）
+        vlog(`[card] ${sid.slice(0, 8)}… 纸已备好（候台上撕卡）`);
       } catch (err) {
-        console.error(`[card] ${sid.slice(0, 8)}… 备纸失败：`, err?.message ?? err);
+        vlog(`[card] ${sid.slice(0, 8)}… 备纸失败：`, err?.message ?? err);
       }
     }
   } finally { cardBusy = false; }
@@ -245,7 +249,7 @@ function startLive() {
     ...(rawPath ? [rawPath] : ['--latest', ...(process.env.FOLEY_PROJECTS ? [process.env.FOLEY_PROJECTS] : [])]),
     '--out', liveOutDir];
   liveChild = spawn('node', liveArgs, { cwd: repoRoot, stdio: ['ignore', 'pipe', 'pipe'] });
-  liveChild.stderr.on('data', d => process.stderr.write(`[live] ${d}`));
+  liveChild.stderr.on('data', d => { if (verbose) process.stderr.write(`[live] ${d}`); });
   let buf = '';
   liveChild.stdout.on('data', chunk => {
     buf += chunk;
@@ -258,7 +262,7 @@ function startLive() {
     }
   });
   liveChild.on('exit', code => {
-    console.error(`[live] 子进程退出（${code}）`);
+    vlog(`[live] 子进程退出（${code}）`);   // 舞台侧收 SSE 'gone'（E5 状态可诊在灯组语汇呈现）
     for (const res of clients) res.write(`event: gone\ndata: {}\n\n`);
     liveChild = null;
   });
@@ -320,7 +324,7 @@ createServer(async (req, res) => {
         await writeFile(join(dir, `${nm}.meta.json`), JSON.stringify(meta, null, 2) + '\n');
         res.writeHead(200, { 'content-type': 'application/json' });
         res.end(JSON.stringify({ saved: [`runs/dubs/${nm}.png`, `runs/dubs/${nm}.meta.json`] }));
-        console.log(`[dub] 落盘 runs/dubs/${nm}.png`);
+        vlog(`[dub] 落盘 runs/dubs/${nm}.png`);
       } catch (e) {
         res.writeHead(400); res.end(String(e));
       }
@@ -365,7 +369,7 @@ createServer(async (req, res) => {
             const meta = await readFile(join(tmp, 'cuts-audio.meta.json'), 'utf8');
             res.writeHead(200, { 'content-type': 'audio/wav', 'x-dub-audio-meta': encodeURIComponent(meta) });
             res.end(wav);
-            console.log(`[dub] 音轨 ${tape}：${(wav.length / 1e6).toFixed(1)}MB WAV`);
+            vlog(`[dub] 音轨 ${tape}：${(wav.length / 1e6).toFixed(1)}MB WAV`);
           } catch (e) { res.writeHead(500); res.end(String(e)); }
           finally { rm(tmp, { recursive: true, force: true }).catch(() => {}); }
         });
@@ -398,7 +402,7 @@ createServer(async (req, res) => {
         await writeFile(join(dir, nm), Buffer.concat(chunks));
         res.writeHead(200, { 'content-type': 'application/json' });
         res.end(JSON.stringify({ saved: `runs/dubs/${nm}` }));
-        console.log(`[dub] 落盘 runs/dubs/${nm}（${(size / 1e6).toFixed(1)}MB）`);
+        vlog(`[dub] 落盘 runs/dubs/${nm}（${(size / 1e6).toFixed(1)}MB）`);
       } catch (e) { res.writeHead(400); res.end(String(e)); }
     });
     return;
@@ -452,14 +456,14 @@ createServer(async (req, res) => {
           await writeFile(join(CARDS_DIR, sid, 'card.skip.json'), JSON.stringify({ note: String(skip).slice(0, 120) }) + '\n');
           res.writeHead(200, { 'content-type': 'application/json' });
           res.end(JSON.stringify({ skipped: true }));
-          console.log(`[card] ${sid.slice(0, 8)}… 无戏可剪，销账`);
+          vlog(`[card] ${sid.slice(0, 8)}… 无戏可剪，销账`);
           return;
         }
         await writeFile(join(CARDS_DIR, sid, 'card.png'), Buffer.from(String(png), 'base64'));
         await writeFile(join(CARDS_DIR, sid, 'card.meta.json'), JSON.stringify(meta ?? {}, null, 2) + '\n');
         res.writeHead(200, { 'content-type': 'application/json' });
         res.end(JSON.stringify({ saved: [`cards/${sid}/card.png`, `cards/${sid}/card.meta.json`] }));
-        console.log(`[card] 收工卡落盘 ${join(CARDS_DIR, sid, 'card.png')}`);
+        vlog(`[card] 收工卡落盘 ${join(CARDS_DIR, sid, 'card.png')}`);
       } catch (e) { res.writeHead(400); res.end(String(e)); }
     });
     return;
@@ -531,7 +535,10 @@ createServer(async (req, res) => {
     res.writeHead(404); res.end('not found');
   }
 }).listen(port, '127.0.0.1', () => { // §0.6.② 三闸各司其职（乙-F5 订正措辞）：绑定断 LAN／Origin 断跨源写／Host 校验断 rebind 读
-  console.log(`stage @ http://127.0.0.1:${port}/${replayOnly ? '?tape=storm（replay-only）' : '（live 默认；?tape=storm 走 replay）'}`);
+  // 首光·两行（丁-E1）：监听中＋URL。其余机器内务走 --verbose；卡片宣告归舞台。
+  console.log(`♪ TAPE·ZERO · 监听中${replayOnly ? '（replay-only）' : ''}`);
+  console.log(`  stage @ http://127.0.0.1:${port}/`);
+  vlog(replayOnly ? '  ?tape=storm 走 replay' : '  live 默认；?tape=storm 走 replay；?mode=live 强制实流；--verbose 看机器内务');
 });
 
 if (!replayOnly) startLive();

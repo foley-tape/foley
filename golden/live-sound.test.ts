@@ -159,3 +159,40 @@ test('LIVE-6 落针宣告（己-5 合龙微单）：wired→needleDrop 出声；
   const wav2 = r2.ctx.render(1.0);
   assert.ok(rmsDb(wav2, EAR_SR, 0.2, 0.45) < -70, 'fg mute 下落针应静默');
 });
+
+test('LIVE-7 暂停语义改判（丙.2）：暂停＝唱片随带停（房间常在），恢复＝续播不重建（单源不叠）', () => {
+  // 合成测试唱片：220Hz 3s（lufs=targetLufs → 定标增益=1，裸波可辨）
+  const n = EAR_SR * 3, x = new Float32Array(n);
+  for (let i = 0; i < n; i++) x[i] = 0.5 * Math.sin(2 * Math.PI * 220 * i / EAR_SR);
+  const clip: RecordClip = { name: 'test-tone', title: 'Test Tone', x, sr: EAR_SR, lufs: sp.record.targetLufs, seconds: 3 };
+
+  // ① 隔离唱片路（床＋前景全 mute）：暂停唱片真静默；恢复复现；paused≠tapeStopped（不被下一包偷偷唤醒）
+  const r = rig([clip]);
+  for (const m of ['l1', 'crackle', 'l2', 's2', 's3', 'hiss', 'fg'] as const) r.eng.setMute(m, true);
+  r.feed(0.05, 8, 0.1);                          // 唱片在放
+  r.at(8.0); r.eng.pauseRecord(8.0);             // 暂停：唱片随带停
+  assert.equal(r.eng.recordPaused, true, '暂停后 recordPaused=true');
+  r.feed(8.1, 14, 0.1);                          // 暂停期喂 WORKING 包：不得复活（paused 只认 resume，非滑停语义）
+  assert.equal(r.eng.recordPaused, true, '暂停不被下一包偷偷唤醒');
+  r.at(14.0); r.eng.resumeRecord(14.0);          // 恢复：续播
+  r.feed(14.1, 20, 0.1);
+  const wav = r.ctx.render(20);
+  const playing = rmsDb(wav, EAR_SR, 4, 7);
+  const paused = rmsDb(wav, EAR_SR, 10, 13);
+  const resumed = rmsDb(wav, EAR_SR, 16, 19);
+  assert.ok(playing > -30, `暂停前唱片在放，实测 ${playing.toFixed(1)} dBFS`);
+  assert.ok(paused < -70, `暂停后唱片真静默（房间已 mute，只剩唱片路），实测 ${paused.toFixed(1)} dBFS`);
+  assert.ok(resumed > -30, `恢复后唱片复现，实测 ${resumed.toFixed(1)} dBFS`);
+  assert.ok(Math.abs(resumed - playing) < 6, `恢复＝续播不重建，单源不叠（电平不翻倍），Δ=${(resumed - playing).toFixed(1)} dB`);
+  assert.equal(r.eng.recordPaused, false, '恢复后 recordPaused=false');
+
+  // ② 房间常在（不变量二）：床不 mute，暂停唱片后整体仍有声——存在层独立于唱片处置
+  const r2 = rig([clip]);
+  r2.eng.setMute('fg', true);                     // 只静前景，床照走
+  r2.feed(0.05, 6, 0.1);
+  r2.at(6.0); r2.eng.pauseRecord(6.0);
+  r2.feed(6.1, 12, 0.1);
+  const wav2b = r2.ctx.render(12);
+  const roomDuringPause = rmsDb(wav2b, EAR_SR, 8, 11);
+  assert.ok(roomDuringPause > -45, `暂停唱片后房间层（床）仍呼吸，实测 ${roomDuringPause.toFixed(1)} dBFS`);
+});

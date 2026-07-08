@@ -231,6 +231,8 @@ export class DubController {
     if (this.state === 'proposing') { this._cancelPerformance(); return; } // 罢演
     if (this.state === 'armed') { this._dismiss(FADE_QUICK_MS); return; }  // 收回提议
     if (this.state !== 'idle' && this.state !== 'resting') return;
+    // 丙.3 船长"死活不明"案：不可用即明确拒绝（物理锁死＋一记摇头），不再静默回 idle 让人猜死活
+    if (!this._available()) { this._refuseKey(); return; }
     if (this._restEl) { this._restEl.remove(); this._restEl = null; }      // 台面清位
     if (this._cardEl) { this._cardEl.remove(); this._cardEl = null; }
     this.keyEl.classList.add('latched');
@@ -240,7 +242,29 @@ export class DubController {
       console.warn('[dub] 不提议：', err.message ?? err);
       this.keyEl.classList.remove('latched');
       this.state = 'idle';
+      this._refuseKey();   // 无戏可剪/今晨无卷：也给明确反馈（可用启发式的诚实兜底）
     }
+  }
+
+  // —— DUB 可用性（丙.3）——
+  // 可用＝机器此刻剪得出东西。replay/demo：有带即可用；live：材料够了才可用（保守地板，
+  // 无戏时按下另有 refuse 兜底——启发式说"够了"但全歇场时如实摇头）。
+  _available() {
+    if (this.mode === 'replay') return !!(this.tape && this.tape.duration > 0);
+    return (this.chart?.lastStageT ?? 0) >= 15000;
+  }
+  _refreshKey() {
+    const k = this.keyEl; if (!k) return;
+    const idle = this.state === 'idle' || this.state === 'resting';
+    const avail = this._available();
+    k.classList.toggle('dub-locked', idle && !avail);
+    k.classList.toggle('dub-ready', idle && avail);
+  }
+  _refuseKey() {
+    const k = this.keyEl; if (!k) return;
+    k.classList.remove('dub-refuse'); void k.offsetWidth; // 重启动画
+    k.classList.add('dub-refuse');
+    setTimeout(() => k.classList.remove('dub-refuse'), 400);
   }
 
   async _loadParams() {
@@ -836,6 +860,7 @@ export class DubController {
   // ———————————————————————— 渲染：齿孔层与撕的软惯性 ————————————————————————
   render(now) {
     const dt = Math.min(now - this._lastNow, 100); this._lastNow = now;
+    this._refreshKey(); // 丙.3：DUB 键随可用性明暗（不可用锁死·可用咬合）——每帧廉价刷新
     // 提议搁置超时 → 缓缓淡去
     if (this.state === 'armed' && this._fadeDeadline && now > this._fadeDeadline) {
       this._dismiss(FADE_SLOW_MS);

@@ -1,0 +1,17 @@
+{
+  "decree": "FOLEY_DECREE_005 丙 P0-2 单一传动＋暂停改判",
+  "A_singleEngine": true,
+  "B_pause": {
+    "wired": true,
+    "recordPaused": true,
+    "recordPresent": true,
+    "roomBreathesDuringPause": 0.01698
+  },
+  "C_resume": {
+    "wired": true,
+    "recordPaused": false
+  },
+  "D_dubReady": true,
+  "pageErrors": 0,
+  "PASS": true
+}

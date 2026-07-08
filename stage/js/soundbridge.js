@@ -32,6 +32,7 @@ export class SoundBridge {
     this.seed = opts.seed || 'live';
     this._records = [];   // 引擎闭包共享此引用：热装=push 后 setRecord（graph 装盘律原样）
     this._bridge = null;
+    this.needleDrops = 0; // 落针计次（机器代理只读态，与 rms()/stats() 同族——回归器免竞态读入场仪式）
   }
 
   /** 开机仪式（用户手势内调用）：起引擎、上钟、开泵。resolve 即有声（房间层）；唱片后到后加入。 */
@@ -125,8 +126,14 @@ export class SoundBridge {
    *  声桥未起（手势前）时静默——接线签的视觉退场照走（main.js），声侧下次开机自然有底噪。 */
   needleDrop() {
     if (!this.engine || !this.ctx) return;
+    this.needleDrops++;
     this.engine.needleDrop(this.ctx.currentTime + 0.03);
   }
+
+  /** 暂停/恢复（第五号手令 丙.2）：暂停＝唱片随带停（房间常在，只停唱片不停床），恢复＝续播不重建。
+   *  单一引擎档位切换——永不二次实例化音频图（丙.1）。 */
+  pause() { if (this.engine && this.ctx) this.engine.pauseRecord(this.ctx.currentTime + 0.02); }
+  resume() { if (this.engine && this.ctx) this.engine.resumeRecord(this.ctx.currentTime + 0.02); }
 
   stop() {
     if (this._timer) clearInterval(this._timer);

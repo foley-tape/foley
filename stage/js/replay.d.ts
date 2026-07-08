@@ -65,6 +65,7 @@ export class Replayer {
   playing: boolean;
   onPacket: ((pkt: StatePacket, isSeek?: boolean) => void)[];
   onMoment: ((m: Moment) => void)[];
+  onPlayState: ((playing: boolean) => void) | null; // 转台开停通知（丙.2 声侧暂停/续播唱片）
   play(): void;
   pause(): void;
   seek(tau: number): void;

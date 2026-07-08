@@ -164,10 +164,11 @@ export class Replayer {
     this.onMoment = [];   // (moment) => void
     this._lastReal = null;
     this._timer = null;
+    this.onPlayState = null; // (playing:boolean)=>void：转台开停通知（声侧据此暂停/续播唱片，丙.2）
   }
 
-  play() { this.playing = true; this._lastReal = null; this._loop(); }
-  pause() { this.playing = false; if (this._timer) { clearInterval(this._timer); this._timer = null; } }
+  play() { const was = this.playing; this.playing = true; this._lastReal = null; this._loop(); if (!was) this.onPlayState?.(true); }
+  pause() { const was = this.playing; this.playing = false; if (this._timer) { clearInterval(this._timer); this._timer = null; } if (was) this.onPlayState?.(false); }
 
   seek(tau) {
     this.stageT = Math.max(0, Math.min(tau, this.tape.duration));

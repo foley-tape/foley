@@ -125,6 +125,111 @@ let liveOutDir = null; // 今晨的纸：live 产物流目录（追赶史＋实�
 function broadcast(line) {
   for (const res of clients) res.write(`data: ${line}\n\n`);
 }
+function broadcastEvent(name, obj) { // 具名 SSE（card/wired 等旁路通告；state/moment 主流照旧走 broadcast）
+  for (const res of clients) res.write(`event: ${name}\ndata: ${JSON.stringify(obj)}\n\n`);
+}
+
+// ── 收工吐卡（轨乙①，三号手令·丁）：spool 尾随 → 蒸馏（默认脱敏）→ 引擎回放出纸 → 页面撕卡 ──
+// 钩子（cli/hook.ts）即发即忘落 spool/events.ndjson；这里尾随消费：resume 不落卡（延续不是终章），
+// clear 落卡（清屏即翻章）；每 session_id 去重，后卡替前卡（同工位覆盖写）。
+// $HOME 读写面纪律（与 B4 裁定同款）：sid 白名单正则＋文件名白名单，无路径拼接自由度；
+// 读面只此两文件（curve/moments.csv），写面只经 /card/save（Origin+令牌同一把刀）。
+// FOLEY_HOME 供测试/CI 指别处（缺省 ~/.foley）；多 serve 共读一 spool 的 cursor 竞争记 FEEDBACK 在案。
+const FOLEY_HOME = process.env.FOLEY_HOME ?? join(homedir(), '.foley');
+const SPOOL_EVENTS = join(FOLEY_HOME, 'spool', 'events.ndjson');
+const SPOOL_CURSOR = join(FOLEY_HOME, 'spool', 'cursor.json');
+const CARDS_DIR = join(FOLEY_HOME, 'cards');
+const CARD_SID = /^[\w-]{4,64}$/;
+const cardJobs = new Map(); // sid → { transcript }（后到替前＝去重）
+let cardBusy = false;
+let spoolOffset = 0;
+let spoolPolling = false;
+
+function onSpoolLine(line) {
+  let e;
+  try { e = JSON.parse(line); } catch { return; }
+  if (e.kind === 'hello') {
+    console.log('[card] 接线自证 hello 到站——钩子→spool→serve 全线通');
+    broadcastEvent('wired', { ok: 1 });
+    return;
+  }
+  if (e.kind !== 'session-end') return;
+  if (e.reason === 'resume') return; // 延续不是终章（三号手令·丁-轨乙裁定）
+  const sid = String(e.sessionId ?? '').replace(/[^\w-]/g, '').slice(0, 64);
+  const transcript = String(e.transcriptPath ?? '');
+  if (!CARD_SID.test(sid) || !transcript) return;
+  cardJobs.set(sid, { transcript });
+}
+
+function runStep(args, timeoutMs) { // 卡片工序子进程（蒸馏/回放）：退码非零即抛，超时格杀
+  return new Promise((resolve, reject) => {
+    const child = spawn(process.execPath, args, { cwd: repoRoot, stdio: ['ignore', 'ignore', 'pipe'] });
+    let err = '';
+    child.stderr.on('data', d => { err += d; });
+    const timer = setTimeout(() => child.kill('SIGKILL'), timeoutMs);
+    child.on('error', e => { clearTimeout(timer); reject(e); });
+    child.on('exit', code => {
+      clearTimeout(timer);
+      if (code === 0) resolve(); else reject(new Error(`退 ${code}：${err.slice(-300)}`));
+    });
+  });
+}
+
+async function makeCard(sid, job) {
+  if (!existsSync(job.transcript)) throw new Error('原始件已不在');
+  const dir = join(CARDS_DIR, sid);
+  await mkdir(dir, { recursive: true });
+  const tape = join(dir, 'session.tape.jsonl');
+  // 脱敏单一大脑在轨丙：这里只调用 distill 默认口径（P1-①），不自造尺
+  await runStep(['cli/index.ts', 'distill', job.transcript, tape], 60000);
+  await runStep(['cli/index.ts', 'replay', tape, '--out', dir, '--hz', '20'], 120000);
+  await rm(join(dir, 'card.png'), { force: true });       // 后卡替前卡：旧卡作废，工位回到待撕
+  await rm(join(dir, 'card.skip.json'), { force: true });
+}
+
+async function drainCardJobs() {
+  if (cardBusy) return;
+  cardBusy = true;
+  try {
+    while (cardJobs.size > 0) {
+      const [sid, job] = cardJobs.entries().next().value;
+      cardJobs.delete(sid);
+      try {
+        await makeCard(sid, job);
+        broadcastEvent('card', { sid });
+        console.log(`[card] ${sid.slice(0, 8)}… 纸已备好（候台上撕卡）`);
+      } catch (err) {
+        console.error(`[card] ${sid.slice(0, 8)}… 备纸失败：`, err?.message ?? err);
+      }
+    }
+  } finally { cardBusy = false; }
+}
+
+async function pollSpool() {
+  if (spoolPolling) return;
+  spoolPolling = true;
+  try {
+    let st;
+    try { st = statSync(SPOOL_EVENTS); } catch { return; } // 无 spool＝未接线，静候
+    if (st.size < spoolOffset) spoolOffset = 0;            // spool 被清/轮转：从头重放（出卡幂等）
+    if (st.size === spoolOffset) return;
+    const fresh = (await readFile(SPOOL_EVENTS)).subarray(spoolOffset);
+    const cut = fresh.lastIndexOf(0x0a);                   // 只消费到最后一个整行（半行等下一拍）
+    if (cut < 0) return;
+    for (const line of fresh.subarray(0, cut).toString('utf8').split('\n')) {
+      if (line.trim()) onSpoolLine(line);
+    }
+    spoolOffset += cut + 1;
+    writeFile(SPOOL_CURSOR, JSON.stringify({ offset: spoolOffset }) + '\n').catch(() => {});
+    drainCardJobs();
+  } finally { spoolPolling = false; }
+}
+
+function startCardDuty() {
+  try { spoolOffset = Number(JSON.parse(readFileSync(SPOOL_CURSOR, 'utf8')).offset) || 0; } catch { spoolOffset = 0; }
+  setInterval(pollSpool, 1500);
+  pollSpool();
+}
 
 // 本地日界的 YYYY-MM-DD（日带轮转命名，M2.2 §0.6 定死）
 function localDate(t = Date.now()) {
@@ -298,6 +403,80 @@ createServer(async (req, res) => {
     });
     return;
   }
+  // 收工吐卡读面（轨乙①）：待撕工单 ＋ 卡片原纸。$HOME 读面纪律（B4 同款）：
+  // sid 白名单正则＋文件名白名单，无路径拼接自由度；只读；Host 闸在最前已兜。
+  if (url.pathname === '/cards/pending') {
+    const pending = [];
+    try {
+      for (const d of readdirSync(CARDS_DIR, { withFileTypes: true })) {
+        if (!d.isDirectory() || !CARD_SID.test(d.name)) continue;
+        const base = join(CARDS_DIR, d.name);
+        if (!existsSync(join(base, 'curve.csv'))) continue;
+        if (existsSync(join(base, 'card.png')) || existsSync(join(base, 'card.skip.json'))) continue;
+        pending.push({ sid: d.name, m: statSync(join(base, 'curve.csv')).mtimeMs });
+      }
+    } catch { /* 无卡房＝无欠账 */ }
+    pending.sort((a, b) => a.m - b.m);
+    res.writeHead(200, { 'content-type': 'application/json', 'cache-control': 'no-store' });
+    res.end(JSON.stringify({ pending: pending.slice(-12).map(p => p.sid) }));
+    return;
+  }
+  {
+    const cm = url.pathname.match(/^\/cards\/([\w-]{4,64})\/(curve\.csv|moments\.csv)$/);
+    if (cm) {
+      try {
+        const body = await readFile(join(CARDS_DIR, cm[1], cm[2]));
+        res.writeHead(200, { 'content-type': 'text/csv; charset=utf-8', 'cache-control': 'no-store' });
+        res.end(body);
+      } catch { res.writeHead(404); res.end(); }
+      return;
+    }
+  }
+  // 撕好的卡落盘（轨乙①）：同一把写盘鉴权刀（Origin+令牌）；覆盖写＝后卡替前卡。
+  // skip 形态：台上无戏可剪（会话太短/全歇）也要销账，否则工单永远待撕。
+  if (req.method === 'POST' && url.pathname === '/card/save') {
+    if (!writeAuthed(req)) { res.writeHead(403); res.end('forbidden'); return; }
+    let body = '', size = 0, tooBig = false;
+    req.on('data', d => {
+      size += d.length;
+      if (size > 32e6) { tooBig = true; req.destroy(); return; }
+      body += d;
+    });
+    req.on('end', async () => {
+      if (tooBig) return;
+      try {
+        const { sid: rawSid, png, meta, skip } = JSON.parse(body);
+        const sid = String(rawSid ?? '');
+        if (!CARD_SID.test(sid) || !existsSync(join(CARDS_DIR, sid))) { res.writeHead(400); res.end('sid 不像样'); return; }
+        if (skip) {
+          await writeFile(join(CARDS_DIR, sid, 'card.skip.json'), JSON.stringify({ note: String(skip).slice(0, 120) }) + '\n');
+          res.writeHead(200, { 'content-type': 'application/json' });
+          res.end(JSON.stringify({ skipped: true }));
+          console.log(`[card] ${sid.slice(0, 8)}… 无戏可剪，销账`);
+          return;
+        }
+        await writeFile(join(CARDS_DIR, sid, 'card.png'), Buffer.from(String(png), 'base64'));
+        await writeFile(join(CARDS_DIR, sid, 'card.meta.json'), JSON.stringify(meta ?? {}, null, 2) + '\n');
+        res.writeHead(200, { 'content-type': 'application/json' });
+        res.end(JSON.stringify({ saved: [`cards/${sid}/card.png`, `cards/${sid}/card.meta.json`] }));
+        console.log(`[card] 收工卡落盘 ${join(CARDS_DIR, sid, 'card.png')}`);
+      } catch (e) { res.writeHead(400); res.end(String(e)); }
+    });
+    return;
+  }
+  // 接线状态（轨乙②③）：页面借此决定要不要在空转时亮「接线单」
+  if (url.pathname === '/onboard/status') {
+    let wired = false;
+    try {
+      const s = JSON.parse(await readFile(join(process.env.CLAUDE_CONFIG_DIR ?? join(homedir(), '.claude'), 'settings.json'), 'utf8'));
+      const groups = s?.hooks?.SessionEnd;
+      const mine = (c) => /cli[\\/]hook\.ts/.test(c) || (/\shook(\s|$)/.test(c) && /cli[\\/]index\.ts|foley/.test(c));
+      wired = Array.isArray(groups) && groups.some(g => Array.isArray(g?.hooks) && g.hooks.some(h => mine(String(h?.command ?? ''))));
+    } catch { /* 无档＝未接 */ }
+    res.writeHead(200, { 'content-type': 'application/json', 'cache-control': 'no-store' });
+    res.end(JSON.stringify({ wired, spool: existsSync(SPOOL_EVENTS) }));
+    return;
+  }
   if (url.pathname === '/live') {
     if (replayOnly || !liveChild) { res.writeHead(503); res.end('live 未开'); return; }
     res.writeHead(200, {
@@ -356,6 +535,7 @@ createServer(async (req, res) => {
 });
 
 if (!replayOnly) startLive();
+if (!replayOnly) startCardDuty(); // 收工吐卡值守（轨乙①）：replay-only 是静态服务器，不背卡片工序
 // P1-② 纵深兜底：任何漏网的未捕获 rejection 只记日志不崩进程（防 F1 同类"异步处理器内同步抛"再打断 live 广播/在制 dub）。
 process.on('unhandledRejection', (err) => { console.error('[serve] 未处理 rejection（兜底不崩）：', err); });
 process.on('SIGINT', () => { liveChild?.kill('SIGINT'); process.exit(0); });

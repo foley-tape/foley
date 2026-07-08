@@ -149,6 +149,67 @@ async function boot() {
   });
 
   window.__stage = { mode, replayer, live, tape, deck, counter, chart, lamps, dub }; // 调试把手（dev）
+
+  // 收工吐卡的台面侧（轨乙①）：serve 尾随 spool 备好纸（SSE 'card' 通告），台上这台机器负责撕卡；
+  // 开机先清欠账（/cards/pending——上一班收工时若没人开着页面，卡在这里补撕）。逐张串行，台上有戏不抢。
+  if (mode === 'live' && params.get('cards') !== '0') {
+    const cardQ = [];
+    let cardBusy = false;
+    const pump = async () => {
+      if (cardBusy) return;
+      cardBusy = true;
+      try {
+        while (cardQ.length > 0) {
+          const sid = cardQ.shift();
+          try { await dub.cutCard(sid); } catch (err) { console.warn('[card]', sid, err.message ?? err); }
+        }
+      } finally { cardBusy = false; }
+    };
+    const enqueue = (sid) => { if (sid && !cardQ.includes(sid)) { cardQ.push(sid); pump(); } };
+    const sweep = () => fetch('/cards/pending').then(r => (r.ok ? r.json() : { pending: [] }))
+      .then(j => (j.pending ?? []).forEach(enqueue)).catch(() => { /* 无卡房＝无欠账 */ });
+    sweep();
+    // SSE 与轮询双保险：live 子进程歇着时（新机器无会话）/live 503、SSE 断粮，
+    // 且开机那次清账可能跑在备纸（蒸馏+回放）完成之前——15s 扫一遍工单兜底
+    setInterval(sweep, 15000);
+    live.es?.addEventListener('card', e => { try { enqueue(JSON.parse(e.data).sid); } catch { /* 坏包不撕 */ } });
+    live.es?.addEventListener('wired', () => dismissWireTag()); // 接线自证到站：接线签退场
+    mountWireTagIfUnwired();
+  }
+}
+
+// —— 接线签（轨乙③）：空转仪表盘的 60 秒接线向导 ——
+// 器件法自查：面板照旧无字——说明字住在一张挂在胡桃木台沿的牛皮吊签上（纸可以有字，纸条的 FOLEY 边字同源）。
+// live 且未接线才亮；点一下签收起（本次会话不再亮）；接线自证（SSE wired）到站即退场。
+let wireTagEl = null;
+function dismissWireTag() {
+  if (!wireTagEl) return;
+  wireTagEl.classList.add('slip');
+  setTimeout(() => { wireTagEl?.remove(); wireTagEl = null; }, 700);
+  try { sessionStorage.setItem('foley-wiretag', 'dismissed'); } catch { /* 私隐模式无仓 */ }
+}
+async function mountWireTagIfUnwired() {
+  try {
+    if (sessionStorage.getItem('foley-wiretag') === 'dismissed') return;
+  } catch { /* 无仓照亮 */ }
+  let st = null;
+  try { st = await fetch('/onboard/status').then(r => (r.ok ? r.json() : null)); } catch { /* 状态取不到不亮签 */ }
+  if (!st || st.wired) return;
+  const el = document.createElement('aside');
+  el.id = 'wire-tag';
+  el.innerHTML = `
+    <i class="grommet"></i>
+    <b>接 线 单</b>
+    <ol>
+      <li><em>终端跑一句</em>npx foley connect</li>
+      <li><em>回 Claude Code</em>照常干活</li>
+      <li><em>收工</em>机器自撕一张卡（默认脱敏）</li>
+    </ol>
+    <small>约 60 秒 · 点此签收起</small>`;
+  el.addEventListener('click', dismissWireTag);
+  document.body.appendChild(el);
+  requestAnimationFrame(() => el.classList.add('hung'));
+  wireTagEl = el;
 }
 
 boot().catch(err => {

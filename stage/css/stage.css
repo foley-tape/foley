@@ -273,6 +273,64 @@ body {
   filter: brightness(0.9);
 }
 
+/* —— hover 铭牌（轨乙④）：淡蚀刻丝印悬停显影——像面板上本就刻着、平时看不清的说明字；
+   非浮动气泡、无底色无描边（交互法自查：不添现代 UI 味）。铭牌出现在件的上方（组贴视口底缘）。 */
+[data-cap] { position: relative; }
+[data-cap]::after {
+  content: attr(data-cap);
+  position: absolute; left: 50%; bottom: calc(100% + 9px);
+  transform: translateX(-50%);
+  white-space: nowrap;
+  font-size: 9px; letter-spacing: 0.20em;
+  color: var(--ink-silk);
+  text-shadow: 0 1px 0 rgba(255, 250, 235, 0.28);
+  opacity: 0; transition: opacity 0.5s ease 0.3s;
+  pointer-events: none;
+}
+[data-cap]:hover::after { opacity: 0.62; }
+/* DUB 组贴视口右缘：铭牌右对齐向左生长，字不出画（操作件永不出画的姊妹条款） */
+#dub-group [data-cap]::after { left: auto; right: 0; transform: none; }
+
+/* —— 接线签（轨乙③）：牛皮吊签挂在台沿——面板照旧无字，说明字只住在纸上（纸条 FOLEY 边字同源）。
+   live 未接线才由 main.js 挂出；点签收起（slip 滑落）。 */
+#wire-tag {
+  position: fixed; left: 6vw; bottom: 40px; z-index: 60; /* 左下：永不压 DUB 组（右下是操作件的地盘） */
+  width: 218px; padding: 14px 16px 10px; cursor: pointer;
+  background:
+    repeating-linear-gradient(97deg, rgba(120, 82, 40, 0.05) 0 3px, transparent 3px 7px),
+    linear-gradient(173deg, #CBB289 0%, #B89F73 62%, #A48A5F 100%);
+  border-radius: 3px;
+  box-shadow: 0 8px 16px rgba(10, 6, 2, 0.5), inset 0 1px 0 rgba(255, 248, 230, 0.45);
+  transform: translateY(10px) rotate(2.2deg);
+  opacity: 0;
+  transition: opacity 0.6s ease, transform 0.7s cubic-bezier(0.2, 0.7, 0.3, 1);
+}
+#wire-tag.hung { opacity: 1; transform: translateY(0) rotate(2.2deg); }
+#wire-tag.slip { opacity: 0; transform: translateY(46px) rotate(6deg); }
+#wire-tag .grommet { /* 打孔铜眼 */
+  position: absolute; left: 50%; top: 7px; transform: translateX(-50%);
+  width: 9px; height: 9px; border-radius: 50%;
+  background: radial-gradient(circle at 35% 30%, #EFE3C4, #8F7B52 60%, #4E4028 100%);
+  box-shadow: inset 0 0 0 2.5px rgba(60, 42, 18, 0.55), 0 1px 1px rgba(255, 248, 230, 0.4);
+}
+#wire-tag b {
+  display: block; text-align: center; margin: 8px 0 9px;
+  font-size: 11px; font-weight: 600; letter-spacing: 0.42em; text-indent: 0.42em;
+  color: #4A371F;
+}
+#wire-tag ol { margin: 0; padding: 0 0 0 16px; }
+#wire-tag li {
+  margin: 5px 0; font-size: 10.5px; line-height: 1.5; color: #54402A;
+}
+#wire-tag li em {
+  display: block; font-style: normal; font-size: 8.5px; letter-spacing: 0.22em;
+  color: #8A6F4A; text-transform: uppercase;
+}
+#wire-tag small {
+  display: block; margin-top: 9px; text-align: center;
+  font-size: 8px; letter-spacing: 0.20em; color: #9A805A;
+}
+
 /* mp4 卡（M-T2）：海报帧作卡面（PEAK 取帧），深烟卡座；点它落盘 */
 #dub-card {
   position: fixed; z-index: 71; cursor: pointer;

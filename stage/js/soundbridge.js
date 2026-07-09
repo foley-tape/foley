@@ -30,7 +30,10 @@ export class SoundBridge {
   constructor(opts = {}) {
     this.repoKey = opts.repoKey || 'live:default';
     this.seed = opts.seed || 'live';
-    this._records = [];   // 引擎闭包共享此引用：热装=push 后 setRecord（graph 装盘律原样）
+    this._records = [];   // 引擎闭包共享此引用（按 catalog 序填槽）：热装=填槽后 setRecord（graph 装盘律原样）
+    this._catalog = null; // catalog.records（上下曲循环依此，船长反馈：选了三首）
+    this.recordIdx = 0;   // 当前上机唱片下标
+    this.onRecordChange = null; // (title)=>void：唱片切换/上桥通知（显示牌读之）
     this._bridge = null;
     this.needleDrops = 0; // 落针计次（机器代理只读态，与 rms()/stats() 同族——回归器免竞态读入场仪式）
   }
@@ -75,34 +78,55 @@ export class SoundBridge {
     if (firstPkt) this._bridge.onPacket(firstPkt);
     this._timer = setInterval(() => this._bridge.pump(), PUMP_MS);
 
-    this._mountRecord(0); // 异步热装，不 await：起声在前，唱片在后（架构方针原文）
+    this._mountRecords(0); // 异步热装，不 await：起声在前，唱片在后（架构方针原文）
     return this;
   }
 
-  /** 唱片装载（异步；缺席按节拍重试——等 `foley records`/B4 粮道通了自动上桥）。 */
-  async _mountRecord(attempt) {
+  /** 唱片装载（异步；缺席按节拍重试）：载全部三首——第一张即起播，其余后台顺序补载，上下曲即时可切。
+   *  （船长反馈：一直是那首歌·选了三首。） */
+  async _mountRecords(attempt) {
     try {
       const catalog = await fetch('../sound/records/catalog.json').then(r => { if (!r.ok) throw new Error(String(r.status)); return r.json(); });
-      const rec = catalog.records.find(r => r.name === 'still-life') ?? catalog.records[0];
-      const buf = await fetch(`../records/${rec.file}`).then(r => { if (!r.ok) throw new Error(`${rec.file} ${r.status}`); return r.arrayBuffer(); });
-      const ab = await this.ctx.decodeAudioData(buf);
-      const n = ab.length, x = new Float32Array(n);
-      for (let c = 0; c < ab.numberOfChannels; c++) {
-        const d = ab.getChannelData(c);
-        for (let i = 0; i < n; i++) x[i] += d[i] / ab.numberOfChannels;
-      }
-      this._records.push({ name: rec.name, title: rec.title, x, sr: ab.sampleRate, seconds: ab.duration, lufs: rec.lufs, bpmMeasured: rec.bpmMeasured });
+      this._catalog = catalog.records || [];
+      if (!this._catalog.length) throw new Error('catalog 空');
+      await this._loadRecord(0);          // 第一张：装槽＋起播
       this.engine.setRecord(0);
-      this.record = rec;
-      console.log(`[sound] 唱片上桥：${rec.title}（${rec.name}）`);
+      this.recordIdx = 0;
+      this.onRecordChange?.(this.currentRecordName);
+      console.log(`[sound] 唱片上桥：${this.currentRecordName}`);
+      for (let i = 1; i < this._catalog.length; i++) {  // 其余后台顺序补载（不阻起声）
+        try { await this._loadRecord(i); } catch (e) { console.warn('[sound] 唱片补载失败', i, e?.message ?? e); }
+      }
     } catch (err) {
-      if (attempt + 1 < RECORD_RETRY_MAX) {
-        this._recordRetry = setTimeout(() => this._mountRecord(attempt + 1), RECORD_RETRY_MS);
+      if ((attempt ?? 0) + 1 < RECORD_RETRY_MAX) {
+        this._recordRetry = setTimeout(() => this._mountRecords((attempt ?? 0) + 1), RECORD_RETRY_MS);
       } else {
         console.warn('[sound] 唱片缺席，落房间层（honest fallback）：', err.message ?? err);
       }
     }
   }
+
+  /** 载第 i 张唱片入槽（幂等；catalog 序，槽与 engine.records 同引用）。 */
+  async _loadRecord(i) {
+    if (this._records[i]) return;
+    const rec = this._catalog[i];
+    const buf = await fetch(`../records/${rec.file}`).then(r => { if (!r.ok) throw new Error(`${rec.file} ${r.status}`); return r.arrayBuffer(); });
+    const ab = await this.ctx.decodeAudioData(buf);
+    const n = ab.length, x = new Float32Array(n);
+    for (let c = 0; c < ab.numberOfChannels; c++) { const d = ab.getChannelData(c); for (let k = 0; k < n; k++) x[k] += d[k] / ab.numberOfChannels; }
+    this._records[i] = { name: rec.name, title: rec.title, x, sr: ab.sampleRate, seconds: ab.duration, lufs: rec.lufs, bpmMeasured: rec.bpmMeasured };
+  }
+
+  /** 上/下一曲（dir ±1，循环）：目标已载即换（engine.setRecord 干净停旧起新）；未载则补载后换。返当前曲名。 */
+  switchRecord(dir) {
+    if (!this._catalog?.length || !this.engine || !this.ctx) return null;
+    const n = this._catalog.length;
+    const i = (((this.recordIdx + dir) % n) + n) % n;
+    const apply = () => { if (this._records[i]) { this.engine.setRecord(i, this.ctx.currentTime + 0.02); this.recordIdx = i; this.onRecordChange?.(this.currentRecordName); } };
+    if (this._records[i]) apply(); else this._loadRecord(i).then(apply).catch(() => {});
+    return this._catalog[i]?.title ?? null;
+  }
+  get currentRecordName() { return this._records[this.recordIdx]?.title ?? this._catalog?.[this.recordIdx]?.title ?? ''; }
 
   // ---- 总线订阅面（与器件同鸭型；start 未毕时到的包如实丢弃——下一包 50ms 后就来） ----
   onPacket(pkt) { this._bridge && this._bridge.onPacket(pkt); }

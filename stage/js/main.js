@@ -83,6 +83,7 @@ async function boot() {
     window.addEventListener('pointerdown', () => {
       if (sb) return; // 丙.1 单引擎：永不二次实例化音频图
       sb = new SoundBridge({ repoKey: 'deck:default', seed: 'deck' });
+      sb.onRecordChange = (name) => { const s = document.querySelector('#now-plate .np-song'); if (s) s.textContent = name; }; // 显示牌读当前曲名
       const born = sb; instruments.push(sb);
       sb.start(lastPktSeen).then(() => { if (window.__stage) window.__stage.sound = born; onSoundReady?.(); })
         .catch((err) => { instruments.splice(instruments.indexOf(born), 1); sb = null; console.warn('[sound] 声桥未起（视觉照走）：', err); });
@@ -186,25 +187,45 @@ async function boot() {
       el.querySelector('.c-name').textContent = item.name;
       el.querySelector('.c-sum').textContent = item.summary || '';
       el.querySelector('.c-dur').textContent = item.kind === 'live' ? '● LIVE' : fmtDur(item.seconds);
-      // rule 2：只请后端选中，不在前端自持选中态
-      el.addEventListener('click', () => { if (!controlsLocked) postTransport('select', { tape: item.id }); });
+      // rule 2：只请后端选中，不在前端自持选中态。点已上机的带＝退带（船长反馈：退带不直观·清屏生硬——
+      // 改为点选中带退带，平滑淡出，不再要右侧 Eject 键）。
+      el.addEventListener('click', () => {
+        if (controlsLocked) return;
+        if (item.id === curLoaded) postTransport('eject');
+        else postTransport('select', { tape: item.id });
+      });
       rackEl.appendChild(el);
     }
     if (data.transport) applyTransport(data.transport);
   }
 
-  // ── 控制面板（右·play/pause/eject 读后端态 rule 4） ──
-  const btnPlay = document.getElementById('ctl-play'), btnEject = document.getElementById('ctl-eject'), panel = document.getElementById('control-panel');
+  // ── 走带显示牌＋诊断式控制（船长十分钟修：去右侧常驻 play/eject 按钮，改机器诊断式）──
+  const nowPlate = document.getElementById('now-plate');
+  const npTape = nowPlate?.querySelector('.np-tape');
+  const npSong = nowPlate?.querySelector('.np-song');
   function updateControls(t) {
     controlsLocked = t.locked || t.phase === 'CUEING';
-    panel?.setAttribute('data-phase', t.phase);
-    if (btnPlay) { btnPlay.disabled = controlsLocked || t.phase === 'EMPTY'; btnPlay.dataset.state = t.phase === 'PLAYING' ? 'playing' : t.phase === 'PAUSED' ? 'paused' : 'idle'; }
-    if (btnEject) btnEject.disabled = controlsLocked || t.phase === 'EMPTY';
+    document.body.classList.toggle('tape-loaded', t.phase !== 'EMPTY'); // 上带→架化左抽屉·机器满台（rule 4 读后端相）
+    if (nowPlate) {
+      nowPlate.dataset.mode = t.phase === 'EMPTY' ? 'empty' : t.phase === 'PAUSED' ? 'paused' : (t.live ? 'live' : 'replay'); // 清晰区分 LIVE/回放
+      // 带名：live 时省去（与"LIVE"模式字重复）；回放/暂停显仓名
+      if (npTape) npTape.textContent = (t.loaded && !t.live) ? (rackIndex.get(t.loaded)?.name ?? '') : '';
+    }
     const dubKey = document.getElementById('dub-key');
     if (dubKey) dubKey.classList.toggle('switch-locked', controlsLocked); // rule 1：切带期录音键锁
   }
-  btnPlay?.addEventListener('click', () => { if (!controlsLocked && curPhase !== 'EMPTY') postTransport(curPhase === 'PLAYING' ? 'pause' : 'play'); });
-  btnEject?.addEventListener('click', () => { if (!controlsLocked && curPhase !== 'EMPTY') postTransport('eject'); });
+  // 诊断式播放/暂停：上带后点走带甲板即切（不常驻按钮·船长反馈：播放键占位、频率低）
+  document.getElementById('deck')?.addEventListener('click', () => {
+    if (controlsLocked || curPhase === 'EMPTY' || curPhase === 'CUEING') return;
+    postTransport(curPhase === 'PLAYING' ? 'pause' : 'play');
+  });
+  // 背景音乐上下曲（船长反馈：一直那首歌·选了三首）——切当前唱片，不动 transport
+  const bindRec = (sel, dir) => nowPlate?.querySelector(sel)?.addEventListener('click', (e) => {
+    e.stopPropagation();
+    const name = window.__stage?.sound?.switchRecord?.(dir);
+    if (name && npSong) npSong.textContent = name;
+  });
+  bindRec('.np-prev', -1); bindRec('.np-next', 1);
 
   // 调试把手（dev；换源后取当前引用）
   window.__stage = { live, deck, counter, chart, lamps, sound: sb, transport: () => curPhase,

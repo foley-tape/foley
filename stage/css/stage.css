@@ -24,106 +24,106 @@ body {
   font-family: "Univers", "Univers LT Std", "Neue Haas Grotesk", "Helvetica Neue", Helvetica, Arial, sans-serif;
 }
 
-#room { position: fixed; inset: 0 0 0 var(--rack-w); background: #060402; }
+#room { position: fixed; inset: 0 0 0 var(--rack-w); background: #060402; transition: left 0.42s cubic-bezier(.4,0,.2,1); }
+/* 上带：机器满台，卡带架化为左抽屉浮层（船长反馈：播放时长条面板占位突兀） */
+body.tape-loaded #room { left: 0; }
 
-/* ═══ 卡带架（第五号手令 丁-E2）：实体磁带收纳架质感，弱化网页扁平 ═══════════════ */
+/* ═══ 卡带架（第五号手令 丁-E2·船长十分钟修）：左抽屉——上带即收成一道脊，移到左缘滑出 ═══ */
 #rack {
-  position: fixed; left: 0; top: 0; bottom: 0; width: var(--rack-w); z-index: 40;
+  position: fixed; left: 0; top: 0; bottom: 0; width: var(--rack-w); z-index: 45;
   display: flex; flex-direction: column;
-  /* 胡桃木收纳架：竖纹＋侧壁投影＋顶底压边 */
   background:
     linear-gradient(90deg, rgba(0,0,0,0.5) 0, transparent 6px),
-    repeating-linear-gradient(0deg, rgba(58,34,18,0.0) 0 3px, rgba(30,17,9,0.32) 3px 4px),
-    linear-gradient(100deg, #40271A 0%, #2E1B10 48%, #241409 100%);
-  box-shadow: inset -10px 0 22px rgba(0,0,0,0.6), 3px 0 18px rgba(0,0,0,0.55);
+    repeating-linear-gradient(0deg, rgba(58,34,18,0.0) 0 3px, rgba(30,17,9,0.30) 3px 4px),
+    linear-gradient(100deg, #3B2417 0%, #2B1A0F 48%, #211208 100%);
+  box-shadow: inset -10px 0 22px rgba(0,0,0,0.55), 3px 0 18px rgba(0,0,0,0.5);
   border-right: 1px solid #17100a;
+  transition: transform 0.42s cubic-bezier(.4,0,.2,1), box-shadow 0.42s ease;
 }
-.rack-head {
-  padding: 16px 16px 10px; letter-spacing: 0.34em; text-indent: 0.34em;
-  color: #C9A876; font-size: 11px; text-shadow: 0 1px 0 rgba(0,0,0,0.6);
-  border-bottom: 1px solid rgba(0,0,0,0.35); box-shadow: 0 1px 0 rgba(120,80,40,0.12);
-}
-.rack-foot { padding: 10px 16px; margin-top: auto; font-size: 9px; letter-spacing: 0.4em; color: #7A5836; opacity: 0.7; }
-#rack-list { flex: 1; overflow-y: auto; overflow-x: hidden; padding: 12px 12px 4px; display: flex; flex-direction: column; gap: 11px; }
-#rack-list::-webkit-scrollbar { width: 7px; }
-#rack-list::-webkit-scrollbar-thumb { background: rgba(120,80,40,0.4); border-radius: 4px; }
+/* 上带：架化抽屉——收成一道脊（露 16px 把手）；hover 脊/架即滑出（船长反馈：播放时隐藏，移左缘滑出） */
+body.tape-loaded #rack { transform: translateX(calc(-100% + 16px)); }
+body.tape-loaded #rack:hover { transform: translateX(0); box-shadow: 10px 0 34px rgba(0,0,0,0.62); }
+.rack-spine { position: absolute; right: 0; top: 0; bottom: 0; width: 16px; opacity: 0; pointer-events: none;
+  background: repeating-linear-gradient(0deg, transparent 0 7px, rgba(255,236,190,0.12) 7px 8px);
+  transition: opacity 0.3s ease; }
+body.tape-loaded #rack .rack-spine { opacity: 0.9; }
+body.tape-loaded #rack:hover .rack-spine { opacity: 0; }
+/* 横幅弱化（船长反馈：重心偏左上）——小、暗、不喧宾 */
+.rack-head { padding: 12px 14px 8px; letter-spacing: 0.3em; text-indent: 0.3em; color: #8C7250;
+  font-size: 9px; text-shadow: 0 1px 0 rgba(0,0,0,0.5); opacity: 0.82;
+  border-bottom: 1px solid rgba(0,0,0,0.3); }
+.rack-foot { padding: 8px 14px; margin-top: auto; font-size: 8px; letter-spacing: 0.36em; color: #6B4E30; opacity: 0.6; }
+#rack-list { flex: 1; overflow-y: auto; overflow-x: hidden; padding: 8px 9px 4px; display: flex; flex-direction: column; gap: 6px; }
+#rack-list::-webkit-scrollbar { width: 6px; }
+#rack-list::-webkit-scrollbar-thumb { background: rgba(120,80,40,0.35); border-radius: 4px; }
 
-/* —— 一盒磁带：塑料外壳＋双卷轴窗＋标签纸；停在架格里，选中即抽出一截 —— */
+/* —— 一盒磁带（紧凑·船长反馈"条目太长"）：单卷轴窗＋名＋时长一行、摘要一小行 —— */
 .cassette {
-  position: relative; display: grid; grid-template-columns: 26px 26px 1fr; grid-template-rows: auto auto;
-  grid-template-areas: "hubL hubR name" "hubL hubR sum"; align-items: center; gap: 2px 10px;
+  position: relative; display: grid; grid-template-columns: 16px 1fr auto; grid-template-rows: auto auto;
+  grid-template-areas: "hub name dur" "hub sum sum"; align-items: center; gap: 0 9px;
   width: 100%; text-align: left; border: 0; cursor: pointer;
-  padding: 12px 12px 12px 14px; border-radius: 4px 6px 6px 4px;
+  padding: 7px 11px 7px 11px; border-radius: 3px 5px 5px 3px;
   color: var(--ink-silk); font-family: inherit;
-  background:
-    linear-gradient(180deg, rgba(255,250,235,0.06) 0 1px, transparent 1px),
-    linear-gradient(168deg, #2B2622 0%, #201C18 52%, #17130F 100%);
-  box-shadow: 0 2px 5px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,250,235,0.06), inset 0 -2px 4px rgba(0,0,0,0.4);
-  transition: transform 0.18s ease, box-shadow 0.18s ease, background 0.2s ease;
+  background: linear-gradient(168deg, #29241F 0%, #1E1A16 55%, #16120E 100%);
+  box-shadow: 0 1px 3px rgba(0,0,0,0.45), inset 0 1px 0 rgba(255,250,235,0.05);
+  transition: transform 0.22s cubic-bezier(.34,1.4,.5,1), box-shadow 0.2s ease, background 0.2s ease;
 }
-.cassette:hover { transform: translateX(3px); }
-.cassette .hub { grid-area: hubL; width: 22px; height: 22px; border-radius: 50%;
-  background: radial-gradient(circle at 50% 45%, #6b5c46 0 5px, #2a231a 6px 8px, #4a3f30 9px 100%);
-  box-shadow: inset 0 0 0 1px rgba(0,0,0,0.5), 0 1px 1px rgba(0,0,0,0.4); }
-.cassette .hub:nth-of-type(2) { grid-area: hubR; }
-.cassette .c-name { grid-area: name; font-size: 12px; font-weight: 600; letter-spacing: 0.06em; color: #D9C8A6;
+.cassette:hover { transform: translateX(4px); background: linear-gradient(168deg, #302A24 0%, #221D18 55%, #18140F 100%); }
+/* 卷轴窗：一枚小暗孔，弱化视觉重心（不再两枚亮红灯） */
+.cassette .hub { grid-area: hub; width: 13px; height: 13px; border-radius: 50%;
+  background: radial-gradient(circle at 50% 45%, #5a4d3a 0 2.5px, #221c14 3.5px 5px, #40361f 6px 100%);
+  box-shadow: inset 0 0 0 1px rgba(0,0,0,0.5); }
+.cassette .hub:nth-of-type(2) { display: none; }   /* 只留一枚窗（船长：两指示灯致重心偏移） */
+.cassette .c-name { grid-area: name; font-size: 11.5px; font-weight: 600; letter-spacing: 0.04em; color: #CDBB98;
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.cassette .c-sum { grid-area: sum; font-size: 10px; color: #9A876A; letter-spacing: 0.02em;
+.cassette .c-sum { grid-area: sum; font-size: 8.5px; color: #8A7658; letter-spacing: 0.01em; margin-top: 1px;
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.cassette .c-dur { position: absolute; top: 9px; right: 11px; font-size: 9px; font-style: normal; letter-spacing: 0.08em;
-  color: #8A775A; }
-.cassette.kind-live .hub { background: radial-gradient(circle at 50% 45%, #C6502E 0 5px, #2a231a 6px 8px, #7a3a24 9px 100%); }
-.cassette.kind-live .c-dur { color: #C6502E; }
-.cassette.kind-demo .c-name { color: #C6B48C; }
-/* 选中：抽出一截＋琥珀边光＋标签点亮（选中态由后端广播驱动，rule 2） */
+.cassette .c-dur { grid-area: dur; font-size: 8.5px; font-style: normal; letter-spacing: 0.06em; color: #7E6C50; }
+.cassette.kind-live .c-dur { color: #CC5638; font-weight: 600; }  /* 仅一处红：小小 ● LIVE，不做两红灯 */
+.cassette.kind-demo .c-name { color: #BEAE87; }
+/* 选中：抽出一截＋琥珀边光（更克制的抽带感，船长反馈"弹出效果再优化"） */
 .cassette.selected {
-  transform: translateX(9px);
-  background:
-    linear-gradient(180deg, rgba(255,250,235,0.1) 0 1px, transparent 1px),
-    linear-gradient(168deg, #3A342C 0%, #2A2521 52%, #201A14 100%);
-  box-shadow: 0 4px 10px rgba(0,0,0,0.55), inset 0 1px 0 rgba(255,236,190,0.16),
-    -3px 0 0 rgba(255,176,90,0.5), 0 0 14px rgba(255,176,90,0.14);
+  transform: translateX(11px);
+  background: linear-gradient(168deg, #3A342C 0%, #2A2420 55%, #1F1A14 100%);
+  box-shadow: 0 3px 9px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,236,190,0.14),
+    -3px 0 0 rgba(255,176,90,0.55), 0 0 12px rgba(255,176,90,0.12);
 }
+.cassette.selected .hub { background: radial-gradient(circle at 50% 45%, #8a7550 0 2.5px, #221c14 3.5px 5px, #5a4a2c 6px 100%); }
 .cassette.selected .c-name { color: #F0DCB0; }
 
-/* ═══ 控制面板（右·丁-E2）：播放/退带＋相灯——键态只读后端字段（rule 4） ═══ */
-#control-panel {
-  position: fixed; right: 0; top: 0; bottom: 0; width: 96px; z-index: 40;
-  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 22px;
-  pointer-events: none;  /* 只按钮接事件，面板留空让机器透出 */
+/* ═══ 走带显示牌（船长反馈修·丁-E2）：清晰区分 LIVE／回放＋上机带名＋背景音乐上下曲 ═══ */
+#now-plate {
+  position: absolute; left: 50%; top: 4px; transform: translateX(-50%); z-index: 6;
+  display: flex; align-items: center; gap: 22px; padding: 5px 14px; border-radius: 5px;
+  background: linear-gradient(180deg, rgba(20,13,6,0.5), rgba(10,7,3,0.6));
+  box-shadow: inset 0 1px 0 rgba(255,250,235,0.06), inset 0 -1px 3px rgba(0,0,0,0.5);
+  opacity: 0; transition: opacity 0.5s ease; pointer-events: none;
 }
-#control-panel .ctl, #control-panel .panel-phase { pointer-events: auto; }
-.ctl {
-  width: 62px; height: 62px; border: 0; border-radius: 50%; cursor: pointer;
-  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px;
-  background: linear-gradient(168deg, #DCCEA6 0%, #B3A077 45%, #8A784F 100%);
-  box-shadow: 0 4px 7px rgba(15,9,3,0.55), inset 0 1px 0 rgba(255,250,235,0.4), inset 0 -3px 6px rgba(30,18,6,0.35);
-  color: var(--ink-silk); font-family: inherit;
-  transition: transform 0.1s ease, box-shadow 0.12s ease, filter 0.2s ease, opacity 0.2s ease;
-}
-.ctl .silk { font-size: 8px; letter-spacing: 0.2em; text-indent: 0.2em; }
-.ctl .ctl-glyph { width: 15px; height: 15px; }
-.ctl#ctl-play .ctl-glyph { clip-path: polygon(14% 0, 14% 100%, 100% 50%); background: #3a3020; } /* ▶ */
-.ctl#ctl-play[data-state="playing"] .ctl-glyph { clip-path: none; background: none;
-  box-shadow: inset 5px 0 0 #3a3020, inset -5px 0 0 #3a3020; } /* ⏸ */
-.ctl#ctl-eject .ctl-glyph { background: #3a3020;
-  clip-path: polygon(50% 0, 100% 55%, 0 55%, 0 55%); /* ▲ */ }
-.ctl:not(:disabled):active { transform: translateY(2px); box-shadow: 0 1px 2px rgba(15,9,3,0.5), inset 0 2px 6px rgba(25,15,5,0.45); }
-.ctl:disabled { opacity: 0.32; cursor: default; filter: saturate(0.5); }
-.ctl#ctl-play[data-state="playing"]:not(:disabled) { box-shadow: 0 4px 7px rgba(15,9,3,0.55), inset 0 1px 0 rgba(255,250,235,0.4), inset 0 -3px 6px rgba(30,18,6,0.35), 0 0 10px rgba(255,176,90,0.2); }
-.panel-phase { display: flex; flex-direction: column; align-items: center; gap: 5px; }
-.panel-phase .phase-lamp { width: 8px; height: 8px; border-radius: 50%; background: #4a3f30; box-shadow: inset 0 0 0 1px rgba(0,0,0,0.4); transition: background 0.3s ease, box-shadow 0.3s ease; }
-.panel-phase .phase-word { font-size: 8px; letter-spacing: 0.22em; color: #9A876A; }
-#control-panel[data-phase="PLAYING"] .phase-lamp { background: var(--emerald); box-shadow: 0 0 8px rgba(79,140,74,0.6); }
-#control-panel[data-phase="PAUSED"] .phase-lamp { background: var(--amber); box-shadow: 0 0 8px rgba(255,176,90,0.5); }
-#control-panel[data-phase="CUEING"] .phase-lamp { background: var(--amber); animation: signal-beacon 0.9s ease-in-out infinite; }
-#control-panel[data-phase="PLAYING"] .phase-word::after { content: "Play"; }
-#control-panel[data-phase="PAUSED"] .phase-word::after { content: "Pause"; }
-#control-panel[data-phase="CUEING"] .phase-word::after { content: "Cueing"; }
-#control-panel[data-phase="EMPTY"] .phase-word::after { content: "Empty"; }
+#now-plate:not([data-mode="empty"]) { opacity: 1; }
+body.tape-loaded #brand { opacity: 0; transition: opacity 0.3s ease; } /* 上带后走带牌接管，隐去静态品牌字免重叠 */
+#now-plate .np-status { display: flex; align-items: center; gap: 8px; }
+.np-tally { width: 8px; height: 8px; border-radius: 50%; background: #4a3f30; box-shadow: inset 0 0 0 1px rgba(0,0,0,0.4); transition: all 0.3s ease; }
+.np-mode { font-size: 9px; letter-spacing: 0.26em; color: #9A876A; }
+.np-tape { font-size: 10px; font-style: normal; letter-spacing: 0.05em; color: #D9C8A6; max-width: 30vw; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+#now-plate[data-mode="live"] .np-tally { background: #E0402A; box-shadow: 0 0 9px rgba(224,64,42,0.75); animation: signal-beacon 1.7s ease-in-out infinite; }
+#now-plate[data-mode="live"] .np-mode { color: #E08A72; }
+#now-plate[data-mode="live"] .np-mode::after { content: "LIVE"; }
+#now-plate[data-mode="replay"] .np-tally { background: var(--emerald); box-shadow: 0 0 7px rgba(79,140,74,0.55); }
+#now-plate[data-mode="replay"] .np-mode::after { content: "PLAYBACK"; }
+#now-plate[data-mode="paused"] .np-tally { background: var(--amber); box-shadow: 0 0 7px rgba(255,176,90,0.5); }
+#now-plate[data-mode="paused"] .np-mode::after { content: "PAUSED"; }
+/* 背景音乐上下曲（船长反馈：一直是那首歌·选了三首） */
+.np-rec { display: flex; align-items: center; gap: 7px; pointer-events: auto; }
+.np-prev, .np-next { border: 0; background: none; color: #B79C6E; font-size: 13px; line-height: 1; cursor: pointer; padding: 2px 3px; opacity: 0.75; transition: opacity 0.15s, transform 0.1s; }
+.np-prev:hover, .np-next:hover { opacity: 1; }
+.np-prev:active, .np-next:active { transform: scale(0.85); }
+.np-song { font-size: 9px; font-style: normal; letter-spacing: 0.08em; color: #9A876A; min-width: 6ch; text-align: center; }
+.np-song::before { content: "♪ "; opacity: 0.7; }
+@media (prefers-reduced-motion: reduce) { #now-plate[data-mode="live"] .np-tally { animation: none; } }
+/* 诊断式播放/暂停：上带后走带甲板可点（点即播放/暂停）——不常驻按钮（船长反馈） */
+body.tape-loaded #deck { cursor: pointer; }
 /* 切带期录音键锁（rule 1）：DUB 键暗淡不可按 */
 #dub-key.switch-locked { filter: brightness(0.55) saturate(0.4); cursor: default; pointer-events: none; }
-@media (prefers-reduced-motion: reduce) { #control-panel[data-phase="CUEING"] .phase-lamp { animation: none; } }
 
 /* —— 整机：延伸出画外即尺度暗示，永不露整机；带轴上缘出画 ——
    注：transform 让给镜头漂移（lens.js），定位走 top 计算 */

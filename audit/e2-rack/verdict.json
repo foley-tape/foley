@@ -5,10 +5,11 @@
     "phase": "EMPTY",
     "selected": null,
     "cassettes": 14,
-    "playState": "idle",
-    "playDisabled": true,
+    "mode": "empty",
+    "tapeLoaded": false,
     "dubLocked": false,
     "gain": null,
+    "song": "",
     "engineId": null
   },
   "B_cueing_locks": {
@@ -18,7 +19,8 @@
   },
   "B_playing": {
     "pass": true,
-    "selected": "storm"
+    "selected": "storm",
+    "mode": "replay"
   },
   "B_switch_fade": {
     "pass": true,
@@ -38,24 +40,34 @@
     "p1sees": "jam",
     "note": "page2 选带 page1 实时反映（rule 2 后端权威）"
   },
-  "D_panel_pause": {
+  "D_deck_pause": {
     "pass": true,
-    "phase": "PAUSED"
+    "phase": "PAUSED",
+    "mode": "paused"
   },
-  "D_panel_resume": {
+  "D_deck_resume": {
     "pass": true,
     "phase": "PLAYING"
   },
-  "E_restart_empty": {
+  "F_record_switch": {
+    "pass": true,
+    "from": "Saturation",
+    "to": "Still Life",
+    "note": "背景音乐上下曲（三首）"
+  },
+  "H_live_mode": {
+    "pass": true,
+    "mode": "live",
+    "note": "清晰区分 LIVE/回放"
+  },
+  "G_eject": {
     "pass": true,
     "phase": "EMPTY",
-    "selected": null,
-    "cassettes": 14,
-    "playState": "idle",
-    "playDisabled": true,
-    "dubLocked": false,
-    "gain": null,
-    "engineId": null
+    "note": "点已上机带退带·平滑回空载"
+  },
+  "E_restart_empty": {
+    "pass": true,
+    "phase": "EMPTY"
   },
   "pageErrors": 0,
   "PASS": true

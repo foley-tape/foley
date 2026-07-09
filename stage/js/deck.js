@@ -76,6 +76,7 @@ export class ReelDeck {
   }
 
   onPacket(pkt, isSeek) {
+    if (!Number.isFinite(pkt.stageT) || !Number.isFinite(pkt.A)) return; // 防脏包毒害走带物理（NaN 一旦入 theta 永久污染）
     if (isSeek) { this.stuck = false; this.stuckTheta = null; this.lastStageT = pkt.stageT; } // dev 跳带即换带上机，卡碟态清零
     const dt = Math.max(0, pkt.stageT - this.lastStageT); // 舞台时间：倍速下机构如实加速
     this.lastStageT = pkt.stageT;

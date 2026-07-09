@@ -12,17 +12,12 @@
 <body>
 <!-- 卡带架（第五号手令 丁-E2）：左侧纵向单列磁带货架——实体收纳架质感，弱化网页扁平。
      磁带条目＝仓名＋摘要＋时长；点带即请后端上机（选中态由后端广播回来，前端不自持）。 -->
-<aside id="rack">
+<aside id="rack" aria-label="卡带架">
   <div class="rack-head"><span class="silk">Cassette Rack</span></div>
   <div id="rack-list"></div>
   <div class="rack-foot silk">TAPE·ZERO</div>
+  <i class="rack-spine" aria-hidden="true"></i><!-- 上带后收成一道脊；鼠标移到左缘滑出（船长反馈） -->
 </aside>
-<!-- 控制面板（右）：播放/退带——键态只读后端 transport 字段（rule 4），切带期锁死（rule 1）。 -->
-<div id="control-panel" data-phase="EMPTY">
-  <button id="ctl-play" class="ctl" data-state="idle" disabled><i class="ctl-glyph"></i><span class="silk">Play</span></button>
-  <button id="ctl-eject" class="ctl" disabled><i class="ctl-glyph"></i><span class="silk">Eject</span></button>
-  <div class="panel-phase"><i class="phase-lamp"></i><span class="silk phase-word"></span></div>
-</div>
 <div id="room" class="pre-gesture">
   <!-- 首光·PLAY 呼吸示能（第五号手令 丁-E1／丙.3）：手势前唯一亮起（琥珀呼吸微光），
        手势即房间醒（声＋光同醒），示能退场。diegetic——机器自己的灯语，非现代弹窗按钮。 -->
@@ -126,6 +121,17 @@
       </div>
 
       <div id="brand" class="silk">Tape · Zero</div>
+
+      <!-- 走带显示牌（船长反馈·丁-E2 修）：清晰区分 LIVE／回放＋上机带名；右侧背景音乐上下曲切换。
+           读后端 transport 字段（rule 4）；点击面板/走带即播放/暂停（诊断式，不常驻按钮）。 -->
+      <div id="now-plate" data-mode="empty">
+        <span class="np-status"><i class="np-tally"></i><b class="np-mode"></b><em class="np-tape"></em></span>
+        <span class="np-rec" title="背景音乐">
+          <button class="np-prev" aria-label="上一曲">◂</button>
+          <i class="np-song"></i>
+          <button class="np-next" aria-label="下一曲">▸</button>
+        </span>
+      </div>
 
       <!-- DUB 剪辑组（M-T1）：操作件不承载读数；时长以纸长签呈现，无数字。
            hover 铭牌（轨乙④）：蚀刻丝印悬停显影，data-cap 说明按件而言、不带读数（面板零数字维持） -->

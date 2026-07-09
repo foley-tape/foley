@@ -25,6 +25,7 @@ export function parseCurve(text) {
     const line = lines[i];
     if (!line) continue;
     const c = line.split(',');
+    if (c.length < 9 || !Number.isFinite(+c[0])) continue; // 半行（live 边写边读的截断末行）→丢，免 NaN 毒害器件
     t[k] = +c[0]; S[k] = +c[1]; T[k] = +c[2]; A[k] = +c[3];
     wow[k] = +c[4]; needle[k] = +c[5];
     phase[k] = Math.max(0, PHASES.indexOf(c[6]));
@@ -42,6 +43,7 @@ export function parseMoments(text) {
     const line = lines[i];
     if (!line) continue;
     const c = line.split(',');
+    if (c.length < 12 || !Number.isFinite(+c[0])) continue; // 半行（截断末行）→丢
     // tags/slot（M2.5 demo 声桥要喂前景分类与音阶度）：hex/枚举位，列审计在册
     out.push({ t: +c[0], seq: +c[2], verb: c[3], outcome: c[4], special: c[7] || null, tags: c[6] || '', slot: c[11] || '' });
   }

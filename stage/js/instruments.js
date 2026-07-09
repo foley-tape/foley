@@ -129,6 +129,12 @@ export class ChartRecorder {
     this.needFull = true;
   }
   _yOf(T) { const top = 26, bot = this.h - 26; return bot - Math.max(0, Math.min(1, T)) * (bot - top); }
+  // 切带清纸（第五号手令 丁-E2）：换带即换纸——墨账清零、接带痕重置、可换 tape 引用（splices 决接痕）。
+  reset(tape) {
+    if (tape) this.tape = tape;
+    this.points = []; this.seams = []; this.pos = 0; this.lastStageT = 0; this.spliceIdx = 0;
+    this.pair = new PacketPair(); this.needFull = true;
+  }
 
   onPacket(pkt, isSeek) {
     if (isSeek) { // dev 跳带：墨迹重来，纸位对齐（DONE 段忽略，仅调试用）

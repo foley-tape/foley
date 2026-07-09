@@ -10,6 +10,19 @@
 <link rel="stylesheet" href="css/stage.css">
 </head>
 <body>
+<!-- 卡带架（第五号手令 丁-E2）：左侧纵向单列磁带货架——实体收纳架质感，弱化网页扁平。
+     磁带条目＝仓名＋摘要＋时长；点带即请后端上机（选中态由后端广播回来，前端不自持）。 -->
+<aside id="rack">
+  <div class="rack-head"><span class="silk">Cassette Rack</span></div>
+  <div id="rack-list"></div>
+  <div class="rack-foot silk">TAPE·ZERO</div>
+</aside>
+<!-- 控制面板（右）：播放/退带——键态只读后端 transport 字段（rule 4），切带期锁死（rule 1）。 -->
+<div id="control-panel" data-phase="EMPTY">
+  <button id="ctl-play" class="ctl" data-state="idle" disabled><i class="ctl-glyph"></i><span class="silk">Play</span></button>
+  <button id="ctl-eject" class="ctl" disabled><i class="ctl-glyph"></i><span class="silk">Eject</span></button>
+  <div class="panel-phase"><i class="phase-lamp"></i><span class="silk phase-word"></span></div>
+</div>
 <div id="room" class="pre-gesture">
   <!-- 首光·PLAY 呼吸示能（第五号手令 丁-E1／丙.3）：手势前唯一亮起（琥珀呼吸微光），
        手势即房间醒（声＋光同醒），示能退场。diegetic——机器自己的灯语，非现代弹窗按钮。 -->

@@ -1,0 +1,62 @@
+{
+  "decree": "FOLEY_DECREE_005 丁-E2",
+  "A_landing_empty": {
+    "pass": true,
+    "phase": "EMPTY",
+    "selected": null,
+    "cassettes": 14,
+    "playState": "idle",
+    "playDisabled": true,
+    "dubLocked": false,
+    "gain": null,
+    "engineId": null
+  },
+  "B_cueing_locks": {
+    "pass": true,
+    "phase": "CUEING",
+    "dubLocked": true
+  },
+  "B_playing": {
+    "pass": true,
+    "selected": "storm"
+  },
+  "B_switch_fade": {
+    "pass": true,
+    "cueGain": 0.403,
+    "afterGain": 0.9
+  },
+  "B_engine_persist": {
+    "pass": true,
+    "note": "同一 AudioContext 引擎跨切带不销毁（rule 1）"
+  },
+  "B_switched_to_busy": {
+    "pass": true,
+    "selected": "busy"
+  },
+  "C_multiclient_sync": {
+    "pass": true,
+    "p1sees": "jam",
+    "note": "page2 选带 page1 实时反映（rule 2 后端权威）"
+  },
+  "D_panel_pause": {
+    "pass": true,
+    "phase": "PAUSED"
+  },
+  "D_panel_resume": {
+    "pass": true,
+    "phase": "PLAYING"
+  },
+  "E_restart_empty": {
+    "pass": true,
+    "phase": "EMPTY",
+    "selected": null,
+    "cassettes": 14,
+    "playState": "idle",
+    "playDisabled": true,
+    "dubLocked": false,
+    "gain": null,
+    "engineId": null
+  },
+  "pageErrors": 0,
+  "PASS": true
+}

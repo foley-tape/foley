@@ -135,6 +135,21 @@ export class SoundBridge {
   pause() { if (this.engine && this.ctx) this.engine.pauseRecord(this.ctx.currentTime + 0.02); }
   resume() { if (this.engine && this.ctx) this.engine.resumeRecord(this.ctx.currentTime + 0.02); }
 
+  /** 切带淡出/淡入（第五号手令 丁-E2 rule 1）：master 增益平滑坡——绝不销毁音频图（免爆破），
+   *  换带只是同一引擎上换喂食源。淡出到近零、淡入回额定。 */
+  fadeOut(sec = 0.42) {
+    if (!this.engine || !this.ctx) return;
+    const g = this.engine.nodes.master.gain, t = this.ctx.currentTime;
+    g.cancelScheduledValues(t); g.setValueAtTime(Math.max(g.value, 0.0001), t);
+    g.linearRampToValueAtTime(0.0001, t + sec);
+  }
+  fadeIn(sec = 0.42) {
+    if (!this.engine || !this.ctx) return;
+    const g = this.engine.nodes.master.gain, t = this.ctx.currentTime;
+    g.cancelScheduledValues(t); g.setValueAtTime(Math.max(g.value, 0.0001), t);
+    g.linearRampToValueAtTime(0.9, t + sec);
+  }
+
   stop() {
     if (this._timer) clearInterval(this._timer);
     if (this._recordRetry) clearTimeout(this._recordRetry);

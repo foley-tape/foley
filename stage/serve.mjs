@@ -7,7 +7,7 @@
 // 中继与钟都不依赖标签页可见性——藏页照走（M2.0 §2 验证件二）。
 import { createServer } from 'node:http';
 import { readFile, writeFile, mkdir, mkdtemp, rm } from 'node:fs/promises';
-import { existsSync, readdirSync, statSync, readFileSync } from 'node:fs';
+import { existsSync, readdirSync, statSync, readFileSync, openSync, readSync, closeSync, fstatSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { join, extname, normalize, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -189,6 +189,25 @@ async function makeCard(sid, job) {
   await runStep(['cli/index.ts', 'replay', tape, '--out', dir, '--hz', '20'], 120000);
   await rm(join(dir, 'card.png'), { force: true });       // 后卡替前卡：旧卡作废，工位回到待撕
   await rm(join(dir, 'card.skip.json'), { force: true });
+  try { await writeRackMeta(dir, tape, job.transcript); } catch { /* 标签失败不阻出卡 */ }
+}
+
+// 卡带架标签（第五号手令 丁-E2）：仓名（源路径末段·非内容）＋录音开头摘要（蒸馏带开头动作族·
+// 脱敏电报，非原文）＋时长（走带轴）。写 rack.json 供 /rack 枚举读；老卡无此文件走回退。
+async function writeRackMeta(dir, tapeFile, transcript) {
+  const enc = dirname(transcript).split(/[\\/]/).filter(Boolean).pop() || '';
+  const repo = enc.split('-').filter(Boolean).pop() || 'session';    // -Users-shadow-tape0 → tape0
+  let summary = '会话录音';
+  try {
+    const lines = (await readFile(tapeFile, 'utf8')).split('\n').slice(1, 60); // 跳 meta 行
+    const verbs = [];
+    for (const l of lines) {
+      try { const m = JSON.parse(l); const v = m.verb && m.verb !== 'OTHER' ? m.verb : m.special; if (v && !verbs.includes(v)) verbs.push(v); } catch { /* 坏行 */ }
+      if (verbs.length >= 3) break;
+    }
+    if (verbs.length) summary = verbs.join(' · ');   // 如 "READ · EDIT · RUN"（机器语汇·无原文）
+  } catch { /* 读不到就用回退 */ }
+  await writeFile(join(dir, 'rack.json'), JSON.stringify({ repo, summary, seconds: stageDurationSec(join(dir, 'curve.csv')) }) + '\n');
 }
 
 async function drainCardJobs() {
@@ -257,7 +276,11 @@ function startLive() {
     while ((nl = buf.indexOf('\n')) >= 0) {
       const line = buf.slice(0, nl); buf = buf.slice(nl + 1);
       if (!line) continue;
-      if (line.includes('"state"')) lastState = line;
+      if (line.includes('"state"')) {
+        lastState = line;
+        // rule 4 pendingAsk 保活：live ASK 待机态回填 transport（只在跳变时广播），全客户端灯语读后端字段
+        try { transportSetPendingAsk(JSON.parse(line).pendingAsk); } catch { /* 坏行不回填 */ }
+      }
       broadcast(line);
     }
   });
@@ -268,16 +291,123 @@ function startLive() {
   });
 }
 
+// ═══ E2 卡带架·transport 状态机（第五号手令 丁-E2）═══════════════════════════════════
+// 服务端权威（rule 2/4）：架上选中、上机带、播放/暂停、游标、live 待机——一处收口，SSE 'transport'
+// 广播全客户端实时同步；前端不单独维护选中态。进程重启即空载（rule 3）：内存态、无持久化、不继承历史。
+// 切带（rule 1）：CUEING 相＝淡出→装带→淡入的服务端节拍窗，此间播放/录音键锁死；客户端音频包络随此态
+// （读态非自计时，rule 4），禁止硬切销毁。
+const TRANSPORT_PHASES = ['EMPTY', 'CUEING', 'PLAYING', 'PAUSED']; // 完整状态枚举（rule 4）
+const CUE_FADE_MS = 460;   // 切带节拍：淡出窗（客户端据此淡出＋锁键）；到点服务端置 loaded+PLAYING→客户端装带淡入
+const transport = {
+  phase: 'EMPTY',      // ∈ TRANSPORT_PHASES
+  selected: null,      // 架上选中 tapeId（rule 2 权威）
+  loaded: null,        // 上机 tapeId
+  cursor: 0,           // 播放游标 ms（rule 3 重启清零）
+  paused: false,       // 暂停标记（rule 3 重启清零）
+  pendingAsk: false,   // live 待机保活（rule 4；由 live 状态流回填）
+  live: false,         // 上机的是否 live 带
+  locked: false,       // 键锁（CUEING 期真，rule 1）
+  epoch: Date.now(),   // 本次进程纪元（客户端据此识别 serve 重启＝历史不继承）
+  seq: 0,              // 状态版本（单调）
+};
+let cueTimer = null;
+function transportSnapshot() { return { ...transport, phases: TRANSPORT_PHASES }; }
+function pushTransport() { transport.locked = transport.phase === 'CUEING'; transport.seq++; broadcastEvent('transport', transportSnapshot()); }
+
+function transportSelect(tapeId) {
+  if (transport.phase === 'CUEING') return false;   // 闭锁期不接新指令（rule 1）
+  if (!rackHas(tapeId)) return false;
+  clearTimeout(cueTimer);
+  transport.selected = tapeId;                       // 选中即刻广播（rule 2 全客户端同步标记）
+  transport.phase = 'CUEING';
+  transport.paused = false;
+  pushTransport();
+  cueTimer = setTimeout(() => {                       // 节拍到：装带上机→PLAYING（客户端淡入）
+    transport.loaded = tapeId;
+    transport.live = tapeId === 'live';
+    transport.cursor = 0;
+    transport.phase = 'PLAYING';
+    pushTransport();
+  }, CUE_FADE_MS);
+  return true;
+}
+function transportPlay() { if (transport.phase === 'PAUSED') { transport.phase = 'PLAYING'; transport.paused = false; pushTransport(); } }
+function transportPause() { if (transport.phase === 'PLAYING') { transport.phase = 'PAUSED'; transport.paused = true; pushTransport(); } }
+function transportEject() {
+  clearTimeout(cueTimer);
+  Object.assign(transport, { phase: 'EMPTY', selected: null, loaded: null, cursor: 0, paused: false, live: false });
+  pushTransport();
+}
+function transportSetPendingAsk(on) { if (!!on !== transport.pendingAsk) { transport.pendingAsk = !!on; pushTransport(); } }
+
+// ── 卡带架枚举（rule 4 标签＝仓名＋摘要＋时长）──
+const DEMO_TAPES = [
+  { id: 'storm',   name: 'STORM',   summary: '暴风工作流·满负荷' },
+  { id: 'busy',    name: 'BUSY',    summary: '密集读写·多线程' },
+  { id: 'jam',     name: 'JAM',     summary: '卡带·反复重试' },
+  { id: 'smooth',  name: 'SMOOTH',  summary: '顺流·一气呵成' },
+  { id: 'silence', name: 'SILENCE', summary: '静场·几无动作' },
+];
+// 卡带时长（秒）＝有效录制时长（走带轴），非墙钟跨度：curve 行为舞台栅格采样（如 100ms/行），
+// 空转已折叠出账（raw t 跳变但不采行）。故 时长 ≈ 行数×行距。只读头 4KB＋文件大小估算（避免整读 MB）。
+function stageDurationSec(file) {
+  let fd;
+  try {
+    fd = openSync(file, 'r');
+    const size = fstatSync(fd).size;
+    if (!size) return 0;
+    const head = Buffer.alloc(Math.min(4096, size));
+    readSync(fd, head, 0, head.length, 0);
+    const lines = head.toString('utf8').split('\n');
+    const t0 = Number(lines[1]?.split(',')[0]), t1 = Number(lines[2]?.split(',')[0]);
+    const interval = (Number.isFinite(t0) && Number.isFinite(t1) && t1 > t0) ? (t1 - t0) : 50; // 行距 ms
+    const complete = lines.slice(1, -1);                    // 去表头与末半行
+    const avgLen = complete.length ? (complete.reduce((s, l) => s + l.length + 1, 0)) / complete.length : 71;
+    const rowCount = Math.max(0, size / avgLen - 1);        // 估数据行数（减表头）
+    return rowCount * interval / 1000;
+  } catch { return 0; } finally { if (fd !== undefined) { try { closeSync(fd); } catch { /* 已关 */ } } }
+}
+function buildRack() {
+  const items = [{ id: 'live', kind: 'live', name: 'LIVE', summary: '今晨·实时会话', seconds: null }];
+  for (const d of DEMO_TAPES) {
+    const cv = join(root, 'fixtures', `${d.id}.curve.csv`);
+    if (existsSync(cv)) items.push({ id: d.id, kind: 'demo', name: d.name, summary: d.summary, seconds: stageDurationSec(cv) });
+  }
+  const cards = [];
+  try {
+    for (const e of readdirSync(CARDS_DIR, { withFileTypes: true })) {
+      if (!e.isDirectory() || !CARD_SID.test(e.name)) continue;
+      const cv = join(CARDS_DIR, e.name, 'curve.csv');
+      if (!existsSync(cv)) continue;
+      let rj = {};
+      try { rj = JSON.parse(readFileSync(join(CARDS_DIR, e.name, 'rack.json'), 'utf8')); } catch { /* 老卡无 rack.json → 回退 */ }
+      cards.push({
+        id: `card:${e.name}`, kind: 'card',
+        name: rj.repo || `session·${e.name.slice(0, 8)}`,
+        summary: rj.summary || '会话录音',
+        seconds: rj.seconds ?? stageDurationSec(cv),
+        _m: statSync(cv).mtimeMs,
+      });
+    }
+  } catch { /* 无卡房 */ }
+  cards.sort((a, b) => b._m - a._m); // 新在上
+  return [...items, ...cards.map(({ _m, ...c }) => c)];
+}
+function rackHas(id) {
+  if (id === 'live') return true;
+  if (DEMO_TAPES.some(d => d.id === id)) return existsSync(join(root, 'fixtures', `${id}.curve.csv`));
+  if (typeof id === 'string' && id.startsWith('card:')) { const sid = id.slice(5); return CARD_SID.test(sid) && existsSync(join(CARDS_DIR, sid, 'curve.csv')); }
+  return false;
+}
+
 createServer(async (req, res) => {
   // Host 白名单闸（P1-④）：先于一切路由（含静态读面与 F1 崩点），非白即 403。
   if (!HOST_OK.has(String(req.headers.host ?? ''))) { res.writeHead(403); res.end('forbidden host'); return; }
   let url;
   try { url = new URL(req.url, 'http://localhost'); }
   catch { res.writeHead(400); res.end('bad url'); return; }
-  // G8 空盘自举：只拦「裸正门」（无 query）；?tape/?mode=live 等来意一律尊重
-  if (demoBoot && url.pathname === '/' && !url.search) {
-    res.writeHead(302, { location: '/?tape=storm&speed=8' }); res.end(); return;
-  }
+  // 第五号手令 丁-E2：首页默认磁带架（rule 4）——裸正门直上 index.html 的空载卡带架（rule 3），
+  // 不再 302 落厂演示卷（G8 空盘"死机观感"由卡带架本身化解：架上有带可选，天然非死）。
   // 今晨的纸：当前 live 产物流快照（curve 含追赶全史；页面铺纸后按 t 去重接 SSE）
   if (url.pathname === '/today/curve.csv' || url.pathname === '/today/moments.csv') {
     if (!liveOutDir) { res.writeHead(404); res.end(); return; }
@@ -481,6 +611,34 @@ createServer(async (req, res) => {
     res.end(JSON.stringify({ wired, spool: existsSync(SPOOL_EVENTS) }));
     return;
   }
+  // ── E2 卡带架路由（第五号手令 丁-E2）──
+  // GET /rack：架上磁带（仓名/摘要/时长）＋当前 transport 快照。POST /transport/{select,play,pause,eject}：
+  // 服务端权威改态（rule 2/4），同源令牌闸（与写盘同刀）。
+  if (url.pathname === '/rack') {
+    res.writeHead(200, { 'content-type': 'application/json', 'cache-control': 'no-store' });
+    res.end(JSON.stringify({ rack: buildRack(), transport: transportSnapshot() }));
+    return;
+  }
+  if (req.method === 'POST' && url.pathname.startsWith('/transport/')) {
+    if (!writeAuthed(req)) { res.writeHead(403); res.end('forbidden'); return; }
+    const action = url.pathname.slice('/transport/'.length);
+    let body = '', size = 0, tooBig = false;
+    req.on('data', d => { size += d.length; if (size > 4096) { tooBig = true; req.destroy(); return; } body += d; });
+    req.on('end', () => {
+      if (tooBig) return;
+      let ok = true;
+      try {
+        if (action === 'select') { const { tape } = JSON.parse(body || '{}'); ok = transportSelect(String(tape ?? '')); }
+        else if (action === 'play') transportPlay();
+        else if (action === 'pause') transportPause();
+        else if (action === 'eject') transportEject();
+        else ok = false;
+      } catch { ok = false; }
+      res.writeHead(ok ? 200 : 400, { 'content-type': 'application/json' });
+      res.end(JSON.stringify(ok ? transportSnapshot() : { error: 'bad transport request' }));
+    });
+    return;
+  }
   if (url.pathname === '/live') {
     if (replayOnly || !liveChild) { res.writeHead(503); res.end('live 未开'); return; }
     res.writeHead(200, {
@@ -490,6 +648,7 @@ createServer(async (req, res) => {
     });
     res.write(':stage live\n\n');
     if (lastState) res.write(`data: ${lastState}\n\n`);
+    res.write(`event: transport\ndata: ${JSON.stringify(transportSnapshot())}\n\n`); // 新客户端即得当前 transport 态（rule 2 同步）
     clients.add(res);
     req.on('close', () => clients.delete(res));
     return;

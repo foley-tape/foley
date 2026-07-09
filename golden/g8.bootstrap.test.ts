@@ -39,15 +39,15 @@ describe('G8 · 空盘自举（正门必须活）', () => {
 
   after(() => { proc?.kill('SIGKILL'); try { rmSync(emptyDir, { recursive: true, force: true }); } catch { /* 已清 */ } });
 
-  test('① 裸正门 302 → ?tape=storm&speed=8（跟随后 200）；带 query 来意尊重', async () => {
+  test('① 首页默认磁带架（丁-E2 取代 G8 302 演示卷）：裸正门 200 直上卡带架；深链来意尊重', async () => {
     const r = await fetch(base + '/', { redirect: 'manual' });
-    assert.equal(r.status, 302, '空盘机器的裸正门必须落演示卷，不许死寂');
-    assert.equal(r.headers.get('location'), '/?tape=storm&speed=8');
-    assert.equal((await fetch(base + '/')).status, 200, '跟随重定向应 200（storm 演示卷在包）');
+    assert.equal(r.status, 200, '首页默认磁带架——裸正门直上 index.html，不再 302（空盘死机观感由卡带架化解）');
+    const html = await r.text();
+    assert.match(html, /id="rack"/, '首页必须是卡带架（架上有带可选，天然非死寂）');
     const live = await fetch(base + '/?mode=live', { redirect: 'manual' });
-    assert.equal(live.status, 200, '?mode=live 显式来意不得改写');
+    assert.equal(live.status, 200, '?mode=live 深链上机可达');
     const tape = await fetch(base + '/?tape=smooth', { redirect: 'manual' });
-    assert.equal(tape.status, 200, '?tape= 显式来意不得改写');
+    assert.equal(tape.status, 200, '?tape= 深链上机可达');
   });
 
   test('② 声资产挂载：params/织体/唱片目录可达，穿越仍被闸', async () => {
@@ -62,12 +62,12 @@ describe('G8 · 空盘自举（正门必须活）', () => {
     }
   });
 
-  test('③ 源码卫兵：正页挂声桥＋自举闸/挂载在位，防回潮', () => {
+  test('③ 源码卫兵：正页挂声桥＋卡带架/声资产在位，防回潮', () => {
     const main = readFileSync(join(repoRoot, 'stage', 'js', 'main.js'), 'utf8');
     assert.match(main, /SoundBridge/, 'main.js 必须接声桥——正页无声即 G8 复发');
     assert.match(main, /pointerdown/, '声桥须由用户手势解锁（浏览器手势律）');
     const serve = readFileSync(join(repoRoot, 'stage', 'serve.mjs'), 'utf8');
-    assert.match(serve, /tape=storm&speed=8/, 'serve 空盘自举 302 不许摘');
+    assert.match(serve, /['"]\/rack['"]/, 'serve 卡带架路由不许摘（首页默认磁带架 丁-E2）');
     assert.match(serve, /sound-params\.json/, 'serve 声资产挂载不许摘');
   });
 });

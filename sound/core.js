@@ -200,6 +200,8 @@ export function buildTrack(snaps, gapCapMs, maxPoints) {
 
 /** 压缩轴上取样（二分，取 ≤pm 最近行）。 */
 export function sampleAt(track, pm) {
+  // 空账（未上带／空载磁带架，丁-E2）：返房间层默认零态（IDLE），免下游 stateOf 读 undefined 崩。
+  if (track.length === 0) return [0, 0, 0, 0, 0, 0, 0, 0];
   let lo = 0, hi = track.length - 1, best = 0;
   while (lo <= hi) { const md = (lo + hi) >> 1; if (track[md][0] <= pm) { best = md; lo = md + 1; } else hi = md - 1; }
   return track[best];

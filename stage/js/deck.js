@@ -154,6 +154,8 @@ export class Counter {
     housingEl.addEventListener('mouseenter', () => loupeEl.classList.add('on'));
     housingEl.addEventListener('mouseleave', () => loupeEl.classList.remove('on'));
   }
+  // 切带里程归零（第五号手令 丁-E2）：换带即换里程账。
+  reset() { this.value = 0; this.lastStageT = 0; this._low = undefined; this._lastV = undefined; }
   onPacket(pkt, isSeek) {
     if (isSeek) { this.value = (pkt.stageT / 1000) * 0.72; this.lastStageT = pkt.stageT; }
     const dt = Math.max(0, pkt.stageT - this.lastStageT);

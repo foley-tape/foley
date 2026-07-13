@@ -18,6 +18,10 @@ node_modules/
 *.log
 .DS_Store
 
+# 合并立法（2026-07-13·老终端五件套）：渲染产物不入库——源 hero_scene.py＋ref/ 入库即可再生；
+# 条帧/样片 ~977MB 属产物（证据副本归 ~/Desktop/至架构师，重件走 Releases 惯例）。
+art/hero/renders/
+
 # Releases 打包产物（scripts/pack-records.mjs 出件，上传后即弃——重媒体不入库 §0.5）
 dist-records/
 

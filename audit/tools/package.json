@@ -1,0 +1,11 @@
+{
+  "name": "foley-audit-tools",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "审计庭大器具箱·局部隔离环境。RMS 机器代理（rms_probe.mjs）的浏览器依赖 playwright-core 限装于此，不入主包依赖（第四号手令 戊）。主包 /Users/shadow/tape0/package.json 与本环境物理隔离。",
+  "//": "用法：node rms_probe.mjs --url ... （node 从本目录 node_modules 解析 playwright-core）。browser 走 ms-playwright 缓存的 chromium-*，rms_probe 自动探测或 --exe 指定。",
+  "dependencies": {
+    "playwright-core": "^1.61.1"
+  }
+}

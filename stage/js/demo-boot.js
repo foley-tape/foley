@@ -11,7 +11,9 @@ import { SoundBridge } from './soundbridge.js';
 import { mountFlapBoard, mountTrackIndex } from './flapboard.js';
 import { runPost, runPenSweep, postGate } from './post.js';
 
-const SEEK_S = 920; // 默认取景：风暴前奏——24s 后即 944s 跳针簇，随后高原（demo 的一幕戏）
+// §9 策展令（队列1）：取景是内容决策——哪盘带、哪一幕，读 fixtures/curation.json（舞台秒，
+// 与 replayer.seek 同钟）。册缺席跌落内置取景（离线场景），跌落必自白不装健康。
+const FALLBACK_SCENE = { tape: 'storm', seekS: 920 };
 
 async function boot() {
   if (document.readyState !== 'complete') {
@@ -20,7 +22,16 @@ async function boot() {
   buildMachine(document.getElementById('machine'));
   mountPerf();   // 帧医生（?perf=1·P0-1 验收器）   // decree13：机器＝场景板＋动态层（单一数据源 markup）
 
-  const tape = await loadTape('storm');
+  let curation = null;
+  try {
+    const r = await fetch('fixtures/curation.json');
+    if (r.ok) curation = await r.json();
+  } catch { /* 网络缺席走跌落 */ }
+  if (!curation?.demo) console.warn('[demo] 策展册缺席——跌落内置取景', FALLBACK_SCENE);
+  const TAPE = curation?.demo?.tape ?? FALLBACK_SCENE.tape;
+  const SEEK_S = curation?.demo?.seekS ?? FALLBACK_SCENE.seekS;
+
+  const tape = await loadTape(TAPE);
   const replayer = new Replayer(tape);
 
   const vu = new VuMeter(document.getElementById('vu-svg'));
@@ -87,7 +98,7 @@ async function boot() {
 
   // POWER：一次人手，声画同启（总线一元论：声桥是回放总线的普通订阅者——画与声吃
   // 同一路包流，橱窗与正页同一条代码路径；唱片异步上桥，先房间层后音乐）
-  const bridge = new SoundBridge({ repoKey: 'demo:storm', seed: 'demo' });
+  const bridge = new SoundBridge({ repoKey: 'demo:' + TAPE, seed: 'demo' });
   replayer.onPacket.push(pkt => bridge.onPacket(pkt));
   replayer.onMoment.push(m => bridge.onMoment(m));
   // ② 翻字牌（两页同法）：曲名唯一显示面·onRecordChange 唯一驱动；换曲键橱窗同约

@@ -107,8 +107,8 @@ async function boot() {
     .then((c) => mountTrackIndex(document.getElementById('track-index'), (c.records || []).map((x) => x.title)))
     .catch(() => {});
   bridge.onRecordChange = (name, userSwitch) => {
-    // POST 演出期让位（两页同法）：揭幕并入幕三翻牌拍
-    const apply = () => flap?.set(name, { onSettle: () => { if (userSwitch) bridge.needleDrop?.(); } });
+    // POST 演出期让位（两页同法）：揭幕并入幕三翻牌拍；哗啦与翻牌同刻（刀四·物理不问缘由）
+    const apply = () => { bridge.solariCue?.(800); flap?.set(name, { onSettle: () => { if (userSwitch) bridge.needleDrop?.(); } }); };
     if (!postGate.defer(apply)) apply();
   };
   document.querySelector('#song-keys .np-prev')?.addEventListener('click', (e) => { e.stopPropagation(); bridge.switchRecord(-1); });

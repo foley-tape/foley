@@ -126,9 +126,9 @@ export function runPost(h, opts = {}) {
       // 三 · 翻牌（与探针重叠）：有台词=揭幕；无台词=空翻——哗啦与起翻同刻
       if (!flapFired && t >= T.flapAt) {
         flapFired = true;
-        sound?.solariCue?.(1050);
         const line = postGate._take();
-        if (line) line(); else flap?.sweep?.();
+        if (line) line();                                  // 揭幕台词自带哗啦（apply 内 cue·免双击）
+        else { sound?.solariCue?.(1050); flap?.sweep?.(); } // 空翻拍由 POST 供声
       }
       // 三 · 马达 ¼ 转（沉重感=1.5s 惯性窗）
       if (!reelFired && t >= T.reelAt) { reelFired = true; deck?.nudge?.(Math.PI / 2, T.reelMs); }

@@ -116,7 +116,8 @@ async function boot() {
       sb.onRecordChange = (name, userSwitch) => {
         // POST 演出期让位（船长时序令）：台词并入幕三翻牌拍=揭幕滚真曲名——
         // §11 唯一写者不变，只延时不代笔；非演出期原样即翻。
-        const apply = () => flap?.set(name, { onSettle: () => { if (userSwitch) born.needleDrop?.(); } });
+        // 哗啦与翻牌同刻（刀四）：翻片级联是物理事件，不问缘由（上桥/切曲/揭幕同响）
+        const apply = () => { born.solariCue?.(800); flap?.set(name, { onSettle: () => { if (userSwitch) born.needleDrop?.(); } }); };
         if (!postGate.defer(apply)) apply();
       };
       const born = sb; instruments.push(sb);

@@ -63,7 +63,20 @@ await cdp.send('Page.startScreencast', { format: 'jpeg', quality: 82, maxWidth: 
 await page.waitForTimeout(PRE * 1000);
 await page.mouse.click(CX, CY);            // 真手势：房间醒→声桥起→POST 开跑
 console.log('[record] 手势已落，POST 应起');
-await page.waitForTimeout(SECS * 1000 - PRE * 1000);
+// --script 'ms:x,y;ms:x,y'（刀四器具进化）：首击后的补充击（ms=距首击毫秒·绝对排程免漂）
+const SCRIPT = argOf('--script', null);
+if (SCRIPT) {
+  const t1 = Date.now();
+  for (const step of SCRIPT.split(';')) {
+    const m = step.match(/^(\d+):(-?\d+),(-?\d+)$/);
+    if (!m) continue;
+    const dueIn = Number(m[1]) - (Date.now() - t1);
+    if (dueIn > 0) await page.waitForTimeout(dueIn);
+    await page.mouse.click(Number(m[2]), Number(m[3]));
+    console.log('[record] 脚本击', m[1] + 'ms', m[2] + ',' + m[3]);
+  }
+}
+await page.waitForTimeout(Math.max(0, SECS * 1000 - PRE * 1000 - (SCRIPT ? SCRIPT.split(';').reduce((a, x) => Math.max(a, Number(x.split(':')[0]) || 0), 0) : 0)));
 await cdp.send('Page.stopScreencast');
 
 // 声轨（audiotap 在手势后上位；未上位=页面没起声，照样出无声视频并明说）

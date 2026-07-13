@@ -72,7 +72,7 @@ factory 缓存（解析顺序 repo 真身 → `~/.foley/**/factory/`）。沿用
 git -C /Users/shadow/tape0 merge --no-ff track/c-security   # 三 commit 一并（B4→契约→repro）
 # 或按 commit 粒度分步：c69d53a(B4) → 39aaed9(契约) → 596e19f(repro)
 ```
-**合入 main 哈希**：候合入（未合入 main＝未完成，增补一.4）——合入后回填此处。
+**合入 main 哈希**：79137a3
 
 ## 五、给架构师的观察（卡外·不自救·增补四.2）
 

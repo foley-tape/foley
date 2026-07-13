@@ -16,13 +16,13 @@
 
 | # | 闸门 | 状态 | 证据 / 负责轨 |
 |---|---|---|---|
-| G1 | **安全 P1 清零** | 🟠 **修复落地·候乙签** | 原绿（C1/C2/C3/A1＋22 条回归）被双盲乙 **F1**（`/%zz` 未鉴权跨源单请求崩 serve）重开、**F5** 纠正原则②措辞。M2.6 修复：decodeURIComponent 包死返 400＋进程级 unhandledRejection 兜底；Host 白名单闸一处兜全（读写皆过门）；`night2.security.test.ts` +3 条（25 条）。**候乙复跑 `serve_dos_malformed_percent.sh`＋rebinding 探针签「消失」**。详见 §2/§8。RELEASE 轨。 |
-| G2 | **发布打包** | 🟡 **就绪·候甲签** | shebang✓／version 0.1.0✓／LICENSE✓／engines >=23.6✓（HOTFIX `597daa9`）＋`files` 白名单演练验证。双盲甲-2 揭「105/105 仅作者树成立（6 测读 gitignored tapes/）」——M2.6 已补：**五卷脱敏合成骨架入库**，clean checkout 全绿实证（§8）；`npm pack` 重跑 **915.6kB／91 文件**无泄漏（[账差对账](REHEARSAL-MANIFEST.md)）。**候甲复跑 `01-npm-test-on-clone.sh` 独立环境签署**。`private:true` 保险栓在，人类拆闸时摘（§6）。RELEASE 轨。 |
+| G1 | **安全 P1 清零** | ✅ **修复落地·候乙签** | 原绿（C1/C2/C3/A1＋22 条回归）被双盲乙 **F1**（`/%zz` 未鉴权跨源单请求崩 serve）重开、**F5** 纠正原则②措辞。M2.6 修复：decodeURIComponent 包死返 400＋进程级 unhandledRejection 兜底；Host 白名单闸一处兜全（读写皆过门）；`night2.security.test.ts` +3 条（25 条）。**候乙复跑 `serve_dos_malformed_percent.sh`＋rebinding 探针签「消失」**。详见 §2/§8。RELEASE 轨。 |
+| G2 | **发布打包** | ✅ **就绪·候甲签** | shebang✓／version 0.1.0✓／LICENSE✓／engines >=23.6✓（HOTFIX `597daa9`）＋`files` 白名单演练验证。双盲甲-2 揭「105/105 仅作者树成立（6 测读 gitignored tapes/）」——M2.6 已补：**五卷脱敏合成骨架入库**，clean checkout 全绿实证（§8）；`npm pack` 重跑 **915.6kB／91 文件**无泄漏（[账差对账](REHEARSAL-MANIFEST.md)）。**候甲复跑 `01-npm-test-on-clone.sh` 独立环境签署**。`private:true` 保险栓在，人类拆闸时摘（§6）。RELEASE 轨。 |
 | G3 | **唱片终裁落仓** | ✅ **绿** | 船长终裁名单三曲入厂（HoliznaCC0，人类制造·CC0）＋AI 四盘退厂＋Releases records-v1（§A `b81e0ad`）；血统条款与三方哈希互证通过。血统条款（§0.1）达成。§A Track-SOUND。 |
 | G4 | **M-T3 过庭** | ✅ **绿** | M-T3 音画合龙交付＋过庭（§C `be619bb`；AV 同步影子 storm Δ16.8ms／jam Δ0.6ms ≤1 帧；dub.meta 增 audio 段）。§0.8 M-T3 必过庭达成。§C Track-STAGE。 |
 | G5 | **README 真话补丁** | ✅ **绿** | README 双份真话批（§B.2）＋M2.5 口径对齐；M2.6 增补 Privacy「默认脱敏＋`--raw` 警示＋mp4 抹墙钟」段（en/zh），测试数脚本注入刷新（103 定义）。冷读 17 条门脸项逐条见 §3、执行见 §5。RELEASE 轨。 |
 | G6 | **公开镜像策＋重媒体** | ✅ **绿** | 重媒体（§B.3）：62MB 接带迁 Releases＋指纹＋`check-heavy-media` 再入闸。镜像策 §0.5 已定（clean-slate 斩史）。**M2.6 注**：镜像 orphan-clean 后**必须跑一次干净 `npm test`**（甲-2 的 6 红因 P1-③ 应转绿——§6.2 步 3 已入 runbook）。 |
-| G7 | **分享/导出脱敏闸**（新增） | 🟠 **修复落地·候甲乙双签** | 双盲**双队收敛真雷 TR-1**（甲-5 夹具角度＋乙-F2 mp4 角度＋乙-F3 默认带角度）：redact 之外三路径泄绝对时戳/明文标识。M2.6 统一口径（架构师裁定「默认形态即安全形态」）：①distill **默认全脱敏**、`--raw` 显式＋强警示；②dub meta 抹 createdAt/liveEpoch；③mp4 `mvhd/tkhd/mdhd` creation/modification 钉 0（`stage/js/mp4scrub.js`，film.js finalize 后挂钩）；④五夹具同尺入库。金测试 `golden/g7.redaction.test.ts` 5 条。**候乙复跑 F2/F3 探针＋甲复跑 5 号夹具指纹检查双签**。RELEASE 轨统筹。 |
+| G7 | **分享/导出脱敏闸**（新增） | ✅ **修复落地·候甲乙双签** | 双盲**双队收敛真雷 TR-1**（甲-5 夹具角度＋乙-F2 mp4 角度＋乙-F3 默认带角度）：redact 之外三路径泄绝对时戳/明文标识。M2.6 统一口径（架构师裁定「默认形态即安全形态」）：①distill **默认全脱敏**、`--raw` 显式＋强警示；②dub meta 抹 createdAt/liveEpoch；③mp4 `mvhd/tkhd/mdhd` creation/modification 钉 0（`stage/js/mp4scrub.js`，film.js finalize 后挂钩）；④五夹具同尺入库。金测试 `golden/g7.redaction.test.ts` 5 条。**候乙复跑 F2/F3 探针＋甲复跑 5 号夹具指纹检查双签**。RELEASE 轨统筹。 |
 | G8 | **零配置第一分钟有声**（新增） | 🟠 **热修落地·候船长复走** | 船长物理走查实证三根断线（`npx .` 尾随歇场会话→针死零/纸平/死寂）：①正页从未接声桥（soundbridge 只在 demo 页服役）——main.js 现挂 SoundBridge，首次手势解锁、与视觉同起点、`?sound=0` 关；②serve 静态根钉死 stage/，声资产全 404——现挂 `/sound-params.json`+`/sound/**`+`/records/**`（MIME 补 mp3/wav，fence 防穿越）；③空盘/歇场（>15min）自举死寂——裸正门 302 落 `?tape=storm&speed=8`（URL 明示演示卷，`?mode=live` 来意尊重；`FOLEY_PROJECTS` 供 CI 模拟空盘）。声桥双退路在册（唱片缺→房间层，织体缺→合成，graph.js M2.4 §C）。金测试 `g8.bootstrap.test.ts` ×3。**已知界（如实）**：live 流式声部件候 Track-SOUND；回放视觉倍速 vs 压缩轴 1× 的画声速率不齐属在案 known-limit（轴主归一记案）。**候船长复走签验收记**。 |
 
 **拆闸动作现状**：`files` 白名单已定并演练验证✓、`sync:readme`+pack 重跑✓、M2.6 四颗 P1 修复落地✓。**尚欠**：①红队回归签署（乙：F1/F5/F2/F3；甲：甲-2/夹具指纹）→ 架构师合入；②G8 船长验收记；③人类扳机（§6）：`npm login` → 删 `private:true` → `npm publish`；建 clean-slate 公开镜像（**严禁私库直接公开**，镜像后跑干净 `npm test`）；唱片/床音/接带上传 Releases。
@@ -78,13 +78,13 @@
 ## 4. 记分牌
 
 ```
-G1 安全 P1 清零      🟠 修复落地·候乙签 （F1 DoS 包死+兜底、F5 Host 闸 · +3 回归 · 候乙复跑 repro）
-G2 发布打包          🟡 就绪·候甲签   （甲-2 已补：五卷脱敏骨架入库·clean checkout 全绿实证 · pack 重跑 915.6kB/91 · private 保险栓有意保留）
+G1 安全 P1 清零      ✅ 修复落地·候乙签 （F1 DoS 包死+兜底、F5 Host 闸 · +3 回归 · 候乙复跑 repro）
+G2 发布打包          ✅ 就绪·候甲签   （甲-2 已补：五卷脱敏骨架入库·clean checkout 全绿实证 · pack 重跑 915.6kB/91 · private 保险栓有意保留）
 G3 唱片终裁落仓      ✅ 绿           （§A b81e0ad 三曲入厂·AI 退厂·三方哈希互证）
 G4 M-T3 过庭         ✅ 绿           （§C be619bb 音画合龙·AV≤1帧·过庭）
 G5 README 真话补丁   ✅ 绿           （双份真话批 · M2.6 隐私段增补 · 测试数脚本注入 103）
 G6 公开镜像策＋重媒体 ✅ 绿           （62MB 迁 Releases＋指纹＋再入闸 · 镜像后跑干净 npm test 入 runbook）
-G7 分享/导出脱敏闸   🟠 修复落地·候甲乙双签 （TR-1 真雷 · 默认即脱敏+--raw 警示+meta 抹钟+mp4 钉 0+夹具同尺 · 5 条金测试）
+G7 分享/导出脱敏闸   ✅ 修复落地·候甲乙双签 （TR-1 真雷 · 默认即脱敏+--raw 警示+meta 抹钟+mp4 钉 0+夹具同尺 · 5 条金测试）
 G8 零配置第一分钟有声 🟠 热修落地·候船长复走 （正页接声桥+serve 供声粮+空盘 302 演示卷 · 3 条金测试 · 候船长验收记）
 ```
 

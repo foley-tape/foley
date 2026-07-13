@@ -1,7 +1,8 @@
 // POST 开机自检·机器验收器（⑦批）：真 chromium 开页→合成首手势→逐 100ms 采样器件状态，
 // 打印时间轴并断言六件套都活过、终态归还（静止零写）。
 //
-//   node stage/tools/verify/post_probe.mjs [--url http://127.0.0.1:4181/?sound=0] [--secs 4.6]
+//   node stage/tools/verify/post_probe.mjs --profile index|demo [--secs 4.6]
+//   （--profile＝一键选房·整固批：demo 自动带 POWER 手势与 URL；显式 --url/--click 可覆写）
 import { existsSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { homedir } from 'node:os';
@@ -9,9 +10,15 @@ import { createRequire } from 'node:module';
 
 const args = process.argv.slice(2);
 const argOf = (k, d) => { const i = args.indexOf(k); return i >= 0 ? args[i + 1] : d; };
-const URL_ = argOf('--url', 'http://127.0.0.1:4181/?sound=0');
+const PROFILE = argOf('--profile', null);
+const PRESET = {
+  index: { url: 'http://127.0.0.1:4181/?sound=0', click: null },
+  demo: { url: 'http://127.0.0.1:4181/demo.html?sound=0', click: '#power' },
+}[PROFILE];
+if (PROFILE && !PRESET) { console.error(`未知 profile：${PROFILE}（可选 index|demo）`); process.exit(2); }
+const URL_ = argOf('--url', PRESET?.url ?? 'http://127.0.0.1:4181/?sound=0');
 const SECS = Number(argOf('--secs', '6.8'));   // 5.0s 紧凑三阶段＋收尾余量（船长二修令后）
-const CLICK = argOf('--click', null);   // demo 页：POST 挂在 POWER，用 --click '#power' 代首手势
+const CLICK = argOf('--click', PRESET?.click ?? null);   // demo 页：POST 挂在 POWER（--profile demo 自动）
 
 function autodetectChromium() {
   const cache = process.env.PLAYWRIGHT_BROWSERS_PATH || join(homedir(), 'Library/Caches/ms-playwright');

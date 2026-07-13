@@ -659,6 +659,43 @@ tgt=bpy.data.objects.new('cam_t', None); bpy.context.collection.objects.link(tgt
 cc=cam.constraints.new('TRACK_TO'); cc.target=tgt; cc.track_axis='TRACK_NEGATIVE_Z'; cc.up_axis='UP_Y'
 cam.data.dof.use_dof=True; cam.data.dof.focus_object=tgt; cam.data.dof.aperture_fstop=C['cam_fstop']
 
+# ── 板相机契约（整固批·勘误录#7"相机锁死＝坐标即常量"的执法化）──────────────────
+# 板族渲染（layout/plate/strip/sprite/anim/loop）共此一签——机位即坐标之根：coords.json
+# 与 plate.css 的全部手拷都锚在这一签上。set_plate_camera()=唯一上机位路径；渲前
+# assert_plate_camera()双比对：①对契约常量 ②对运行时 coords 存签（stage/assets/
+# plate.coords.json 的 _camera）——不符即 RuntimeError 拒渲：宁可不出图，不出坐标错位
+# 的图（⑥"MODE=still 错机位整批作废"血案的闸门化）。CAMCHECK=1 环境口：签核毕即退不渲。
+PLATE_CAM = dict(loc=(-0.2, 12.6, 0.3), lens=58.0, tgt=(-0.2, 0.05, -0.5), dof=False)
+
+def set_plate_camera():
+    cam.location = PLATE_CAM['loc']; cam.data.lens = PLATE_CAM['lens']
+    tgt.location = PLATE_CAM['tgt']; cam.data.dof.use_dof = PLATE_CAM['dof']
+
+def plate_cam_signature():
+    return dict(loc=[round(float(v), 6) for v in cam.location], lens=round(float(cam.data.lens), 3),
+                tgt=[round(float(v), 6) for v in tgt.location], dof=bool(cam.data.dof.use_dof))
+
+def assert_plate_camera(stage_name):
+    import json as _json, sys as _sys
+    sig = plate_cam_signature()
+    want = dict(loc=[round(float(v), 6) for v in PLATE_CAM['loc']], lens=round(float(PLATE_CAM['lens']), 3),
+                tgt=[round(float(v), 6) for v in PLATE_CAM['tgt']], dof=PLATE_CAM['dof'])
+    if sig != want:
+        raise RuntimeError(f'[camera-contract] {stage_name}: 场景相机≠板契约——拒渲\n  现场 {sig}\n  契约 {want}')
+    _cj = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', '..', 'stage', 'assets', 'plate.coords.json')
+    _stored = None
+    try:
+        with open(_cj) as _f: _stored = _json.load(_f).get('_camera')
+    except Exception: pass
+    if _stored is not None and _stored != sig:
+        raise RuntimeError(f'[camera-contract] {stage_name}: 契约相机≠运行时 coords 存签（板已按另一机位印过坐标）——拒渲\n  存签 {_stored}\n  现场 {sig}')
+    if _stored is None:
+        print(f'[camera-contract] {stage_name}: 运行时 coords 尚无 _camera 存签（老册）——以契约渲；plate 印坐标时自动补签')
+    print(f'[camera-contract] {stage_name}: 签核通过 loc={sig["loc"]} lens={sig["lens"]} dof={sig["dof"]}')
+    if os.environ.get('CAMCHECK'):
+        print(f'[camera-contract] CAMCHECK：{stage_name} 签核毕·按令不渲即退')
+        _sys.exit(0)
+
 # ---------- 动效编排（层分离精神：光不动、盘在转；惯性律；魔眼呼吸；拨杆拨下/回） ----------
 def _linearize(ob):   # 逐帧关键帧→线性插值，防 Bezier 自动柄在转动上过冲抖动（兼容 5.x 槽式 action）
     ad = ob.animation_data
@@ -817,14 +854,14 @@ def build_loop():
 
 # ---------- 出图 ----------
 if MODE == 'anim':
-    cam.location=(-0.2, 12.6, 0.3); cam.data.lens=58; tgt.location=(-0.2, 0.05, -0.5); cam.data.dof.use_dof=False  # 全机取景（含记录仪·机位锁死）
+    set_plate_camera(); assert_plate_camera('anim')   # 全机取景（含记录仪·机位锁死＝契约）
     build_animation()
     scene.render.image_settings.color_depth='8'
     scene.render.filepath = OUT   # 帧目录前缀（如 .../frames/f_）→ 写 f_0001.png …
     print(f'[hero] anim {scene.frame_start}-{scene.frame_end} -> {OUT}####  ({RESX}x{int(RESX*10/16)}, {SAMPLES} spp)')
     bpy.ops.render.render(animation=True)
 elif MODE == 'loop':
-    cam.location=(-0.2, 12.6, 0.3); cam.data.lens=58; tgt.location=(-0.2, 0.05, -0.5); cam.data.dof.use_dof=False  # 全机取景·机位锁死（同动效）
+    set_plate_camera(); assert_plate_camera('loop')   # 全机取景·机位锁死（同动效＝契约）
     build_loop()
     scene.render.image_settings.color_depth='8'
     scene.render.filepath = OUT
@@ -843,8 +880,7 @@ elif MODE == 'recorder':
     bpy.ops.render.render(write_still=True)
 elif MODE == 'layout':
     reelL.rotation_euler[1]=radians(14); reelR.rotation_euler[1]=radians(52)
-    cam.location=(-0.2, 12.6, 0.3); cam.data.lens=58; tgt.location=(-0.2, 0.05, -0.5)   # 全机布局验证（机器仍溢出画外）
-    cam.data.dof.use_dof=False
+    set_plate_camera(); assert_plate_camera('layout')   # 全机布局验证（机器仍溢出画外·契约机位）
     # peek 渲染闸（复盘 R1·⑥勘误后归正宗）：板相机在 layout——peek/补窗一律走本分支。
     # ⚠️勘误入册：MODE=still 是旧英雄机位（C 默认·DOF 开），与板不同框——⑥首轮补丁错机位即此坑。
     _pk = os.environ.get('PEEK')
@@ -944,7 +980,7 @@ elif MODE == 'plate':
     if _rp:                                             # decree13 乙-2：纸面烘入板·无墨；墨=真页 live canvas 层（免双线）
         _rp.data.materials.clear()
         _rp.data.materials.append(img_emissive('paper_plain','/Users/shadow/tape0/stage/assets/paper.png',1.0,rough=0.62))
-    cam.location=(-0.2, 12.6, 0.3); cam.data.lens=58; tgt.location=(-0.2, 0.05, -0.5); cam.data.dof.use_dof=False  # 全机取景（同合页/loop·机位锁死）
+    set_plate_camera(); assert_plate_camera('plate')   # 全机取景（同合页/loop·机位锁死＝契约）
     scene.render.resolution_x=RESX; scene.render.resolution_y=int(RESX*10/16)
     bpy.context.view_layer.update()
     dg = bpy.context.evaluated_depsgraph_get(); cam_e = cam.evaluated_get(dg)
@@ -959,6 +995,7 @@ elif MODE == 'plate':
     def _disc(cx,cy,cz,r):
         return _bb([(cx-r,cy,cz),(cx+r,cy,cz),(cx,cy,cz-r),(cx,cy,cz+r)])
     coords=dict(
+        _camera=plate_cam_signature(),   # 相机契约存签：本册坐标由此机位所印（assert_plate_camera 对签）
         res=[scene.render.resolution_x, scene.render.resolution_y],
         reelL=_disc(-C['reel_cx'],0.12,C['reel_cz'],1.05),
         reelR=_disc( C['reel_cx'],0.12,C['reel_cz'],1.05),
@@ -1002,7 +1039,7 @@ elif MODE == 'strip':
         if o.type == 'MESH' and o not in keep:
             try: o.visible_camera = False
             except Exception: pass
-    cam.location=(-0.2, 12.6, 0.3); cam.data.lens=58; tgt.location=(-0.2, 0.05, -0.5); cam.data.dof.use_dof=False  # 同板相机·锁死
+    set_plate_camera(); assert_plate_camera('strip')   # 同板相机·锁死＝契约
     scene.render.film_transparent=True; scene.render.image_settings.color_mode='RGBA'
     scene.render.resolution_x=RESX; scene.render.resolution_y=int(RESX*10/16)
     bpy.context.view_layer.update()
@@ -1048,7 +1085,7 @@ elif MODE in ('strip_guide', 'strip_band'):
         if o.type=='MESH' and o not in keep:
             try: o.visible_camera=False
             except Exception: pass
-    cam.location=(-0.2,12.6,0.3); cam.data.lens=58; tgt.location=(-0.2,0.05,-0.5); cam.data.dof.use_dof=False  # 同板相机·锁死
+    set_plate_camera(); assert_plate_camera('strip_guide/band')   # 同板相机·锁死＝契约
     scene.render.film_transparent=True; scene.render.image_settings.color_mode='RGBA'
     scene.render.resolution_x=RESX; scene.render.resolution_y=int(RESX*10/16)
     bpy.context.view_layer.update()
@@ -1098,7 +1135,7 @@ elif MODE == 'sprite_penarm':
     for _nm in ('rec_tip', 'rec_arm'):   # 五勘：旧粗笔尖=隐形影子柱正罩珠顶（visible_camera=False 影子照投）——彻底出场
         _ob = bpy.data.objects.get(_nm)
         if _ob: _ob.hide_render = True
-    cam.location=(-0.2,12.6,0.3); cam.data.lens=58; tgt.location=(-0.2,0.05,-0.5); cam.data.dof.use_dof=False
+    set_plate_camera(); assert_plate_camera('sprite_penarm')   # 契约机位
     scene.render.film_transparent=True; scene.render.image_settings.color_mode='RGBA'
     scene.render.resolution_x=RESX; scene.render.resolution_y=int(RESX*10/16)
     bpy.context.view_layer.update()
@@ -1134,7 +1171,7 @@ elif MODE == 'sprite_penrail':
         if o.type=='MESH' and o not in keep:
             try: o.visible_camera=False
             except Exception: pass
-    cam.location=(-0.2,12.6,0.3); cam.data.lens=58; tgt.location=(-0.2,0.05,-0.5); cam.data.dof.use_dof=False
+    set_plate_camera(); assert_plate_camera('sprite_penrail')   # 契约机位
     scene.render.film_transparent=True; scene.render.image_settings.color_mode='RGBA'
     scene.render.resolution_x=RESX; scene.render.resolution_y=int(RESX*10/16)
     bpy.context.view_layer.update()
@@ -1167,7 +1204,7 @@ elif MODE == 'sprite_flap':
         if o.type=='MESH' and o not in keep:
             try: o.visible_camera=False
             except Exception: pass
-    cam.location=(-0.2,12.6,0.3); cam.data.lens=58; tgt.location=(-0.2,0.05,-0.5); cam.data.dof.use_dof=False
+    set_plate_camera(); assert_plate_camera('sprite_flap')   # 契约机位
     scene.render.film_transparent=True; scene.render.image_settings.color_mode='RGBA'
     scene.render.resolution_x=RESX; scene.render.resolution_y=int(RESX*10/16)
     bpy.context.view_layer.update()
@@ -1219,7 +1256,7 @@ elif MODE == 'sprite_flapglass':
         if o.type=='MESH' and o not in keep:
             try: o.visible_camera=False
             except Exception: pass
-    cam.location=(-0.2,12.6,0.3); cam.data.lens=58; tgt.location=(-0.2,0.05,-0.5); cam.data.dof.use_dof=False
+    set_plate_camera(); assert_plate_camera('sprite_flapglass')   # 契约机位
     scene.render.film_transparent=True; scene.render.image_settings.color_mode='RGBA'
     scene.render.resolution_x=RESX; scene.render.resolution_y=int(RESX*10/16)
     bpy.context.view_layer.update()

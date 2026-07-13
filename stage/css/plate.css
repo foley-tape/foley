@@ -54,7 +54,7 @@
      canvas 层只有盘那么大；帧不变零绘制。 */
   position: absolute; inset: 0; width: 100%; height: 100%;
 }
-#tapeband { left: 0; top: 0; width: 1px; height: 1px; }   /* 带已烘入板·此元素仅供 deck.js 引用 */
+#tapeband { left: 0; top: 0; width: 1px; height: 1px; z-index: 4; }   /* 带已烘入板·此元素仅供 deck.js 引用（z=清葬受迁） */
 /* 第三批③：走带活层（placement＝渲染打印铆定·与板同源同灯；canvas 皮同 .reel-spin） */
 #guide-l  { left: 58.3594%; top: 47.0000%; width: 4.5703%; height: 7.2500%; }
 #guide-r  { left: 31.9141%; top: 47.0000%; width: 4.5312%; height: 7.2500%; }
@@ -105,6 +105,7 @@ body.tape-loaded #deck:active { background: radial-gradient(closest-side, rgba(0
    canvas 生纸理＋#paper-relight（板上自身烘焙光的低频重照层·multiply）＝纸继承渲染光照与色调；
    dub-overlay（齿孔亮起=光）在重照层之上不受压暗。 —— */
 #chart-canvas, #paper-relight, #dub-overlay { left: 24.506%; top: 75.258%; width: 45.889%; height: 14.51%; }
+#dub-overlay { touch-action: none; }   /* 清葬受迁：纸上拖选/撕纸的触控独占（M-T1 律） */
 /* ④ 伺服滑针（placement=渲染打印铆定·中位姿态渲＝_yOf(0.5) 对齐）；transform 由 ChartRecorder 值变才写。
    滑轨=静件（追修·船长案"剧烈时臂座分离"：滑套恒骑轨，机构闭合） */
 #pen-head { left: 64.9609%; top: 78.8750%; width: 8.5938%; height: 7.5625%; will-change: transform; pointer-events: none; }
@@ -224,6 +225,13 @@ body.tape-loaded #deck:active { background: radial-gradient(closest-side, rgba(0
 /* Dymo B 案已随光机融合废除（文字由光承载·无外贴介质） */
 
 /* —— 计数轮（读窗已烘入板·hover 微距 loupe 现滚动数字·复用旧 loupe/wheel 皮） —— */
+/* 整固批·读窗临时压暗（船长令"断电即黑"）：计数轮已拆（P0-5），板上白卡读窗不该亮着——
+   multiply 沉入深铜色（栅缝结构隐约保留＝仍是一扇窗，不是一块补丁）；区域=coords counter
+   （白卡实测即 bbox 全域·185 阈值）；正式窗体候棘爪律返工重渲板。 */
+#counter-dim {
+  left: 56.903%; top: 59.837%; width: 6.666%; height: 5.701%;
+  background: #2A2118; mix-blend-mode: multiply; border-radius: 3px;
+}
 #counter-housing { left: 56.903%; top: 59.837%; width: 6.666%; height: 5.701%; pointer-events: auto; cursor: none; }
 #counter-housing .slot { display: none; }
 #loupe {
@@ -238,6 +246,7 @@ body.tape-loaded #deck:active { background: radial-gradient(closest-side, rgba(0
   left: 36.711%; top: 94.288%; width: 13.289%; height: 2.697%;   /* 底盘重构：裁短收窄（coords nameplate） */
   display: block; pointer-events: none;
   transform: none; padding: 0; gap: 0;      /* 清旧胶囊的居中位移/内距（胶囊已死·牌烘入板） */
+  transition: opacity 0.5s ease; z-index: 6;   /* 清葬受迁（原 stage 胶囊块幸存位：牌层序在收边层上） */
 }
 #now-plate[data-mode="empty"] { opacity: 1; }   /* 空机＝无字的黄铜坯牌（板上本体恒在·非隐藏部件） */
 #now-plate .np-tally, #now-plate .np-mode { display: none; }   /* 模式靠光不靠字（乙-5）；data 契约仍在 */
@@ -247,7 +256,7 @@ body.tape-loaded #deck:active { background: radial-gradient(closest-side, rgba(0
   font: 500 min(0.70vw, 1.11vh)/1 "Univers", "Neue Haas Grotesk", "Helvetica Neue", Helvetica, Arial, sans-serif;
   letter-spacing: 0.34em; text-indent: 0.34em; font-style: normal; text-transform: uppercase;
   color: #3A2C1C; text-shadow: 0 1px 0 rgba(255, 214, 130, 0.44);   /* 光影清洗①：蚀刻凹槽下缘金色受光唇 */
-  white-space: nowrap; overflow: hidden; max-width: 38ch;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 38ch;   /* ellipsis=清葬受迁 */
 }
 /* 三.1 档案行（圈选②中性编号）：小号蚀刻元数据 NO./LEN/域——工业档案的第二行 */
 #now-plate .np-meta {
@@ -267,10 +276,13 @@ body.tape-loaded #deck:active { background: radial-gradient(closest-side, rgba(0
   position: absolute; top: 0; height: 100%; width: 42.5%;
   pointer-events: auto; cursor: pointer;
   background: none; border: 0; padding: 0; color: transparent;
+  font-size: 13px; line-height: 1; opacity: 0.75;               /* 清葬受迁（原 stage .np-prev/.np-next 幸存位：opacity 吃进 ::after 山形键） */
+  transition: opacity 0.15s, transform 0.1s;
 }
 #song-keys .np-prev { left: 0; }
 #song-keys .np-next { right: 0; }
 #song-keys .np-prev:hover, #song-keys .np-next:hover {
+  opacity: 1;                                                    /* 清葬受迁 */
   background: radial-gradient(closest-side, rgba(255, 214, 150, 0.12), rgba(255, 214, 150, 0) 82%);
 }
 #song-keys .np-prev::after, #song-keys .np-next::after {
@@ -281,6 +293,7 @@ body.tape-loaded #deck:active { background: radial-gradient(closest-side, rgba(0
 }
 #song-keys .np-next::after { content: '››'; }
 #song-keys .np-prev:active, #song-keys .np-next:active {
+  transform: scale(0.85);                                        /* 清葬受迁：按压缩身与键沉同拍 */
   background: linear-gradient(180deg, rgba(0, 0, 0, 0.32), rgba(0, 0, 0, 0.08) 42%, rgba(0, 0, 0, 0.16));   /* 键沉：顶缘影加深 */
 }
 #song-keys .np-prev:active::after, #song-keys .np-next:active::after {
@@ -362,15 +375,28 @@ body.tape-loaded #deck:active { background: radial-gradient(closest-side, rgba(0
 #dub-group {
   left: 27.479%; top: 58.186%; width: 8.072%; height: 8.952%;
   display: block; pointer-events: none;
+  z-index: 5;   /* 清葬受迁：命中辉光在收边层上 */
 }
 #dub-key {
   position: absolute; right: 0; top: 14%; width: 67%; height: 73%;
   pointer-events: auto; cursor: pointer;
   background: none; border: 0; color: transparent; padding: 0;
   box-shadow: none; border-radius: 0; text-shadow: none;   /* 清旧钢键皮（键体烘入板） */
+  transition: filter 0.2s ease;   /* 清葬受迁：锁死/解锁的暗淡渐变 */
 }
 #dub-key:active, #dub-key.latched, #dub-key.dub-locked, #dub-key.dub-ready {
   transform: none; box-shadow: none; color: transparent;
+}
+/* —— DUB 状态规则（清葬受迁·M-T1/第五号手令丙.3 律原文）：锁死=物理不可按；拒绝=摇头 —— */
+#dub-key:active, #dub-key.latched { filter: brightness(0.9); }
+#dub-key.dub-locked { filter: brightness(0.6) saturate(0.55); cursor: default; }
+#dub-key.switch-locked { filter: brightness(0.55) saturate(0.4); cursor: default; pointer-events: none; }   /* 切带期录音键锁（rule 1） */
+#dub-key.dub-refuse { animation: dub-refuse 0.36s ease; }
+@keyframes dub-refuse {
+  0%, 100% { transform: translateX(0); }
+  22% { transform: translateX(-3px); }
+  55% { transform: translateX(3px); }
+  82% { transform: translateX(-2px); }
 }
 #dub-key:hover { background: radial-gradient(closest-side, rgba(255, 214, 150, 0.13), rgba(255, 214, 150, 0) 80%); }
 #dub-key:active { background: linear-gradient(180deg, rgba(0, 0, 0, 0.36), rgba(0, 0, 0, 0.10) 42%, rgba(0, 0, 0, 0.20)); }   /* 键沉：顶缘影加深（凹面键帽的受压读法） */
@@ -420,9 +446,16 @@ body.tape-loaded #deck:active { background: radial-gradient(closest-side, rgba(0
   font-size: min(0.68vw, 1.09vh); letter-spacing: 0.42em; text-indent: 0.42em;
   color: #E8DCC0; text-shadow: 0 0 9px rgba(255, 232, 190, 0.4);
 }
-/* 呼吸只在手势前活着（P0-1③：手势后动画归零，不留常燃） */
+/* 呼吸只在手势前活着（P0-1③：手势后动画归零，不留常燃）——清葬注：旧 stage 侧曾有一条
+   未设门的 #play-cue .glow 常燃动画（板前遗规·手势后仍烧合成器），随清葬下葬，门自此唯一。 */
 #room.pre-gesture #play-cue .glow { animation: play-breathe 3.2s ease-in-out infinite; }
 #room.pre-gesture #play-cue .silk { animation: play-breathe-text 3.2s ease-in-out infinite; }
+#play-cue.gone { opacity: 0 !important; transition: opacity 0.9s ease; }   /* 清葬受迁（main.js 手势后点名） */
+@keyframes play-breathe { 0%, 100% { opacity: 0.42; transform: scale(0.95); } 50% { opacity: 1; transform: scale(1.05); } }
+@keyframes play-breathe-text { 0%, 100% { opacity: 0.5; } 50% { opacity: 0.96; } }
+@media (prefers-reduced-motion: reduce) {
+  #play-cue .glow, #play-cue .silk { animation: none; opacity: 0.85; }
+}
 
 /* —— 待机纸暗（014 丙-3）：待机法＝整机睡暗留一粒指示灯——纸受灯照，灯低纸暗。
    校准钮③（归船长）：--paper-idle。 —— */

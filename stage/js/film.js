@@ -102,7 +102,10 @@ export class FilmPrinter {
   async _buildPlates(k = 1) {
     const M = this.machine;
     const mRect = { x: M.offsetLeft, y: M.offsetTop, w: M.offsetWidth, h: M.offsetHeight };
-    const css = await fetch('css/stage.css').then(r => r.text());
+    // 快照与真机同两张表（清葬批修）：板期起机器皮唯一在 plate.css——只内联 stage.css 的
+    // 旧快照自 decree13 起就与真机分家；双表内联后，stage.css 清葬对视频版面零扰动。
+    const css = (await Promise.all(['css/stage.css', 'css/plate.css']
+      .map((u) => fetch(u).then((r) => r.text())))).join('\n');
     const clone = M.cloneNode(true);
     // 动态件出版面——只藏画、不拆骨：remove 会塌缩布局（bezel 压成饼、flex 兄弟挪位，
     // 版面与实机坐标就此分家——M-T2 首印的两枚"暗药丸"教训）；visibility 保盒不保画。

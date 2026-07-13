@@ -25,6 +25,9 @@ export function buildMachine(el, opts = {}) {
   el.innerHTML = `
     <img class="plate" src="assets/plate.webp"
          alt="a reel-to-reel tape machine" decoding="async" draggable="false">
+    <!-- 整固批：计数轮读窗临时压暗（断电即黑）——器件已拆（P0-5），板上印着的白卡不该亮；
+         正式窗体候棘爪律返工重渲。紧贴板、居一切动态层之下。 -->
+    <i class="ov" id="counter-dim" aria-hidden="true"></i>
 
     <!-- 带盘＝定光胶片条（decree13 丁-②）：同场景同灯 N 帧自转雪碧图·deck.js 换帧；条未到时板上静盘兜底 -->
     <div class="ov reel" id="reel-l"></div>

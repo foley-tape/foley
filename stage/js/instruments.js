@@ -54,32 +54,8 @@ export class VuMeter {
     this._fed = false;
     this._srcT = null;
   }
-  _buildTicks(g) {
-    // 刻度弧：无数字（字法）。主刻 5 道，副刻其间；末四分之一加粗（高张力区）。
-    const cx = 150, cy = 168, rOut = 118, NS = 'http://www.w3.org/2000/svg';
-    const pt = (deg, r) => `${(cx + Math.sin(deg * Math.PI / 180) * r).toFixed(1)} ${(cy - Math.cos(deg * Math.PI / 180) * r).toFixed(1)}`;
-    const arc = (a0, a1, r, stroke, wdt) => {
-      const p = document.createElementNS(NS, 'path');
-      p.setAttribute('d', `M ${pt(a0, r)} A ${r} ${r} 0 0 1 ${pt(a1, r)}`);
-      p.setAttribute('fill', 'none'); p.setAttribute('stroke', stroke); p.setAttribute('stroke-width', wdt);
-      g.appendChild(p);
-    };
-    // 红区并弧（M1.9 打磨②）：同一条弧上印刷，不浮置
-    arc(-47, 23.5, rOut, '#3B3225', 2);
-    arc(23.5, 47, rOut, '#6E3A28', 2.6);
-    for (let i = 0; i <= 24; i++) {
-      const major = i % 6 === 0;
-      const a = (-47 + (SWEEP * i) / 24) * (Math.PI / 180);
-      const hot = i >= 18;
-      const rIn = rOut - (major ? 14 : 8);
-      const line = document.createElementNS(NS, 'line');
-      line.setAttribute('x1', cx + Math.sin(a) * rIn); line.setAttribute('y1', cy - Math.cos(a) * rIn);
-      line.setAttribute('x2', cx + Math.sin(a) * rOut); line.setAttribute('y2', cy - Math.cos(a) * rOut);
-      line.setAttribute('stroke', hot ? '#6E3A28' : '#3B3225');
-      line.setAttribute('stroke-width', major ? 2.4 : hot ? 1.8 : 1.1);
-      g.appendChild(line);
-    }
-  }
+  /* _buildTicks 已葬（清葬批·发现栏原令）：板前时代 SVG 自画刻度遗物——表脸自⑤起烙板
+     （vu_texture.py），零调用点。 */
   onPacket(pkt, isSeek) {
     if (SHADOW && this.pair.p1 && !isSeek) {
       const s = Math.abs(pkt.needle - this.pair.p1.needle) / (PACKET_MS / 1000);

@@ -115,6 +115,10 @@
 [清葬后半·队列2] 发现栏余量清账＋悬案二两律执法·机器验收全过 · 船长机证据: ~/Desktop/至架构师/清葬后半证据_键面神圣_琴键悬停辉光.png · 2026-07-13
   ①死件出殡：#light-field 元素（两页静态尸体·decree13 弃增量光层）与 plate 压熄规则同穴；.np-rec 死规则拔除（markup 无此元素）。②键面神圣律（悬案二裁决①）：四交互面 z30 统一键面层——快照对表恰好意图集（两页各 4 处 z 变+1 拆件·零意外）。③reduced-motion 特异性修复（a11y 旧案就地结）。金测 169/166✔·tsc 绿·POST 终态归还照过。
 
+[声资产批·刀一] 制度面三件（阶级表＋越级检测仪＋十四声户口册）·机器验收全过——法典§二"先于任何声上线接好"执行完毕 · 船长机证据: ~/Desktop/至架构师/声批刀一证据_越级检测仪_首航.txt · 2026-07-13
+  ①响度阶级入参：sound-params.json `classes` 节（呼吸=床/耳语≤床+6/手感≤床+12/仪式锚 callPeakLufs=−14·全起手值）＋resolve 执法（缺节抛·阶级序 whisper<touch 参数层拦死=l2<l1 同形制）；金测 75。②**越级检测仪**：graph.js `reportSound` 申报口（新声不申报不许上线·仪表异常不波及发声）＋soundbridge `_mountClassMeter`（?soundclass=1 诊断口已登记·复用机器代理 analyser·环形账 100ms×4s·床基线=声前 2.2s 中位·超限=console 违宪红灯＋window.__soundclass 记账·缺参零挂载）。③**PROVENANCE 十四声户口册**（sound/assets/PROVENANCE.md·修册律=先入册再发声）：逐声登记 触发/物理出处/阶级/来源/状态——候刀二（继电器/钨丝/新床两层）·候刀三（Solari 合成/伺服/重定级）·**候猎寻×4**（甲板咔嚓/抬带/琴键/DUB 键=CC0 网络采集+验照非本席权能，未猎前禁合成冒名）·休眠（棘爪·随计数轮）·占位（弹带·派工包明令候设计二轮）。
+  L2 首航（真 chromium+autoplay 旗·真鼠标）：needleDrop 落针入账 {ritual·峰−28.1dBFS·对床−4.8dB·ok:true}——表活账活红灯在位零误报。⚠️勘误+1：**声桥出生挂 window pointerdown——evaluate(click()) 只发 click 不发 pointerdown**，合成手势必走 page.mouse（真输入管线）。金测 170/167✔·tsc 绿。
+
 ## 五、证据规范
 每项完工在此追加一行：`[P0-x] 完成 · 船长机证据: <路径/命令> · 日期`。无船长机证据＝未完成。
 

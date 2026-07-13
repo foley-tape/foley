@@ -26,6 +26,7 @@ export interface SoundParams {
     habituationFactor: number; habituationWindowSec: number; habituationFloorRatio: number;
   };
   call: { gain: number; askBandHzLo: number; askBandHzHi: number; askRepeatSec: number };
+  classes: { whisperOverBedDb: number; touchOverBedDb: number; meterWindowMs: number; meterToleranceDb: number };   // 声资产批§二 响度阶级
   loudness: { bedLufs: number; bedSwingDb: number; fgPeakLufs: number; callPeakLufs: number; truePeakDbTp: number };
   scale: { pentatonic: number[]; rootMidiBase: number; rootMidiSpan: number };
   record: {

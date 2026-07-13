@@ -53,6 +53,13 @@
     "askBandHzHi": 4000,
     "askRepeatSec": 90
   },
+  "classes": {
+    "_": "响度阶级（声资产批设计法·定稿§二·惊吓根治法）：呼吸(床)＜耳语(≤床+whisper)＜手感(≤床+touch)＜仪式(作曲编排·峰值锚 loudness.callPeakLufs)。单声越级检测仪执法（?soundclass 诊断口·超限=违宪红灯）；上线纪律=先接检测再上声。",
+    "whisperOverBedDb": 6,
+    "touchOverBedDb": 12,
+    "meterWindowMs": 250,
+    "meterToleranceDb": 1.5
+  },
   "loudness": {
     "_": "G7 执法（SOUND-R2）：床积分响度 K 加权门控积分，中张力段 1× 原速测。R3 唱片在位改口径见 record.targetLufs。",
     "bedLufs": -26,

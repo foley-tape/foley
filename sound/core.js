@@ -22,6 +22,16 @@ export function resolveSoundParams(raw) {
   }
   // 铁律执法（SOUND-R2 §2 L2）：和声垫电平永远低于织体体——参数层就把违例拦死
   if (out.bed.l2Gain >= out.bed.l1Gain) throw new Error(`铁律：l2Gain(${out.bed.l2Gain}) 必须 < l1Gain(${out.bed.l1Gain})——和声垫永远躺在织体下面`);
+  // 声资产批·响度阶级（定稿法§二）：classes 节——惊吓根治法的参数正身
+  out.classes = p['classes'];
+  if (!out.classes) throw new Error('sound-params 缺少 classes（声资产批·响度阶级）');
+  for (const k of ['whisperOverBedDb', 'touchOverBedDb', 'meterWindowMs', 'meterToleranceDb']) {
+    if (typeof out.classes[k] !== 'number') throw new Error(`sound-params 缺少 classes.${k}（响度阶级）`);
+  }
+  // 阶级序铁律：耳语永远低于手感（参数层拦死——与 l2<l1 同形制执法）
+  if (out.classes.whisperOverBedDb >= out.classes.touchOverBedDb) {
+    throw new Error(`阶级序：whisperOverBedDb(${out.classes.whisperOverBedDb}) 必须 < touchOverBedDb(${out.classes.touchOverBedDb})`);
+  }
   // SOUND-R3 唱机改造：record 节（唱片总线处置参数）
   out.record = p['record'];
   if (!out.record) throw new Error('sound-params 缺少 record（SOUND-R3 唱机改造）');

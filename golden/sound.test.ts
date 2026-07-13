@@ -487,3 +487,12 @@ test('60 hiss 采样率不变性（M2.4 §A.2 漂修执法）：44.1k/48k 带内
   const d48 = bandAt(48000), d44 = bandAt(44100);
   assert.ok(Math.abs(d48 - d44) < 0.15, `hiss 带内 RMS 采样率漂 ${Math.abs(d48 - d44).toFixed(3)}dB（判据 <0.15；修前 0.37）`);
 });
+
+test('75 响度阶级 resolve 执法（声资产批§二）：缺节即抛、阶级序倒置即抛、仪式锚在位', () => {
+  const noCls = structuredClone(soundRaw); delete noCls.classes;
+  assert.throws(() => resolveSoundParams(noCls), /classes/, '阶级表是地基——缺节不容默认漂移');
+  const bad = structuredClone(soundRaw); bad.classes.whisperOverBedDb = bad.classes.touchOverBedDb;
+  assert.throws(() => resolveSoundParams(bad), /阶级序/, '耳语必须低于手感（参数层拦死）');
+  assert.ok(sp.classes.whisperOverBedDb < sp.classes.touchOverBedDb);
+  assert.equal(typeof sp.loudness.callPeakLufs, 'number', '仪式级峰值锚（callPeakLufs）在位');
+});

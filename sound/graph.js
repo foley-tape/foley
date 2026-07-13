@@ -428,6 +428,7 @@ export function buildEngine(ctx, SP, opts) {
   const E = {
     ctx, SP, R, ROOT,
     nodes: { master, shelf, lp, wowDelay: wowDelayNode, bedBus, wearBus, fgBus, l1Level, crackleLevel, l2Level, s2Level, s3Level, hissLevel, l1Breath, recLP, recG },
+    onSound: null,   // 越级检测仪抽头（声资产批§二）：单声上线报 {name, klass, at}——检测先于上线的执法口
     transport: null,
     lastGridAt: 0, lastBarAt: 0, lastAskRepeat: -1e9, doneSilentUntil: -1, wxLatch: 0,
     habLog: new Map(),
@@ -692,8 +693,14 @@ export function buildEngine(ctx, SP, opts) {
    *  软"咚"（触点低频三角快降）＋一撮表面噪声涌起（针尖入纹的"呲"）。走前景总线（fgBus，
    *  与 pluck/page 同族）——接线宣告与唱片在否无关，房间层态也须可闻，故不入唱片链（recG 无盘即哑）；
    *  隔离板 fg 勾掉则连带静默（announcement 属前景族）。一次性源，非遥测映射、不入回归主流。 */
+  /** 单声申报（越级检测仪·声资产批§二）：每一枚具名声上线时自报阶级——表在则审，不在则零成本。 */
+  function reportSound(name, klass, at) {
+    try { E.onSound && E.onSound({ name, klass, at }); } catch (_e) { /* 仪表异常不许波及发声 */ }
+  }
+
   function needleDrop(at) {
     if (E.mutes.has('fg')) return;
+    reportSound('needleDrop', 'ritual', at);   // 落针=仪式级（十四声户口册 #12）
     // P0-2（LEDGER）：拆"不锈钢盘"——原 110Hz 硬三角＋1.9k 带通突刺读感金属敲击。
     // 换"软针落"：① 更低更软的触点"扑"（80→42Hz 正弦·半电平） ② 针入纹＝在库 l1-crackle
     // 真采样一撮涌起（低通 2.4k·慢起慢收·无金属带通）；资产缺席退软化噪声（低通 1.6k）。
@@ -838,6 +845,7 @@ export function buildEngine(ctx, SP, opts) {
     pauseRecord, resumeRecord, // 丙.2：暂停＝唱片随带停（房间常在），恢复＝续播不重建
     get recordPaused() { return E.rec.paused; },
     setMute(name, on) { if (on) E.mutes.add(name); else E.mutes.delete(name); },
+    setOnSound(fn) { E.onSound = fn; },   // 越级检测仪挂钩（?soundclass 诊断口专用）
     stop(at) {
       R.stopAll(at);
       recStopAll(at); // G1 含唱片路径：levels 闸（recG）+源硬停，双重

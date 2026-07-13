@@ -78,8 +78,53 @@ export class SoundBridge {
     if (firstPkt) this._bridge.onPacket(firstPkt);
     this._timer = setInterval(() => this._bridge.pump(), PUMP_MS);
 
+    // 越级检测仪（声资产批§二·?soundclass=1 诊断口）：单声 RMS 对床基线的阶级审计——
+    // 上线纪律"先接检测再上声"的仪器正身；缺参零挂载零成本。
+    if (new URLSearchParams(location.search).get('soundclass') === '1') this._mountClassMeter(eng, sp);
+
     this._mountRecords(0); // 异步热装，不 await：起声在前，唱片在后（架构方针原文）
     return this;
+  }
+
+  /** 越级检测仪：复用机器代理 analyser（审计庭 RMS 律·同一只 2048 时域窗）。
+   *  环形账（100ms 采样·存 4s）：床基线=声前 [at−2.2s, at−0.15s] 中位 RMS；声峰=窗内最大 RMS。
+   *  超限判：耳语 ≤床+whisper｜手感 ≤床+touch｜仪式 ≤ loudness.callPeakLufs（绝对锚·近似 dBFS RMS）。
+   *  违宪=console 红灯＋window.__soundclass 记账（L2 验收抽取口）。 */
+  _mountClassMeter(eng, sp) {
+    const ring = [];   // [tCtx, rmsDb]
+    const buf = new Float32Array(this.analyser.fftSize);
+    const rmsDb = () => {
+      this.analyser.getFloatTimeDomainData(buf);
+      let e = 0;
+      for (let i = 0; i < buf.length; i++) e += buf[i] * buf[i];
+      const r = Math.sqrt(e / buf.length);
+      return r <= 1e-6 ? -120 : 20 * Math.log10(r);
+    };
+    window.__soundclass = [];
+    const poll = setInterval(() => {
+      ring.push([this.ctx.currentTime, rmsDb()]);
+      while (ring.length && ring[0][0] < this.ctx.currentTime - 4) ring.shift();
+    }, 100);
+    this._classPoll = poll;
+    eng.setOnSound(({ name, klass, at }) => {
+      const win = (sp.classes.meterWindowMs ?? 250) / 1000;
+      const delayMs = Math.max(0, at - this.ctx.currentTime) * 1000 + (win + 0.35) * 1000;   // at=音频钟（可在未来）
+      setTimeout(() => {
+        const base = ring.filter(([t]) => t >= at - 2.2 && t <= at - 0.15).map(([, d]) => d).sort((a, b) => a - b);
+        const peakArr = ring.filter(([t]) => t >= at && t <= at + win).map(([, d]) => d);
+        if (!base.length || !peakArr.length) return;
+        const baseDb = base[Math.floor(base.length / 2)];
+        const peakDb = Math.max(...peakArr);
+        const overDb = peakDb - baseDb;
+        const tol = sp.classes.meterToleranceDb ?? 1.5;
+        const limit = klass === 'whisper' ? sp.classes.whisperOverBedDb
+          : klass === 'touch' ? sp.classes.touchOverBedDb : null;   // ritual/legacy=绝对锚
+        const ok = limit != null ? overDb <= limit + tol : peakDb <= (sp.loudness.callPeakLufs + tol);
+        const row = { name, klass, at: Math.round(at * 1000) / 1000, baseDb: Math.round(baseDb * 10) / 10, peakDb: Math.round(peakDb * 10) / 10, overDb: Math.round(overDb * 10) / 10, ok };
+        window.__soundclass.push(row);
+        if (!ok) console.error('[越级红灯·违宪]', JSON.stringify(row));
+      }, delayMs);
+    });
   }
 
   /** 唱片装载（异步；缺席按节拍重试）：载全部三首——第一张即起播，其余后台顺序补载，上下曲即时可切。

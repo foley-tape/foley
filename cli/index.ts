@@ -19,6 +19,7 @@ import { runRenderCuts } from './rendercuts.ts';
 import { runRecordsFetch } from './records-fetch.ts';
 import { runHook } from './hook.ts';
 import { runConnect, offerConnect } from './connect.ts';
+import { runDoctor } from './doctor.ts';
 
 const cmd = process.argv[2];
 
@@ -36,6 +37,7 @@ function usage(): void {
   console.error('  probe   探针页（v1 声音相：床＋前景＋调音抽屉）');
   console.error('  records 出厂音频（唱片+床音织体）：首启明示征询下载（哈希校验；拒绝照常起播——房间层/合成织体退路）');
   console.error('  connect 接线：收工吐卡接进你的 Claude Code（征询后分层写 ~/.claude/settings.json 的 SessionEnd 钩子）');
+  console.error('  doctor  体检：一条命令答"它到底接了啥"——项目/会话数/live 尾随谁/唱片在位/音频/serve 状态（只读）');
   console.error('  hook    （内部）SessionEnd 钩子落纸头——connect 代装；stdin 钩子 JSON → ~/.foley/spool/');
 }
 
@@ -107,6 +109,9 @@ if (isDeck) {
       break;
     case 'connect':
       runConnect(process.argv.slice(3)).catch((e) => { console.error(String(e?.message || e)); process.exit(1); });
+      break;
+    case 'doctor':
+      runDoctor(process.argv.slice(3)).catch((e) => { console.error(String(e?.message || e)); process.exit(1); });
       break;
     case 'hook':
       runHook(process.argv.slice(3));

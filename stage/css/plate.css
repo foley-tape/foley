@@ -64,6 +64,7 @@
 #deck {
   left: 9.6%; top: 3.272%; width: 75.587%; height: 47.848%;
   pointer-events: auto; cursor: pointer; background: none;
+  z-index: 30;   /* 键面神圣律（悬案二裁决①）：交互面示能辉光永不被收边层压暗 */
 }
 /* ⑦示能统一：甲板=可点（诊断式播放/暂停）——悬停即工作灯凑近的一层大区低度暖晕；
    按下=整席受压微暗（甲板沉不下去，暗一档=被手按住）。tape-loaded 门：空机甲板不可点，不许发光。 */
@@ -183,7 +184,7 @@ body.tape-loaded #deck:active { background: radial-gradient(closest-side, rgba(0
 /* ⑥ 伺服马达座（rec_pivot 实测 bbox）：户口定职=点按一趟滑针校准扫摆；示能同语（⑦） */
 #servo-knob {
   left: 70.75%; top: 80.0%; width: 3.2%; height: 5.4%;
-  pointer-events: auto; cursor: pointer;
+  pointer-events: auto; cursor: pointer; z-index: 30;   /* 键面神圣律 */
   background: none; border: 0; padding: 0; color: transparent;
   box-shadow: none; border-radius: 50%;
 }
@@ -266,12 +267,12 @@ body.tape-loaded #deck:active { background: radial-gradient(closest-side, rgba(0
   color: #4A3A26; text-shadow: 0 1px 0 rgba(255, 214, 130, 0.30);
   white-space: nowrap;
 }
-#now-plate .np-rec { position: absolute; right: 0; top: -18%; width: 26%; height: 130%; pointer-events: none; }
+/* .np-rec 已死（markup 无此元素·REC 灯烘板/削头案归信箱重构图）——规则随清葬后半拔除 */
 /* np-song 已死（BATCH3 ②）：曲名迁出主牌，归右侧 Solari 翻字牌 */
 /* 换曲＝板上机械拨杆的左右命中半区（左=上一曲·右=下一曲）；hover 只许辉光 */
 /* —— 操作区（底盘重构·三分法之中）：换曲琴键×2（键帽烙板·盲操体量）。
    命中区=键帽实域（coords key_prev/key_next 渲染打印）；键沉三件套=山形蚀刻下沉+顶缘影加深+键面微暗 —— */
-#song-keys { left: 53.178%; top: 94.629%; width: 10.179%; height: 2.65%; pointer-events: none; }
+#song-keys { left: 53.178%; top: 94.629%; width: 10.179%; height: 2.65%; pointer-events: none; z-index: 30; }   /* 键面神圣律 */
 #song-keys .np-prev, #song-keys .np-next {
   position: absolute; top: 0; height: 100%; width: 42.5%;
   pointer-events: auto; cursor: pointer;
@@ -375,7 +376,7 @@ body.tape-loaded #deck:active { background: radial-gradient(closest-side, rgba(0
 #dub-group {
   left: 27.479%; top: 58.186%; width: 8.072%; height: 8.952%;
   display: block; pointer-events: none;
-  z-index: 5;   /* 清葬受迁：命中辉光在收边层上 */
+  z-index: 30;   /* 键面神圣律（悬案二裁决①·原清葬受迁 z5 并入键面层） */
 }
 #dub-key {
   position: absolute; right: 0; top: 14%; width: 67%; height: 73%;
@@ -454,7 +455,8 @@ body.tape-loaded #deck:active { background: radial-gradient(closest-side, rgba(0
 @keyframes play-breathe { 0%, 100% { opacity: 0.42; transform: scale(0.95); } 50% { opacity: 1; transform: scale(1.05); } }
 @keyframes play-breathe-text { 0%, 100% { opacity: 0.5; } 50% { opacity: 0.96; } }
 @media (prefers-reduced-motion: reduce) {
-  #play-cue .glow, #play-cue .silk { animation: none; opacity: 0.85; }
+  /* 特异性修复（清葬后半）：须压过 #room.pre-gesture 动画规则——同选择器复合，后写者胜 */
+  #room.pre-gesture #play-cue .glow, #room.pre-gesture #play-cue .silk { animation: none; opacity: 0.85; }
 }
 
 /* —— 待机纸暗（014 丙-3）：待机法＝整机睡暗留一粒指示灯——纸受灯照，灯低纸暗。
@@ -481,5 +483,4 @@ body.tape-loaded #deck:active { background: radial-gradient(closest-side, rgba(0
   position: absolute; inset: 0; pointer-events: none;
 }
 
-/* 旧镜头法 multiply hack 作废（板已一次布光·decree13 甲-5 弃增量光层） */
-#light-field { display: none !important; }
+/* #light-field 已随清葬后半整族出殡（旧镜头法 multiply hack·decree13 甲-5 弃）——元素与压熄规则同穴 */

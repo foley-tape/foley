@@ -10,7 +10,12 @@
 // 时长语义：一切时长＝舞台秒（录制长度）——墙钟已被 TR-1 抹除，机器不知道现在几点
 // （ALL-NIGHTER 因此改判 LONG PLAY，本文件不得引入任何墙钟判据）。
 
-export const SEAL_LAW_VER = 1;   // 判据版本：变更→架上未撕卡重判（草章可浮动）；已出屋 Dub 永不追改（出屋侧执法）
+export const SEAL_LAW_VER = 2;   // 判据版本：变更→架上未撕卡重判（草章可浮动）；已出屋 Dub 永不追改（出屋侧执法）
+// v2（分诊令·派工包§二路2 语义修正·2026-07-13）：
+//   跳针＝局域态不是职业总账——同签名错误须在局域窗内连撞（600s·起手值）或引擎自证
+//   STUCK_LOOP 边沿；全带累计会把 19 小时长航的零星重试误读成"永循同圈"（busy 案）。
+//   粗混＝终止于未解的张力——末段 T 高企 **或** 近期错误未平；"未平"只认实质性解决
+//   （RESOLVE/STUCK_CLEARED），DONE 是收工戳（蒸馏器 30min 空档必盖·烂尾也收工）不算平。
 
 // 八枚闭集，数组序＝优先序（粗混＞抢救＞一条过＞跳针＞长版＞即兴＞小样＞样片）。
 // band＝词汇表 v1 分布目标（%）：兜底 30–40 ／ 类型各 5–15 ／ 稀有 1–5。
@@ -30,6 +35,8 @@ export const SEAL_THRESHOLDS = {
   oneTakeMaxFails: 1,     // ONE TAKE：报错 ≤1（011-R2 原文）
   oneTakeMaxPeakT: 0.55,  // ONE TAKE：峰值 T 低（起手值）
   grooveMinRepeat: 3,     // LOCKED GROOVE：同签名错误重复 ≥3（011-R 原文·判据自 OVERDUB 承继）
+  grooveLocalWindowS: 600, // LOCKED GROOVE：同签名重复的局域窗（秒·起手值·v2 语义修正——锁槽是被困的状态）
+  tailErrWindowS: 600,    // ROUGH MIX："近期错误"的尾窗（秒·起手值·v2）
   salvageHighT: 0.70,     // SALVAGE：高张力线（起手值）
   salvageDwellS: 120,     // SALVAGE：高张力累计驻留 ≥（秒·起手值）
   salvageEndT: 0.35,      // SALVAGE：终局解决＝尾窗张力落线下（起手值）
@@ -75,27 +82,48 @@ export function extractFeatures(tape, th = SEAL_THRESHOLDS) {
   // 时刻账（special 行＝状态边沿不计事件账；011-R 判据"错误"＝outcome FAIL）
   const bySig = new Map(), slots = new Set();
   let fails = 0, stuckEdges = 0, cleared = 0, resolves = 0, asks = 0, done = 0;
+  // v2 平息账：实质性解决＝RESOLVE/STUCK_CLEARED；成事＝OK 事件（错后仍在成事＝战事已平）。
+  // DONE 不入账——它是收工戳（蒸馏器 30min 空档必盖·烂尾也收工），收工≠解决。
+  let lastFailT = -1, lastSubstResolveT = -1, lastOkT = -1;
   for (const m of moments) {
     if (m.special) {
       if (m.special === 'STUCK_LOOP') stuckEdges++;
-      else if (m.special === 'STUCK_CLEARED') cleared++;
-      else if (m.special === 'RESOLVE') resolves++;
+      else if (m.special === 'STUCK_CLEARED') { cleared++; lastSubstResolveT = Math.max(lastSubstResolveT, m.stageT); }
+      else if (m.special === 'RESOLVE') { resolves++; lastSubstResolveT = Math.max(lastSubstResolveT, m.stageT); }
       else if (m.special === 'DONE') done++;
       continue;
     }
     if (m.slot) slots.add(m.slot);
     if (m.verb === 'ASK') asks++;
+    if (m.outcome === 'OK') lastOkT = Math.max(lastOkT, m.stageT);
     if (m.outcome === 'FAIL') {
       fails++;
-      if (m.sig) bySig.set(m.sig, (bySig.get(m.sig) || 0) + 1);
+      lastFailT = Math.max(lastFailT, m.stageT);
+      if (m.sig) { if (!bySig.has(m.sig)) bySig.set(m.sig, []); bySig.get(m.sig).push(m.stageT); }
     }
   }
-  let maxSameSigRepeat = 0;
-  for (const n of bySig.values()) if (n > maxSameSigRepeat) maxSameSigRepeat = n;
+  // 同签名账两本：全带累计（指纹/报告用）＋局域窗最大（判章用·v2——锁槽是被困的状态不是总账）
+  let maxSameSigRepeat = 0, maxSameSigLocal = 0;
+  const localMs = th.grooveLocalWindowS * 1000;
+  for (const ts of bySig.values()) {
+    if (ts.length > maxSameSigRepeat) maxSameSigRepeat = ts.length;
+    ts.sort((a, b) => a - b);
+    for (let i = 0; i < ts.length; i++) {
+      let j = i;
+      while (j < ts.length && ts[j] <= ts[i] + localMs) j++;
+      if (j - i > maxSameSigLocal) maxSameSigLocal = j - i;
+    }
+  }
+  // v2 粗混第二支：近期错误未平＝带**终止在**未平的错上——尾窗内有 FAIL，且其后
+  // 既无实质性解决（RESOLVE/STUCK_CLEARED）也无任何成事（OK）。错后仍有 OK 工作
+  // ＝战事已平（storm 转晴长航案：散错后 46 分钟持续成事，不是烂尾）。
+  const tailFrom = durMs - th.tailErrWindowS * 1000;
+  const tailUnresolved = lastFailT >= 0 && lastFailT >= tailFrom
+    && lastFailT > lastSubstResolveT && lastFailT > lastOkT;
 
   return {
     durS, tPeak, tEndMean, tHighDwellS: highDwellMs / 1000, tSkeleton, storm,
-    fails, distinctSigs: bySig.size, maxSameSigRepeat, files: slots.size,
+    fails, distinctSigs: bySig.size, maxSameSigRepeat, maxSameSigLocal, tailUnresolved, files: slots.size,
     stuckEdges, cleared, resolves, asks, done, moments: moments.length,
   };
 }
@@ -105,14 +133,18 @@ const f2 = (x) => (Math.round(x * 100) / 100).toString();
 // 八枚谓词（与 SEALS 同序）：每枚答〔中没中，为什么〕——why 即阶段一悬停判章理由的粮。
 function checksOf(f, th) {
   return [
-    { id: 'ROUGH_MIX', hit: f.tEndMean >= th.roughEndT,
-      why: `尾窗T̄=${f2(f.tEndMean)}${f.tEndMean >= th.roughEndT ? '≥' : '<'}${th.roughEndT}（收工张力${f.tEndMean >= th.roughEndT ? '未解' : '已落'}）` },
+    { id: 'ROUGH_MIX', hit: f.tEndMean >= th.roughEndT || f.tailUnresolved,
+      why: f.tailUnresolved
+        ? `近期错误未平（尾窗${th.tailErrWindowS / 60}min 内 FAIL 后无实质解决·DONE 收工戳不算平）`
+        : `尾窗T̄=${f2(f.tEndMean)}${f.tEndMean >= th.roughEndT ? '≥' : '<'}${th.roughEndT}（终止于${f.tEndMean >= th.roughEndT ? '未解的' : '已落的'}张力）` },
     { id: 'SALVAGE', hit: f.tHighDwellS >= th.salvageDwellS && f.tEndMean <= th.salvageEndT,
       why: `高张力(≥${th.salvageHighT})驻留${Math.round(f.tHighDwellS)}s${f.tHighDwellS >= th.salvageDwellS ? '≥' : '<'}${th.salvageDwellS}s·尾窗T̄=${f2(f.tEndMean)}${f.tEndMean <= th.salvageEndT ? '≤' : '>'}${th.salvageEndT}` },
     { id: 'ONE_TAKE', hit: f.fails <= th.oneTakeMaxFails && f.tPeak <= th.oneTakeMaxPeakT,
       why: `报错${f.fails}${f.fails <= th.oneTakeMaxFails ? '≤' : '>'}${th.oneTakeMaxFails}·峰值T=${f2(f.tPeak)}${f.tPeak <= th.oneTakeMaxPeakT ? '≤' : '>'}${th.oneTakeMaxPeakT}` },
-    { id: 'LOCKED_GROOVE', hit: f.maxSameSigRepeat >= th.grooveMinRepeat,
-      why: `最大同签名错误重复${f.maxSameSigRepeat}${f.maxSameSigRepeat >= th.grooveMinRepeat ? '≥' : '<'}${th.grooveMinRepeat}` },
+    { id: 'LOCKED_GROOVE', hit: f.maxSameSigLocal >= th.grooveMinRepeat || f.stuckEdges >= 1,
+      why: f.stuckEdges >= 1
+        ? `引擎自证卡针（STUCK_LOOP 边沿×${f.stuckEdges}）`
+        : `同签名错误局域重复${f.maxSameSigLocal}${f.maxSameSigLocal >= th.grooveMinRepeat ? '≥' : '<'}${th.grooveMinRepeat}（${th.grooveLocalWindowS / 60}min 窗·全带累计${f.maxSameSigRepeat} 仅供参考）` },
     { id: 'LONG_PLAY', hit: f.durS >= th.longPlayMinS,
       why: `时长${Math.round(f.durS / 60)}min${f.durS >= th.longPlayMinS ? '≥' : '<'}${th.longPlayMinS / 60}min` },
     { id: 'JAM', hit: f.durS >= th.jamMinS && f.files >= th.jamMinFiles && !f.storm,

@@ -45,7 +45,8 @@ export function parseMoments(text) {
     const c = line.split(',');
     if (c.length < 12 || !Number.isFinite(+c[0])) continue; // 半行（截断末行）→丢
     // tags/slot（M2.5 demo 声桥要喂前景分类与音阶度）：hex/枚举位，列审计在册
-    out.push({ t: +c[0], seq: +c[2], verb: c[3], outcome: c[4], special: c[7] || null, tags: c[6] || '', slot: c[11] || '' });
+    // sig（阶段〇章判定·011-R2 跳针章）：错误签名列——同签名错误分组的唯一粮源，附加字段零行为变
+    out.push({ t: +c[0], seq: +c[2], verb: c[3], outcome: c[4], special: c[7] || null, tags: c[6] || '', sig: c[8] || '', slot: c[11] || '' });
   }
   return out;
 }

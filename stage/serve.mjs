@@ -7,12 +7,15 @@
 // 中继与钟都不依赖标签页可见性——藏页照走（M2.0 §2 验证件二）。
 import { createServer } from 'node:http';
 import { readFile, writeFile, mkdir, mkdtemp, rm } from 'node:fs/promises';
-import { existsSync, readdirSync, statSync, readFileSync, openSync, readSync, closeSync, fstatSync } from 'node:fs';
+import { existsSync, readdirSync, statSync, readFileSync, writeFileSync, openSync, readSync, closeSync, fstatSync } from 'node:fs';
 import { homedir } from 'node:os';
-import { join, extname, normalize, dirname } from 'node:path';
+import { join, extname, normalize, dirname, basename } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { spawn } from 'node:child_process';
 import { randomBytes } from 'node:crypto';
+// 阶段〇真相层（纯函数·页内同源）：装配与章律各一份，serve 只做 IO 壳
+import { buildTape } from './js/replay.js';
+import { extractFeatures, judgeSeal, snapC, SEAL_LAW_VER } from './js/seal-law.js';
 
 const root = fileURLToPath(new URL('.', import.meta.url));
 const repoRoot = dirname(root.replace(/\/$/, ''));
@@ -144,6 +147,39 @@ const SPOOL_EVENTS = join(FOLEY_HOME, 'spool', 'events.ndjson');
 const SPOOL_CURSOR = join(FOLEY_HOME, 'spool', 'cursor.json');
 const CARDS_DIR = join(FOLEY_HOME, 'cards');
 const CARD_SID = /^[\w-]{4,64}$/;
+
+// ── 阶段〇·FT 注册（增补包 v2 修正一）：入架注册即编号——会话首次被发现登记即获 FT 号，
+// 永久不可变；数带不数卡（后卡替前卡不换号）；厂带不占序（DEMO_TAPES 永不进注册表）。
+// 回填序＝curve.csv mtime 升序（最老的带＝FT-0001，「你的第 N 盘」时序）；注册表 append-only。
+const FT_REGISTRY_FILE = join(FOLEY_HOME, 'ft-registry.json');
+function ensureFTs(discoveries) {   // [{sid, mtime}] → { sid: ft }
+  let reg;
+  try { reg = JSON.parse(readFileSync(FT_REGISTRY_FILE, 'utf8')); } catch { reg = null; }
+  if (!reg || typeof reg !== 'object') reg = { version: 1, next: 1, tapes: {} };
+  if (!reg.tapes || typeof reg.tapes !== 'object') reg.tapes = {};
+  const taken = Object.values(reg.tapes).filter(Number.isInteger);
+  if (!Number.isInteger(reg.next) || reg.next <= Math.max(0, ...taken)) reg.next = Math.max(0, ...taken) + 1;
+  const fresh = discoveries
+    .filter((d) => !Number.isInteger(reg.tapes[d.sid]))
+    .sort((a, b) => (a.mtime - b.mtime) || (a.sid < b.sid ? -1 : 1));
+  for (const d of fresh) reg.tapes[d.sid] = reg.next++;
+  if (fresh.length) {
+    try { writeFileSync(FT_REGISTRY_FILE, JSON.stringify(reg) + '\n'); } catch { /* 注册写失败不阻架（下次再补） */ }
+  }
+  return reg.tapes;
+}
+
+// 判章（阶段〇·草章律）：读带全文→同源特征管线→八枚闭集。带缺失/坏带→null（缺席留白，禁装健康）。
+// draft:true＝定标期铅灰草章（修正二）；lawVer 变＝架上未撕卡重判（草章可浮动至阈值立法锁定日）。
+function judgeCardSeal(dir) {
+  try {
+    const curveText = readFileSync(join(dir, 'curve.csv'), 'utf8');
+    let momentsText = 't\n';
+    try { momentsText = readFileSync(join(dir, 'moments.csv'), 'utf8'); } catch { /* 无时刻带合法 */ }
+    const v = judgeSeal(extractFeatures(buildTape(basename(dir), curveText, momentsText)));
+    return { id: v.id, en: v.en, zh: v.zh, reason: v.reason, draft: true, lawVer: SEAL_LAW_VER, at: new Date().toISOString() };
+  } catch { return null; }
+}
 const cardJobs = new Map(); // sid → { transcript }（后到替前＝去重）
 let cardBusy = false;
 let spoolOffset = 0;
@@ -208,7 +244,17 @@ async function writeRackMeta(dir, tapeFile, transcript) {
     }
     if (verbs.length) summary = verbs.join(' · ');   // 如 "READ · EDIT · RUN"（机器语汇·无原文）
   } catch { /* 读不到就用回退 */ }
-  await writeFile(join(dir, 'rack.json'), JSON.stringify({ repo, opening, summary, seconds: stageDurationSec(join(dir, 'curve.csv')) }) + '\n');
+  // v3（阶段〇）：出卡即带全套真相层——FT（入架注册即编号：出卡即入架）＋C-号＋草章
+  const sid = basename(dir);
+  const seconds = stageDurationSec(join(dir, 'curve.csv'));
+  const ftMap = ensureFTs([{ sid, mtime: Date.now() }]);
+  const seal = judgeCardSeal(dir);
+  await writeFile(join(dir, 'rack.json'), JSON.stringify({
+    v: 3, repo, opening, summary, seconds,
+    ft: Number.isInteger(ftMap[sid]) ? ftMap[sid] : null,
+    c: snapC(seconds),
+    ...(seal ? { seal } : {}),
+  }) + '\n');
 }
 
 async function drainCardJobs() {
@@ -410,17 +456,29 @@ function openingLine(path) {
   } catch { /* 母带读不动＝无开场白，不算错 */ } finally { if (fd !== undefined) { try { closeSync(fd); } catch { /* 已关 */ } } }
   return null;
 }
-function ensureCardMeta(dir, sid) {
+function ensureCardMeta(dir, sid, ft) {
   let rj = {};
   try { rj = JSON.parse(readFileSync(join(dir, 'rack.json'), 'utf8')); } catch { /* 老卡无标签 */ }
-  if (rj.repo && rj.opening !== undefined) return rj;
-  const m = findMaster(sid);
-  if (m) {
-    if (!rj.repo) rj.repo = m.repo;
-    if (rj.opening === undefined) rj.opening = openingLine(m.path) ?? '';
-    if (rj.seconds === undefined) rj.seconds = stageDurationSec(join(dir, 'curve.csv'));
-    writeFile(join(dir, 'rack.json'), JSON.stringify(rj) + '\n').catch(() => { /* 下次再愈 */ });
+  let dirty = false;
+  // v2 遗产愈合（母带侧：仓名/开场白——依赖母带在场）
+  if (!(rj.repo && rj.opening !== undefined)) {
+    const m = findMaster(sid);
+    if (m) {
+      if (!rj.repo) { rj.repo = m.repo; dirty = true; }
+      if (rj.opening === undefined) { rj.opening = openingLine(m.path) ?? ''; dirty = true; }
+    }
   }
+  if (rj.seconds === undefined) { rj.seconds = stageDurationSec(join(dir, 'curve.csv')); dirty = true; }
+  // v3 真相层愈合（带侧：FT/C-号/草章——只依赖带与注册表，母带不在场照愈）
+  if (Number.isInteger(ft) && rj.ft !== ft) { rj.ft = ft; dirty = true; }   // 注册表是编号唯一权威
+  const c = snapC(rj.seconds ?? 0);
+  if (rj.c !== c) { rj.c = c; dirty = true; }
+  if (!rj.seal || rj.seal.lawVer !== SEAL_LAW_VER) {                        // 草章浮动：判据版本变即重判
+    const s = judgeCardSeal(dir);
+    if (s) { rj.seal = s; dirty = true; }
+  }
+  if (rj.v !== 3) { rj.v = 3; dirty = true; }
+  if (dirty) writeFile(join(dir, 'rack.json'), JSON.stringify(rj) + '\n').catch(() => { /* 下次再愈 */ });
   return rj;
 }
 // 架序（P0-4 → RACK_SPEC 一段）：真会话新在前（mtime 供前端算相对时间）→ 厂盘垫底。
@@ -430,17 +488,25 @@ function buildRack() {
   const items = replayOnly ? [] : [{ id: 'live', kind: 'live', name: 'LIVE', summary: '今晨·实时会话', seconds: null }];
   const cards = [];
   try {
+    // 先集中发现→FT 注册（修正一：入架即编号·回填按 mtime 升序），再逐卡愈合标签
+    const discoveries = [];
     for (const e of readdirSync(CARDS_DIR, { withFileTypes: true })) {
       if (!e.isDirectory() || !CARD_SID.test(e.name)) continue;
       const cv = join(CARDS_DIR, e.name, 'curve.csv');
       if (!existsSync(cv)) continue;
-      const rj = ensureCardMeta(join(CARDS_DIR, e.name), e.name);
+      discoveries.push({ sid: e.name, mtime: statSync(cv).mtimeMs, cv });
+    }
+    const ftMap = ensureFTs(discoveries);
+    for (const d of discoveries) {
+      const rj = ensureCardMeta(join(CARDS_DIR, d.sid), d.sid, ftMap[d.sid]);
       cards.push({
-        id: `card:${e.name}`, kind: 'card',
+        id: `card:${d.sid}`, kind: 'card',
         name: rj.repo || '无名带',
         summary: rj.opening || rj.summary || '会话录音',
-        seconds: rj.seconds ?? stageDurationSec(cv),
-        mtime: statSync(cv).mtimeMs,
+        seconds: rj.seconds ?? stageDurationSec(d.cv),
+        mtime: d.mtime,
+        // 阶段〇真相层随 API 供数（页面未渲染＝不动船长日视之物；阶段一候点头门再上架）
+        ft: rj.ft ?? null, c: rj.c ?? null, seal: rj.seal ?? null,
       });
     }
   } catch { /* 无卡房 */ }

@@ -16,12 +16,12 @@ export function resolveSoundParams(raw) {
   for (const k of ['bpm', 'gridDiv', 'bed', 'foreground', 'call', 'loudness', 'scale']) {
     if (out[k] === undefined || out[k] === null) throw new Error(`sound-params 缺少 ${k}`);
   }
-  if (typeof out.bed.breathDepth !== 'number') throw new Error('sound-params 缺少 bed.breathDepth（SOUND-R1 方案 B）');
-  for (const k of ['l1Gain', 'l1IdleGain', 'l1AirRatio', 'crackleDbLo', 'crackleDbHi', 'l2Gain']) {
-    if (typeof out.bed[k] !== 'number') throw new Error(`sound-params 缺少 bed.${k}（SOUND-R2 三层床）`);
+  // 新床 v3（声资产批定稿§三·旧织体床退役令）：马达低哼＋过头嘶两层——地基参数缺一即抛
+  for (const k of ['humGain', 'hissGain', 'hissSpeedPow', 'hissSpeedMax', 'hissWowDepth', 'crackleDbLo', 'crackleDbHi']) {
+    if (typeof out.bed[k] !== 'number') throw new Error(`sound-params 缺少 bed.${k}（新床 v3）`);
   }
-  // 铁律执法（SOUND-R2 §2 L2）：和声垫电平永远低于织体体——参数层就把违例拦死
-  if (out.bed.l2Gain >= out.bed.l1Gain) throw new Error(`铁律：l2Gain(${out.bed.l2Gain}) 必须 < l1Gain(${out.bed.l1Gain})——和声垫永远躺在织体下面`);
+  // 床铁律 v3：嘶（带走增量）永远不盖过哼的一个量级以上——床是地板不是戏（参数层拦死）
+  if (out.bed.hissGain > out.bed.humGain * 4) throw new Error(`床律：hissGain(${out.bed.hissGain}) 不得 > humGain×4——过头嘶是带走的呼吸增量，不是主角`);
   // 声资产批·响度阶级（定稿法§二）：classes 节——惊吓根治法的参数正身
   out.classes = p['classes'];
   if (!out.classes) throw new Error('sound-params 缺少 classes（声资产批·响度阶级）');
@@ -50,64 +50,53 @@ export const linToDb = (lin) => (lin <= 1e-9 ? -180 : 20 * Math.log10(lin));
 
 // ---------- 床（连续层）映射律 §2.2 ----------
 
+// 新床 v3（声资产批定稿§三）：房间层身份＝机器自己的运转声——马达低哼＋带过磁头嘶。
+// 状态表（歧义封口原文）：待机（手势前）＝全静（ctx 未生，本函数不涉）｜POST 后无带走＝哼独存｜
+// 带走（live 录制或唱片播放）＝哼＋嘶（嘶随速度/wow 同变）｜暂停抬带＝嘶止哼存（听得见的安静）。
+// 旧织体床（L1/L2/S2/S3/呼吸）退役令：直接替换、不并存、不留开关——本函数不再输出作曲层。
+// 混音宪法不动：唱片在位（recordOn）床整体 under（−9dB 近隐但在）；唱片仍为主声道。
 export function bedTargets(s, sp) {
   const b = sp.bed;
-  const T = clamp01(s.T), A = clamp01(s.A), wow = clamp01(s.wow);
-  const idle = s.phase === 'IDLE';
+  const T = clamp01(s.T), wow = clamp01(s.wow);
   const silence = s.phase === 'DONE';
-  // SOUND-R3 总纲：音乐由唱片供给，信息由机器供给。唱片在位（recordOn）时作曲四层
-  // （L1/L2/S2/S3）退场——房间层只在无唱片态发声；磨损（crackle/hiss）是机器介质噪声，照旧。
-  // 未传 recordOn（旧调用方/金测试）＝false，全部 R2 断言原样成立（判据冻结纪律）。
   const rec = s.recordOn === true;
-  const trim = dbToLin(b.trimDb); // 床总闸进 targets：验收能量模型与渲染器同一数字
-  // P0-2 混音宪法（LEDGER）：唱片在位时磨损（crackle/hiss）随之近隐——唱片为主声道。
-  // 缺省（参数缺席）＝0dB：旧 fixtures/金测试旧世界原样（判据冻结纪律的兼容面）。
+  // moving＝带走（走带在动）；未传（旧调用方）＝按"机器上电即走带"的旧世界近似 true——
+  // 状态表的三态由页桥/引擎传运输真值（transport 在场且未暂停）。
+  const moving = s.moving !== false;
+  const speed = typeof s.speed === 'number' && s.speed > 0 ? s.speed : 1;
+  const trim = dbToLin(b.trimDb);
   const under = rec ? dbToLin(b.underRecordDb ?? 0) : 1;
-  // L1 织体体（真采样为体；IDLE 唯余此层最弱态——白皮书 v1.1 §2.1）
-  const l1 = trim * (silence || rec ? 0 : idle ? b.l1IdleGain : b.l1Gain);
-  // crackle 磨损织体（T 驱动，与 hiss 同属介质噪声，直达输出）
+  // 哼：机器上电即在（呼吸级地板）——DONE 滑停带停机不停（听得见的安静），永不随相位熄
+  const hum = trim * under * b.humGain;
+  // 嘶：带走门控·随速度幂律·wow 微摆（读头接触不稳）——暂停抬带即止
+  const spdGain = Math.min(Math.pow(speed, b.hissSpeedPow), b.hissSpeedMax ?? Infinity);   // 饱和：读头噪声随速度有限增长（验收 58× 压缩试听不失控）
+  const hiss = moving && !silence
+    ? trim * under * b.hissGain * spdGain * (1 + b.hissWowDepth * (wow - 0.5) * 2 * 0.5)
+    : 0;
+  // crackle：唱片磨损介质噪声（身份归唱片系统·T 驱动照旧·不随织体床退役）
   const crackle = trim * under * (silence ? 0 : dbToLin(b.crackleDbLo + (b.crackleDbHi - b.crackleDbLo) * T));
-  // L2 和声垫（三关铁律成品；永低于 L1——resolve 已执法）
-  const l2 = trim * (silence || idle || rec ? 0 : b.l2Gain);
-  const s2gate = clamp01((A - b.s2GateA) / (1 - b.s2GateA));
-  const s2 = trim * (silence || idle || rec ? 0 : b.s2Gain * s2gate);
-  const s3gate = clamp01((T - b.s3GateT) / (1 - b.s3GateT));
-  const s3 = trim * (silence || rec ? 0 : b.s3Gain * s3gate);
-  const hissLin = trim * under * (silence ? 0 : dbToLin(b.hissDbLo + (b.hissDbHi - b.hissDbLo) * T));
   return {
-    l1, crackle, l2, s2, s3, hissLin,
+    hum, hiss, crackle,
     filterHz: b.filterHzHi + (b.filterHzLo - b.filterHzHi) * T,
     hfShelfDb: b.hfShelfDbLo + (b.hfShelfDbHi - b.hfShelfDbLo) * T,
-    wowCents: b.wowCentsLo + (b.wowCentsHi - b.wowCentsLo) * wow,
-    susProb: T,
-    density: b.s2DensityLo + (b.s2DensityHi - b.s2DensityLo) * A,
     hover: s.pendingAsk,
     silence,
   };
 }
 
-/** 床能量（dB）：不相关源的 RMS 合成。抽象设计能量——单调性/门控律的口径（金测试 ㉚）。 */
+/** 床能量（dB）：不相关源的 RMS 合成（新床 v3：哼＋嘶＋crackle）。单调性/门控律口径。 */
 export function bedEnergyDb(bt) {
-  const e = Math.sqrt(bt.l1 * bt.l1 + bt.crackle * bt.crackle + bt.l2 * bt.l2
-    + bt.s2 * bt.s2 + bt.s3 * bt.s3 + bt.hissLin * bt.hissLin);
+  const e = Math.sqrt(bt.hum * bt.hum + bt.hiss * bt.hiss + bt.crackle * bt.crackle);
   return e <= 1e-9 ? -120 : 20 * Math.log10(e);
 }
 
 /**
- * 床渲染 RMS 设计模型（dB）—— G3 的"设计值"口径（SOUND-R1）。
- * 与 bedEnergyDb 的区别只有一项：S2 是稀疏打点（拍点稀疏、力度轻——白皮书 §2.1 设计如此），
- * 长程 RMS = 电平 × S2_CREST × √(密度/参考密度)（打点能量/秒 ∝ 触发率）。
- * 连续 stem 正身在 graph.js 内以固定常数归一到单位 RMS（金测试逐 stem 锁定），电平数字即渲染 RMS。
- * 口径：bedBus 点（S4 磁带总线着色不入账——总线是"同一台机器"的染色，不是床的能量律）。
- * S2_CREST 为离线渲染实测冻结的定标常数（金测试锁定；probe/ear 同一渲染代码，故两处同真）。
+ * 床渲染 RMS 设计模型（dB）——G3"设计值"口径（新床 v3）。
+ * 三 stem 皆连续源、正身归一到单位 RMS（hum 经 CALIB.humNorm；嘶/crackle 沿旧定标链），
+ * 电平数字即渲染 RMS——设计能量与渲染能量同一张表（S2 打点已随织体床退役，无 crest 特例）。
  */
-export const S2_REF_DENSITY = 0.55;
-export const S2_CREST = 0.02615; // 离线渲染实测冻结（@48k，参考密度 0.55，定标轮 SOUND-R1）
 export function bedRmsDb(bt) {
-  const s2eff = bt.s2 * S2_CREST * Math.sqrt(Math.max(bt.density, 0) / S2_REF_DENSITY);
-  const e = Math.sqrt(bt.l1 * bt.l1 + bt.crackle * bt.crackle + bt.l2 * bt.l2
-    + s2eff * s2eff + bt.s3 * bt.s3 + bt.hissLin * bt.hissLin);
-  return e <= 1e-9 ? -120 : 20 * Math.log10(e);
+  return bedEnergyDb(bt);
 }
 
 // ---------- 唱片总线映射律（SOUND-R3 §2：机器对唱片的处置——皇冠机制上真盘） ----------

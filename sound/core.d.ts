@@ -5,20 +5,19 @@ export interface SoundParams {
   bpm: number;
   gridDiv: number; // 8 = 1/8 网格
   bed: {
-    l1Gain: number; l1IdleGain: number; l1AirRatio: number; // L1 织体体（SOUND-R2：真采样为体）
-    crackleDbLo: number; crackleDbHi: number;               // 磨损织体（T 驱动，直达输出）
-    l2Gain: number;                                          // L2 和声垫（铁律：< l1Gain，resolve 执法）
-    s2Gain: number; s2GateA: number; s2DensityLo: number; s2DensityHi: number;
-    s3Gain: number; s3GateT: number;
+    // 新床 v3（声资产批定稿§三·旧织体床退役令）：马达低哼＋带过磁头嘶
+    humGain: number;                     // 马达低哼电平（呼吸级地板·三关铁律出生）
+    hissGain: number;                    // 过头嘶电平（带走满速基准）
+    hissSpeedPow: number;                // 嘶随走带速度幂律
+    hissSpeedMax: number;                // 速度增益饱和上限（读头噪声有限增长）
+    hissWowDepth: number;                // wow→嘶电平微摆深度
+    crackleDbLo: number; crackleDbHi: number; // 唱片磨损介质噪声（随 T·不随织体床退役）
     filterHzHi: number; filterHzLo: number;
-    hissDbLo: number; hissDbHi: number;
-    wowCentsLo: number; wowCentsHi: number;
     hfShelfDbLo: number; hfShelfDbHi: number;
     slewMsFast: number; slewMsSlow: number;
     doneSilenceSec: number;
-    trimDb: number;      // 床总闸（dB）：EAR-1 沿革；v2 出厂 0，响度由 G7 执法
-    breathDepth: number; // 呼吸深度（相对值 0.05–0.20）：方案 B 乘法级，挂 L1 正身
-    underRecordDb?: number; // P0-2 混音宪法：唱片在位时磨损（crackle/hiss）让位 dB；缺省 0＝旧判据兼容
+    trimDb: number;      // 床总闸（dB）：G2 遍历域沿革
+    underRecordDb?: number; // P0-2 混音宪法：唱片在位床整体让位 dB；缺省 0＝旧判据兼容
   };
   foreground: {
     peakGain: number; failGain: number; pageGain: number; bellGain: number;
@@ -46,7 +45,9 @@ export interface SoundParams {
 export interface BedState {
   T: number; A: number; wow: number;
   phase: Phase; weather: Weather; pendingAsk: boolean;
-  recordOn?: boolean; // SOUND-R3：唱片在位——作曲四层（L1/L2/S2/S3）退场；磨损照旧
+  recordOn?: boolean; // SOUND-R3：唱片在位——床整体 under（混音宪法）
+  moving?: boolean;   // v3 状态表：带走（transport 在场且未暂停）；未传=true（旧调用方近似）
+  speed?: number;     // 走带速度（嘶幂律粮）；未传=1
 }
 
 export interface RecordTargets {
@@ -59,19 +60,13 @@ export interface RecordTargets {
 }
 
 export interface BedTargets {
-  l1: number;        // L1 织体体增益（IDLE 时唯余此层最弱态）
-  crackle: number;   // 磨损织体增益（T 驱动；与 hiss 同路直达输出）
-  l2: number;        // L2 和声垫增益（铁律：永低于 l1）
-  s2: number;        // 律动增益（A 门控）
-  s3: number;        // 张力弦增益（T 门控）
-  hissLin: number;   // 磁带底噪线性增益（T 驱动；v2 出低通直达输出）
+  hum: number;       // 马达低哼增益（机器上电即在·呼吸级地板·DONE 不熄=听得见的安静）
+  hiss: number;      // 过头嘶增益（带走门控·随速度幂律与 wow 微摆·暂停抬带即止）
+  crackle: number;   // 唱片磨损介质噪声增益（T 驱动·underRecord 近隐·wearBus 直达输出）
   filterHz: number;  // 主滤波截止 8k→1.8k 随 T 线性下压
   hfShelfDb: number; // 高频搁架 0→−6dB
-  wowCents: number;  // 走带不稳深度 3→22 音分（wow 驱动）
-  susProb: number;   // 和声悬挂音比例 = T
-  density: number;   // 律动触发概率 0.2→0.9 随 A
-  hover: boolean;    // WAITING：床转半终止悬停（属和声延音）
-  silence: boolean;  // DONE：正格终止 → 真静默 ≥4s
+  hover: boolean;    // WAITING（保留位·作曲床退役后无消费者）
+  silence: boolean;  // DONE：唱片滑停/嘶止（哼不随此熄——状态表）
 }
 
 /** 轨迹行：[compMs, needle, T, A, wxIdx, phIdx, wow, ask] */
@@ -84,8 +79,6 @@ export const linToDb: (lin: number) => number;
 export function bedTargets(s: BedState, sp: SoundParams): BedTargets;
 export function recordTargets(s: BedState, sp: SoundParams): RecordTargets;
 export function bedEnergyDb(bt: BedTargets): number;
-export const S2_REF_DENSITY: number;
-export const S2_CREST: number;
 export function bedRmsDb(bt: BedTargets): number;
 export function habituationGain(n: number, sp: SoundParams): number;
 export function quantizeUpSec(atSec: number, sp: SoundParams): number;

@@ -2,45 +2,21 @@
 // 浏览器（probe 页内嵌本文件真源）与离线机器耳朵（sound/offline.ts + cli ear）跑**同一份图代码**。
 // 依赖 core.js（纯映射律）；页内嵌时按行拼接（剥 import/export），Node 侧正常 ESM。
 //
-// ── 音频图全览 v2（规矩①：拓扑注释即图纸，改图必改此注释）────────────────────────
+// ── 音频图全览 v3（声资产批·床改判：旧织体床退役令——L1织体/L2和声垫/S2律动/S3张力弦/呼吸LFO 全族出殡）──
 //
-//  [L1 织体体]  bodySrc(room tone 采样环｜fb 粉噪) ─ bodyG(定标) ─┐
-//               airSrc(film static 采样环｜fb 气噪) ─ airG(定标×比) ─┴→ l1Sum
-//                 → l1Breath(乘法级 bias=1 ±breathDepth ← breathLfo1/2 × bD1/2)   ← 方案 B 沿革
-//                 → l1Level(电平 bt.l1) ──────────────────────────┐
-//  [L2 和声垫]  pitchedStack 三关：5 声部失谐堆叠(±3–10 音分) → l2F(动低通       │
-//               ←双互质自由 LFO 调制口) → l2Sat(轻饱和) → l2Norm → l2Level(bt.l2) ─┤
-//  [S2 律动]    kick/hat（一次性源，调度器打点）→ s2Level(bt.s2) ─────────────────┤
-//  [S3 张力弦]  pitchedStack 三关：5 声部失谐堆叠 → s3F(动低通←双 LFO) → s3Sat     │
-//               → s3Norm → s3Level(bt.s3) ────────────────────────┤
-//                                                                 ├→ bedBus(duck)
-//               bedBus → wowDelay(30ms 调制口 ← wowLfo1/2 × wowD1/2) → lp(8k→1.8k) → shelf ─┐
-//  [前景]       拨弦/纸页/铃/…（一次性源＋包络）→ fgBus → lp（同过磁带染色）                  ├→ master → dest
-//  [L3 磨损]    crackleSrc(采样环｜fb 脉冲串) → crackleNorm → crackleLevel(bt.crackle) ─┐    │
-//               hiss(噪声环) → hissHP(2.2k) → hissLP(7.5k) → hissNorm → hissLevel ──────┴→ wearBus(duck) ─┘
-//               （SOUND-R2 §2 L3：hiss/crackle=介质噪声，出 S4 低通直达输出——"磁带变闷"不再滤走"磁带变糙"）
+//  [床·哼]   motorHum＝pitchedStack 三关成品（低频暖嗡·四声部失谐+动低通+轻饱和）
+//              → humNorm(定标) → humLevel(bt.hum) → wearBus ——机身直达·上电即在·不过 wow（马达是速度基准）
+//  [床·嘶]   hiss(噪声环) → hissHP(2.2k) → hissLP(7.5k) → hissNorm → hissLevel(bt.hiss) → wearBus
+//              ——带走门控·电平随速度幂律与 wow 微摆（噪声吃 pitch-wow 无意义·旧 L3"变闷不滤变糙"法理原样）
+//  [L3 磨损] crackleSrc(采样环｜fb 脉冲串) → crackleNorm → crackleLevel(bt.crackle) → wearBus(duck) → master
+//              （身份归唱片系统：随 T·underRecord 近隐——不随织体床退役）
+//  [前景]     拨弦/纸页/铃/…（一次性源＋包络）→ fgBus → lp(8k→1.8k·T 染色) → shelf → master → dest
+//  [唱片层]   recSrc → recLP → recG → master（SOUND-R3 原样：STUCK 换源/tape-stop/暂停续播）
+//  （bedBus/wowDelay 调制链随织体床出殡——床三 stem 皆 wearBus 直达；wow 唯归唱片 playbackRate）
 //
-//  [唱片层 R3]  recSrc(BufferSource：唱片 PCM，loop 顺播；STUCK/复走=换源排程，见下)
-//                 .playbackRate ←(调制口) recWowLfo(≈0.55Hz) × recWowD    ——走带不稳=音高微醺（rt.wowCents）
-//                 .playbackRate ←(自动化) DONE tape-stop：1→0 linearRamp（tapeStopSec，pitch 随速降）
-//               → recLP(lowpass ← T：8k→1.8k，S4 参数域平移=磁带变旧变闷) → recG(level：定标×duck×关断) → master
-//               定标：recG 基准 = dbToLin(record.targetLufs − catalog.lufs)（数据驱动归一，L1 rmsDb 同形制）
-//               STUCK 跳针（唯一全排程解法——离线渲染器无事件循环，禁 live 改属性）：
-//                 主源 stop(at)；stuckSrc 同 buffer 短循环 [pos−L,pos]（L=stuckLoopSec 窗种子化）start(at,pos−L) stop(at+dur)；
-//                 resumeSrc 全曲 start(at+dur, pos)——CLEARED 即复走，双端逐字同源。
-//               唱片在位 → bedTargets(recordOn) 收作曲四层（L1/L2/S2/S3 归零=音乐由唱片供给）；
-//               磨损（crackle/hiss）与前景照旧（信息由机器供给）；隔离板勾掉唱片=房间层回场（G6 无唱片态口径）。
+//  状态表（定稿§三·bedTargets 执法）：待机（手势前）＝全静（ctx 未生）｜POST 后无带走＝哼独存｜
+//  带走＝哼＋嘶｜暂停抬带＝嘶止哼存。唱片在位床整体 under（混音宪法 P0-2 不动）。
 //
-//  电平参数（规矩② stop/trim 遍历域）：l1/crackle/l2/s2/s3/hiss 六电平（+bedBus/wearBus duck）
-//    - trim 在 core.bedTargets 内乘进每一个电平目标，applyBed 是电平唯一写者——绕闸支路无处出生。
-//  调制口（规矩③ 唯一可接外接信号的参数）：l1Breath.gain（bias1）、wowDelay.delayTime（bias30ms）、
-//    l2F.frequency / s3F.frequency（动低通，三关之二——双互质慢速自由 LFO，深度有界）。
-//    其余 AudioParam 禁手——registry.connect 见参数即抛。
-//  三关铁律（SOUND-R2 §2 L2，结构性执法）：有音高声部只能经 pitchedStack() 出生——
-//    ①≥3 声部失谐堆叠 ②动低通≥2 互质 LFO ③轻饱和；直连裸振荡器上总线在本图无路径。
-//  一次性源（规矩②之三）：前景与 S2 打点登记注册表，stopAll 当场枪毙。
-//  资产（SOUND-R2 §2 L1）：CC0 采样见 sound/assets/（LICENSES.md 逐条溯源）；无资产时
-//    fallback 合成织体（粉噪+脉冲串 crackle，repo-key 种子变奏）同构顶上——结构不因资产缺席而变。
 // ─────────────────────────────────────────────────────────────────────────────
 
 // import 禁用 as 别名（NIGHT-2 审计 probe-coreDegreeHz 案）：页壳内嵌=剥 import 行的逐字拼接，
@@ -191,10 +167,9 @@ export function createRegistry(ctx) {
 
 // ---------- 定标常数（金测试锁定；离线渲染实测冻结 @48k） ----------
 export const CALIB = {
-  l2Norm: 1.5141, // L2 和声垫正身（5 声部三关成品）→ 1.0 RMS（定标轮 R2 实测冻结 @48k）
-  s3Norm: 1.6288, // S3 张力弦正身（5 声部三关成品过动低通）→ 1.0 RMS（同上）
+  humNorm: 1.5156, // 马达低哼正身（三关成品）→ 1.0 RMS（床改判定标轮实测冻结 @48k·2026-07-13）
   hissNorm: 2.519, // 白噪过 2.2k–7.5k 带限 → 1.0 RMS（R2 复校 @48k）
-  fbBodyLen: 11.3, fbAirLen: 8.9, fbCrackleLen: 9.7, // fallback 织体环长（互不通约秒）
+  fbCrackleLen: 9.7, // fallback crackle 环长（旧织体环 body/air 已随退役令出殡）
 };
 
 // ---------- 三关铁律构造器（SOUND-R2 §2 L2：有音高声部唯一的出生通道） ----------
@@ -231,27 +206,7 @@ function pitchedStack(R, ctx, name, spec) {
   return { out: sat, oscs, info };
 }
 
-// ---------- fallback 合成织体（无资产退路 + repo-key 变奏源） ----------
-function pinkBuffer(ctx, name, lenSec, seedStr, hpHz = 0) {
-  const rng = mulberry32(seedOf(seedStr));
-  const n = Math.ceil(ctx.sampleRate * lenSec);
-  const x = new Float32Array(n);
-  let b0 = 0, b1 = 0, b2 = 0, hp = 0;
-  const hpA = hpHz > 0 ? Math.exp(-2 * Math.PI * hpHz / ctx.sampleRate) : 0;
-  for (let i = 0; i < n; i++) {
-    const w = rng() * 2 - 1;
-    b0 = 0.99765 * b0 + w * 0.0990460;
-    b1 = 0.96300 * b1 + w * 0.2965164;
-    b2 = 0.57000 * b2 + w * 1.0526913;
-    let v = b0 + b1 + b2 + w * 0.1848;
-    if (hpHz > 0) { hp = hpA * hp + (1 - hpA) * v; v -= hp; } // 一阶去低（气感织体）
-    x[i] = v;
-  }
-  let e = 0; for (let i = 0; i < n; i++) e += x[i] * x[i];
-  const g = 1 / Math.sqrt(e / n);
-  for (let i = 0; i < n; i++) x[i] *= g; // 单位 RMS——与资产 rmsDb 定标同一口径
-  return x;
-}
+// ---------- fallback 合成织体（crackle 无资产退路；旧 body/air 粉噪环已随织体床退役） ----------
 function crackleBuffer(ctx, name, lenSec, seedStr, perSec = 32) {
   const rng = mulberry32(seedOf(seedStr));
   const n = Math.ceil(ctx.sampleRate * lenSec);
@@ -293,63 +248,33 @@ export function buildEngine(ctx, SP, opts) {
   const master = R.gain('master', 0.9);
   const shelf = R.filter('shelf', 'highshelf', 4500);
   const lp = R.filter('lp', 'lowpass', SP.bed.filterHzHi, 0.4);
-  const wowDelayNode = ctx.createDelay(0.1);
-  R.modStage('wowDelay', wowDelayNode, wowDelayNode.delayTime, 0.03);
-  const wowLfo1 = R.osc('wowLfo1', 'sine', 0.9);
-  const wowLfo2 = R.osc('wowLfo2', 'sine', 1.31);
-  const wowD1 = R.depth('wowD1', 0.002);
-  const wowD2 = R.depth('wowD2', 0.002);
-  R.modulate(wowLfo1, wowD1, wowDelayNode.delayTime);
-  R.modulate(wowLfo2, wowD2, wowDelayNode.delayTime);
-
-  const bedBus = R.gain('bedBus', 1); R.auto(bedBus.gain);
-  const wearBus = R.gain('wearBus', 1); R.auto(wearBus.gain); // L3 介质噪声路（出低通，直达 master）
+  const wearBus = R.gain('wearBus', 1); R.auto(wearBus.gain); // 床三 stem 直达路（duck 让位口）
   const fgBus = R.gain('fgBus', 1);
-  R.connect(bedBus, wowDelayNode); R.connect(wowDelayNode, lp);
   R.connect(fgBus, lp);
   R.connect(lp, shelf); R.connect(shelf, master);
   R.connect(wearBus, master);
   R.connect(master, ctx.destination);
 
-  // ---- L1 织体体：真采样为体，fallback 同构顶上 ----
-  const l1Level = R.level('l1');
-  const breathG = ctx.createGain();
-  const l1Breath = R.modStage('l1Breath', breathG, breathG.gain, 1);
-  const breathLfo1 = R.osc('breathLfo1', 'sine', 1 / 7.3);
-  const breathLfo2 = R.osc('breathLfo2', 'sine', 1 / 11.9);
-  const bD1 = R.depth('bD1', 0.2); const bD2 = R.depth('bD2', 0.2);
-  R.modulate(breathLfo1, bD1, breathG.gain);
-  R.modulate(breathLfo2, bD2, breathG.gain);
-  bD1.gain.value = SP.bed.breathDepth * 0.6;
-  bD2.gain.value = SP.bed.breathDepth * 0.4;
-  const l1Sum = R.gain('l1Sum', 1);
-  const rate = 1 + (keyRng() - 0.5) * 0.02; // repo-key 变奏：±1% 重放率（每仓一间房的色温）
-  const bodyClip = assets && assets['l1-roomtone'];
-  const airClip = assets && assets['l1-filmstatic'];
-  const air = Math.min(Math.max(SP.bed.l1AirRatio, 0), 1);
-  // 配比按能量归一（不相关源功率和）：√(1−air)/√air——l1 电平数字=织体总 RMS（G3 记账口径）
-  const wBody = Math.sqrt(1 - air), wAir = Math.sqrt(air);
-  if (bodyClip) {
-    const src = R.textureLoop('l1Body', rotated(bodyClip.x, keyRng()), bodyClip.sr, rate);
-    const g = R.gain('l1BodyG', Math.pow(10, -bodyClip.rmsDb / 20) * wBody); // manifest rmsDb 定标→单位 RMS×配比
-    R.connect(src, g); R.connect(g, l1Sum);
-  } else {
-    const src = R.textureLoop('l1Body', pinkBuffer(ctx, 'fbBody', CALIB.fbBodyLen, 'fb-body:' + opts.repoKey), ctx.sampleRate, rate);
-    const g = R.gain('l1BodyG', wBody); // fallback 已单位 RMS
-    R.connect(src, g); R.connect(g, l1Sum);
-  }
-  if (airClip) {
-    const src = R.textureLoop('l1Air', rotated(airClip.x, keyRng()), airClip.sr, rate * 1.003);
-    const g = R.gain('l1AirG', Math.pow(10, -airClip.rmsDb / 20) * wAir);
-    R.connect(src, g); R.connect(g, l1Sum);
-  } else {
-    const src = R.textureLoop('l1Air', pinkBuffer(ctx, 'fbAir', CALIB.fbAirLen, 'fb-air:' + opts.repoKey, 300), ctx.sampleRate, rate * 1.003);
-    const g = R.gain('l1AirG', wAir);
-    R.connect(src, g); R.connect(g, l1Sum);
-  }
-  R.connect(l1Sum, breathG); R.connect(breathG, l1Level); R.connect(l1Level, bedBus);
+  // ---- 床·哼：马达低哼（三关铁律出生·呼吸级地板·不过 wow——马达是基准不是介质） ----
+  const humLevel = R.level('hum');
+  const humNormG = R.gain('humNormG', CALIB.humNorm);
+  const humRoot = 55 * Math.pow(2, (keyRng() - 0.5) * 0.06);   // 每仓一台电机（±3% 转速色温·种子化）
+  const hum = pitchedStack(R, ctx, 'hum', {
+    type: 'sine',
+    voices: [
+      { hz: humRoot, cents: 0, gain: 0.62 },          // 基频：电机极对转
+      { hz: humRoot * 2, cents: +6, gain: 0.34 },     // 二次：铁芯磁致
+      { hz: humRoot * 3, cents: -7, gain: 0.16 },     // 三次：机箱板共振
+      { hz: humRoot * 4.02, cents: +4, gain: 0.07 },  // 高次残响（微失谐=真机不谐和）
+    ],
+    filterBase: 260, filterQ: 0.5,
+    filterLfos: [{ rate: 1 / 8.7, depth: 40 }, { rate: 1 / 13.1, depth: 26 }],   // 负载微摆（互质慢速）
+    filterDepthMax: 90, satK: 1.6,
+  });
+  R.connect(hum.out, humNormG); R.connect(humNormG, humLevel); R.connect(humLevel, wearBus);
 
-  // ---- L3 磨损：crackle + hiss，出低通直达输出 ----
+  // ---- L3 磨损：crackle + hiss ----
+  const rate = 1 + (keyRng() - 0.5) * 0.02; // repo-key 变奏：±1% 重放率（每仓一间房的色温·自 L1 块迁存）
   const crackleLevel = R.level('crackle');
   const crackleClip = assets && assets['l1-crackle'];
   if (crackleClip) {
@@ -370,49 +295,9 @@ export function buildEngine(ctx, SP, opts) {
   const hf = R.filter('hissHP', 'highpass', 2200, 0.5);
   const hlp = R.filter('hissLP', 'lowpass', 7500, 0.4);
   R.connect(hiss, hf); R.connect(hf, hlp); R.connect(hlp, hissNorm); R.connect(hissNorm, hissLevel);
-  R.connect(hissLevel, wearBus);
+  R.connect(hissLevel, wearBus);   // v3：嘶电平已随 wow 微摆（bedTargets）——pitch-wow 对噪声无意义，直达路原样
 
-  // ---- L2 和声垫（三关铁律） ----
-  const l2Level = R.level('l2');
-  const l2Norm = R.gain('l2Norm', CALIB.l2Norm);
-  const l2 = pitchedStack(R, ctx, 'l2', {
-    type: 'triangle',
-    voices: [
-      { hz: midiToHz(ROOT), cents: 0, gain: 0.5 },
-      { hz: midiToHz(ROOT), cents: +5.5, gain: 0.5 },
-      { hz: midiToHz(ROOT + 7), cents: -4, gain: 0.42 },
-      { hz: midiToHz(ROOT + 12), cents: +7, gain: 0.28 },
-      { hz: midiToHz(ROOT + 12), cents: -3.5, gain: 0.28 },
-    ],
-    filterBase: 1100, filterQ: 0.4,
-    filterLfos: [{ rate: 1 / 59, depth: 320 }, { rate: 1 / 137, depth: 190 }],
-    filterDepthMax: 600, satK: 1.8,
-  });
-  R.connect(l2.out, l2Norm); R.connect(l2Norm, l2Level); R.connect(l2Level, bedBus);
-
-  // ---- S3 张力弦（过三关升级；hover 属和声延音沿革） ----
-  const s3Level = R.level('s3');
-  const s3NormG = R.gain('s3NormG', CALIB.s3Norm);
-  const s3 = pitchedStack(R, ctx, 's3', {
-    type: 'triangle',
-    voices: [
-      { hz: midiToHz(ROOT), cents: +4.5, gain: 0.6 },   // v1（hover→ROOT+7）
-      { hz: midiToHz(ROOT + 7), cents: -4, gain: 0.42 }, // v2（hover→ROOT+14；悬挂音选声）
-      { hz: midiToHz(ROOT + 12), cents: -6, gain: 0.3 },
-      { hz: midiToHz(ROOT), cents: -3.2, gain: 0.2 },
-      { hz: midiToHz(ROOT), cents: +9, gain: 0.08 },
-    ],
-    filterBase: 900, filterQ: 0.3,
-    filterLfos: [{ rate: 1 / 53, depth: 180 }, { rate: 1 / 97, depth: 110 }],
-    filterDepthMax: 500, satK: 1.6,
-  });
-  R.connect(s3.out, s3NormG); R.connect(s3NormG, s3Level); R.connect(s3Level, bedBus);
-  const v1 = s3.oscs[0].osc, v2 = s3.oscs[1].osc;
-  const v1Cents = s3.oscs[0].cents, v2Cents = s3.oscs[1].cents;
-
-  // ---- S2 律动电平（打点由调度器造一次性源） ----
-  const s2Level = R.level('s2');
-  R.connect(s2Level, bedBus);
+  // （L2 和声垫/S3 张力弦/S2 律动已随旧织体床退役令出殡——作曲层不再是床的一部分）
   R.auto(lp.frequency); R.auto(shelf.gain);
 
   // ---- 唱片层（SOUND-R3）：recSrc → recLP → recG → master ----
@@ -427,12 +312,13 @@ export function buildEngine(ctx, SP, opts) {
   // ---- 引擎状态 ----
   const E = {
     ctx, SP, R, ROOT,
-    nodes: { master, shelf, lp, wowDelay: wowDelayNode, bedBus, wearBus, fgBus, l1Level, crackleLevel, l2Level, s2Level, s3Level, hissLevel, l1Breath, recLP, recG },
+    nodes: { master, shelf, lp, wearBus, fgBus, humLevel, crackleLevel, hissLevel, recLP, recG },
     onSound: null,   // 越级检测仪抽头（声资产批§二）：单声上线报 {name, klass, at}——检测先于上线的执法口
     transport: null,
     lastGridAt: 0, lastBarAt: 0, lastAskRepeat: -1e9, doneSilentUntil: -1, wxLatch: 0,
     habLog: new Map(),
-    mutes: new Set(), // 隔离板：'l1'|'crackle'|'l2'|'s2'|'s3'|'hiss'|'fg'|'record'
+    mutes: new Set(), // 隔离板 v3：'hum'|'hiss'|'crackle'|'fg'|'record'
+    paused: false,   // 运输暂停旗（状态表'暂停抬带=嘶止哼存'的真值源——pause/resumeRecord 同刀设）
     rec: { idx: -1, meta: null, buf: null, srcs: [], calibLin: 0, posBase: 0, posBaseAt: 0, tapeStopped: false, paused: false, pausePos: 0 },
   };
 
@@ -531,6 +417,7 @@ export function buildEngine(ctx, SP, opts) {
    *  记住读头位置；床/底噪/呼吸一概不动——存在层独立于此（不变量二）。paused 与 tapeStopped 分道：
    *  后者遇非 DONE 相自动复活（滑停语义），前者只认 resumeRecord（暂停不该被下一包偷偷叫醒）。 */
   function pauseRecord(at) {
+    E.paused = true;                          // v3 状态表：暂停抬带=嘶止哼存（下一网格 applyBed 执法）
     if (E.rec.paused || !recOn() || !E.rec.srcs.length) return;
     E.rec.pausePos = recPosAt(at);            // 记住读头＝续播点
     const sec = SP.record.pauseSec ?? 0.28;   // 拨杆 wow：短于 tape-stop 滑停
@@ -548,6 +435,7 @@ export function buildEngine(ctx, SP, opts) {
   }
   /** 恢复唱片（续播不重建）：从暂停读头位置重新落针起播；房间层本就没停，续上即可。 */
   function resumeRecord(at) {
+    E.paused = false;                         // v3 状态表：复走=嘶回
     if (!E.rec.paused) return;
     E.rec.paused = false;
     if (!E.transport || !E.rec.meta) return;
@@ -574,23 +462,11 @@ export function buildEngine(ctx, SP, opts) {
       else param.setTargetAtTime(v, at, tc);
     };
     const mg = (n) => (E.mutes.has(n) ? 0 : 1);
-    set(l1Level.gain, bt.l1 * mg('l1'), slow);
+    set(humLevel.gain, bt.hum * mg('hum'), slow);
+    set(hissLevel.gain, bt.hiss * mg('hiss'), fast);      // 嘶随走带即停即起（暂停抬带=嘶止要快）
     set(crackleLevel.gain, bt.crackle * mg('crackle'), slow);
-    set(l2Level.gain, bt.l2 * mg('l2'), slow);
-    set(s2Level.gain, bt.s2 * mg('s2'), fast);
-    set(s3Level.gain, bt.s3 * mg('s3'), fast);
-    set(hissLevel.gain, bt.hissLin * mg('hiss'), slow);
     set(lp.frequency, bt.filterHz, slow);
     set(shelf.gain, bt.hfShelfDb, slow);
-    const wowAmt = 0.03 * (Math.pow(2, bt.wowCents / 1200) - 1);
-    R.setDepth(wowD1, wowAmt * 0.7, at, slow, imm);
-    R.setDepth(wowD2, wowAmt * 0.4, at, slow, imm);
-    R.setDepth(bD1, SP.bed.breathDepth * 0.6, at, slow, imm);
-    R.setDepth(bD2, SP.bed.breathDepth * 0.4, at, slow, imm);
-    // WAITING 悬停：属方向延音（半终止）；声部失谐随行（三关①不因 hover 失效）
-    const f1 = midiToHz(bt.hover ? ROOT + 7 : ROOT) * Math.pow(2, v1Cents / 1200);
-    const f2 = midiToHz(bt.hover ? ROOT + 14 : ROOT + 7) * Math.pow(2, v2Cents / 1200);
-    set(v1.frequency, f1, fast); set(v2.frequency, f2, fast);
   }
 
   // ---- 唱片参数施加（SOUND-R3；与 applyBed 同拍调度） ----
@@ -654,7 +530,7 @@ export function buildEngine(ctx, SP, opts) {
     o.connect(g);
   }
   function duck(at) {
-    for (const bus of [bedBus, wearBus]) {
+    for (const bus of [wearBus]) {
       bus.gain.cancelScheduledValues(at);
       bus.gain.setTargetAtTime(0.55, at - 0.12 < ctx.currentTime ? at : at - 0.12, 0.03);
       bus.gain.setTargetAtTime(1.0, at + 0.25, 0.2);
@@ -740,10 +616,8 @@ export function buildEngine(ctx, SP, opts) {
     E.transport = { audio0, speed, track, durMs, startPm };
     E.lastGridAt = audio0; E.lastBarAt = audio0; E.lastAskRepeat = -1e9;
     E.doneSilentUntil = -1; E.wxLatch = 0; E.habLog.clear();
-    for (const bus of [bedBus, wearBus]) {
-      bus.gain.cancelScheduledValues(ctx.currentTime);
-      bus.gain.setValueAtTime(1, ctx.currentTime);
-    }
+    wearBus.gain.cancelScheduledValues(ctx.currentTime);
+    wearBus.gain.setValueAtTime(1, ctx.currentTime);
     // 唱片起播（R3）：重建源（stop 后源不可复用）；唱片内相位=带位置映射（确定性＋跳转对应感）
     if (E.rec.meta || records.length) {
       recStopAll(ctx.currentTime);
@@ -755,7 +629,8 @@ export function buildEngine(ctx, SP, opts) {
     applyBed(bedTargets(stateOf(s0), SP), ctx.currentTime, true);
     applyRecord(recordTargets(stateOf(s0), SP), ctx.currentTime, true);
   }
-  const stateOf = (s) => ({ T: s[2], A: s[3], wow: s[6], phase: ['IDLE', 'WORKING', 'WAITING', 'DONE'][s[5]] || 'WORKING', weather: 'CLEAR', pendingAsk: s[7] === 1, recordOn: recOn() });
+  const stateOf = (s) => ({ T: s[2], A: s[3], wow: s[6], phase: ['IDLE', 'WORKING', 'WAITING', 'DONE'][s[5]] || 'WORKING', weather: 'CLEAR', pendingAsk: s[7] === 1, recordOn: recOn(),
+    moving: !!E.transport && !E.paused, speed: E.transport ? E.transport.speed : 1 });   // 状态表三态真值（v3）
 
   function scheduleGridUntil(untilSec) {
     const { audio0, speed, track, durMs, startPm } = E.transport;
@@ -764,33 +639,7 @@ export function buildEngine(ctx, SP, opts) {
       const s = sampleAt(track, Math.min(gpm, durMs));
       const bt = bedTargets(stateOf(s), SP);
       if (at > E.doneSilentUntil) { applyBed(bt, at, false); applyRecord(recordTargets(stateOf(s), SP), at, false); }
-      if (at >= E.lastBarAt + bar() - 1e-6) {
-        E.lastBarAt = at; E.wxLatch = s[4];
-        if (!bt.hover) {
-          const bi = Math.round((at - audio0) / bar());
-          const sus = (Math.abs(Math.sin(bi * 311.7)) % 1) < bt.susProb;
-          v2.frequency.setTargetAtTime(midiToHz(ROOT + (sus ? 5 : 7)) * Math.pow(2, v2Cents / 1200), at, SP.bed.slewMsSlow / 1000);
-        }
-      }
-      if (bt.s2 > 0 && at > E.doneSilentUntil) {
-        const gi = Math.round((at - audio0) / grid());
-        const strong = (gi % 4 === 0), r = Math.abs(Math.sin(gi * 127.1)) % 1;
-        if (r < bt.density * (strong ? 0.9 : 0.35)) {
-          if (strong) {
-            const k = ctx.createOscillator(); k.frequency.setValueAtTime(85, at);
-            k.frequency.exponentialRampToValueAtTime(42, at + 0.09);
-            const kg = ctx.createGain(); kg.connect(s2Level);
-            kg.gain.setValueAtTime(0.7, at); kg.gain.exponentialRampToValueAtTime(0.001, at + 0.18);
-            k.connect(kg); k.start(at); k.stop(at + 0.2); R.ephemeral(k, at + 0.2);
-          } else {
-            const h = noiseBurst(at, 0.03);
-            const hf2 = ctx.createBiquadFilter(); hf2.type = 'highpass'; hf2.frequency.value = 6500;
-            const hg = ctx.createGain(); hg.connect(s2Level);
-            hg.gain.setValueAtTime(0.25, at); hg.gain.exponentialRampToValueAtTime(0.001, at + 0.04);
-            h.connect(hf2); hf2.connect(hg);
-          }
-        }
-      }
+      // （bar 悬挂音摆/S2 打点已随作曲床出殡——网格唯余床/唱片参数与 ASK 重奏）
       if (s[7] === 1 && (at - E.lastAskRepeat) >= SP.call.askRepeatSec) {
         E.lastAskRepeat = at;
         if (at > audio0 + 1 && !E.mutes.has('fg')) askMotif(at);
@@ -831,8 +680,8 @@ export function buildEngine(ctx, SP, opts) {
   return {
     ctx, SP, ROOT, nodes: E.nodes,
     registry: R,
-    assetsUsed: { body: !!bodyClip, air: !!airClip, crackle: !!crackleClip },
-    stackInfo: { l2: l2.info, s3: s3.info }, // 三关铁律自述（金测试断言口）
+    assetsUsed: { crackle: !!crackleClip },   // v3：织体资产（roomtone/filmstatic）随退役令出列
+    stackInfo: { hum: hum.info }, // 三关铁律自述（金测试断言口·v3=马达低哼）
     get transport() { return E.transport; },
     get lastGridAt() { return E.lastGridAt; },
     get doneSilentUntil() { return E.doneSilentUntil; },
@@ -849,7 +698,6 @@ export function buildEngine(ctx, SP, opts) {
     stop(at) {
       R.stopAll(at);
       recStopAll(at); // G1 含唱片路径：levels 闸（recG）+源硬停，双重
-      bedBus.gain.setTargetAtTime(1, at, 0.05);
       wearBus.gain.setTargetAtTime(1, at, 0.05);
     },
     hardMute() { R.hardMute(); },

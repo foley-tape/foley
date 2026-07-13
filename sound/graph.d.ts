@@ -39,7 +39,7 @@ export interface Registry {
 }
 
 export const CALIB: {
-  l2Norm: number; s3Norm: number; hissNorm: number;
+  humNorm: number; hissNorm: number;
   fbBodyLen: number; fbAirLen: number; fbCrackleLen: number;
 };
 
@@ -62,9 +62,9 @@ export interface SoundEngine {
   trigger(cls: number, atSec: number, deg: number, vel: number): void;
   applyBedNow(pm: number): void;
   needleDrop(atSec: number): void;
-  setMute(name: 'l1' | 'crackle' | 'l2' | 's2' | 's3' | 'hiss' | 'fg' | 'record', on: boolean): void;
+  setMute(name: 'hum' | 'hiss' | 'crackle' | 'fg' | 'record', on: boolean): void;   // 隔离板 v3
   assetsUsed: { body: boolean; air: boolean; crackle: boolean };
-  stackInfo: { l2: StackInfo; s3: StackInfo };
+  stackInfo: { hum: StackInfo };   // 三关自述 v3（马达低哼）
   // 唱片面（SOUND-R3）
   readonly recordInfo: { idx: number; name: string; title: string; seconds: number; count: number; tapeStopped: boolean } | null;
   recordCount: number;

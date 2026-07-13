@@ -412,7 +412,7 @@ function frame(){ const pm=Math.min(playMs(),dur); const s=sampleAt(track,pm);
   document.getElementById('prog').textContent=(pm/1000).toFixed(0)+'s / '+(dur/1000).toFixed(0)+'s';
   document.getElementById('wx').textContent=WX[s[4]];
   const bt=bedTargets({T:s[2],A:s[3],wow:s[6],phase:PHASE_IDX[s[5]]||'WORKING',weather:'CLEAR',pendingAsk:s[7]===1},SP);
-  document.getElementById('bed').textContent=(bt.silence?'静默':bt.hover?'悬停':'L1 '+bt.l1.toFixed(3)+' L2 '+bt.l2.toFixed(3)+' S3 '+bt.s3.toFixed(3)+' 磨损 '+(bt.crackle+bt.hissLin).toFixed(4));
+  document.getElementById('bed').textContent=(bt.silence?'滑停':'哼 '+bt.hum.toFixed(3)+' 嘶 '+bt.hiss.toFixed(3)+' 磨损 '+bt.crackle.toFixed(4));
   const ri=engine?engine.recordInfo:null, rm=!engine&&RECORDS_META.length?RECORDS_META[recIndex0]:null;
   document.getElementById('rec').textContent = ri?(ri.title+' '+(ri.idx+1)+'/'+ri.count+(ri.tapeStopped?' ⏹滑停':'')):(rm?(rm.title||rm.name)+' '+(recIndex0+1)+'/'+RECORDS_META.length:'（无——房间层）');
   if(playing && pm<dur) raf=requestAnimationFrame(frame); else if(pm>=dur) stopPlay(); }
@@ -465,7 +465,7 @@ document.getElementById('recNext').onclick=()=>{
 // ===== 隔离板（EAR-7）：层禁声走引擎（engine.setMute），不动 SP/哈希；起播前的勾选先记账后施加 =====
 const isoMutes=new Set();
 (function(){ const board=document.getElementById('isoBoard');
-  const LAYERS=[['record','唱片'],['l1','L1 织体体'],['crackle','磨损crackle'],['l2','L2 和声垫'],['s2','S2 律动'],['s3','S3 张力弦'],['hiss','底噪hiss'],['fg','前景+呼唤']];
+  const LAYERS=[['record','唱片'],['hum','马达低哼'],['hiss','过头嘶'],['crackle','磨损crackle'],['fg','前景+呼唤']];
   for(const [key,label] of LAYERS){
     const lab=document.createElement('label'); lab.style.cssText='display:flex;gap:4px;align-items:center';
     const cb=document.createElement('input'); cb.type='checkbox'; cb.checked=true;
@@ -503,11 +503,10 @@ if(new URLSearchParams(location.search).get('tuner')==='1'){
   const panel=document.getElementById('tuner'); panel.style.display='block';
   const fields=[
     ['bed','trimDb',-24,6],
-    ['bed','breathDepth',0.05,0.20],
-    ['bed','l1Gain',0,0.2],['bed','l1IdleGain',0,0.1],['bed','l1AirRatio',0,1],
-    ['bed','l2Gain',0,0.15],['bed','crackleDbLo',-70,-30],['bed','crackleDbHi',-50,-15],
-    ['bed','s2Gain',0,0.4],['bed','s2GateA',0,1],
-    ['bed','s3Gain',0,0.4],['bed','s3GateT',0,1],['bed','filterHzLo',300,4000],['bed','filterHzHi',2000,12000],
+    ['bed','humGain',0,0.08],['bed','hissGain',0,0.06],
+    ['bed','hissSpeedPow',0,2],['bed','hissWowDepth',0,1],
+    ['bed','crackleDbLo',-70,-30],['bed','crackleDbHi',-50,-15],
+    ['bed','filterHzLo',300,4000],['bed','filterHzHi',2000,12000],
     ['bed','hissDbLo',-80,-40],['bed','hissDbHi',-60,-20],['bed','wowCentsLo',0,10],['bed','wowCentsHi',5,50],
     ['bed','hfShelfDbHi',-12,0],['bed','slewMsFast',50,1000],['bed','slewMsSlow',200,2000],['bed','doneSilenceSec',1,10],
     ['foreground','peakGain',0,0.6],['foreground','failGain',0,0.6],['foreground','pageGain',0,0.3],

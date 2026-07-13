@@ -140,7 +140,7 @@ export function g3Band(sp: SoundParams, prep: BandPrep): G3Band {
   let acc = 0, n = 0;
   for (let at = 1; at < BAND_RENDER_SEC; at += grid) {
     const s = sampleAt(prep.track, Math.min(at * 1000 * prep.speed, prep.durMs));
-    const lin = Math.pow(10, bedRmsDb(bedTargets(stateOf(s), sp)) / 20) * 0.9; // master 0.9 入模型
+    const lin = Math.pow(10, bedRmsDb(bedTargets({ ...stateOf(s), moving: true, speed: prep.speed }, sp)) / 20) * 0.9; // master 0.9 入模型·speed=试听压缩倍速（嘶饱和律同渲染同尺）
     acc += lin * lin; n++;
   }
   const designDb = n ? 10 * Math.log10(Math.max(acc / n, 1e-24)) : -120;

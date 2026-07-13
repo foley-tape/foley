@@ -481,7 +481,8 @@ export function buildEngine(ctx, SP, opts) {
     const d = b.getChannelData(0);
     for (let i = 0; i < n; i++) d[i] = (tickRng() * 2 - 1) * (1 - i / n);
     const s = ctx.createBufferSource(); s.buffer = b;
-    const hp = ctx.createBiquadFilter(); hp.type = 'highpass'; hp.frequency.value = 1800; hp.Q.value = 0.5;
+    // P0-2 尾单：1800Hz 高通亮嗒（金属感）→ 1250Hz 带通闷"啵"（黑胶锁槽的那种 pop）
+    const hp = ctx.createBiquadFilter(); hp.type = 'bandpass'; hp.frequency.value = 1250; hp.Q.value = 0.7;
     const g = ctx.createGain(); g.gain.value = SP.record.stuckTickGain;
     R.connect(s, hp); R.connect(hp, g); R.connect(g, recLP);
     s.start(at); R.ephemeral(s, at + 0.05);
@@ -667,9 +668,14 @@ export function buildEngine(ctx, SP, opts) {
     oneOsc('sine', midiToHz(ROOT + 7), t5, at + 0.2).connect(envG(t5, g * 0.25, 0.01, 0.15));
   }
   function skip(at) {
-    duck(at); const n = noiseBurst(at, 0.08);
-    const f = ctx.createBiquadFilter(); f.type = 'bandpass'; f.frequency.value = 1600;
-    n.connect(f); f.connect(envG(at, SP.call.gain, 0.003, 0.09));
+    // P0-2 尾单（船长点名"敲铁盆"）：原 1600Hz 带通噪爆·满呼唤增益·3ms 起音＝钢盆脆响。
+    // 改"唱针滑擦"：带通中心 900→500Hz 下滑（针在纹里打滑的闷擦）·Q 放松·增益 0.55×·起音 8ms——
+    // 跳针仍一耳可辨，但那是唱片系统的声，不是厨房的。
+    duck(at); const n = noiseBurst(at, 0.12);
+    const f = ctx.createBiquadFilter(); f.type = 'bandpass'; f.Q.value = 0.6;
+    f.frequency.setValueAtTime(900, at);
+    f.frequency.exponentialRampToValueAtTime(500, at + 0.11);
+    n.connect(f); f.connect(envG(at, SP.call.gain * 0.55, 0.008, 0.12));
   }
   function askMotif(at) {
     duck(at); const hz = askMotifHz(ROOT, SP);
@@ -688,16 +694,29 @@ export function buildEngine(ctx, SP, opts) {
    *  隔离板 fg 勾掉则连带静默（announcement 属前景族）。一次性源，非遥测映射、不入回归主流。 */
   function needleDrop(at) {
     if (E.mutes.has('fg')) return;
-    // ① 触点低频"咚"：110→52Hz 快降三角，短促软着陆（落针的重量感）
-    const thunk = ctx.createOscillator(); thunk.type = 'triangle';
-    thunk.frequency.setValueAtTime(110, at);
-    thunk.frequency.exponentialRampToValueAtTime(52, at + 0.1);
-    thunk.connect(envG(at, SP.foreground.saveGain * 0.9, 0.006, 0.14));
-    thunk.start(at); thunk.stop(at + 0.2); R.ephemeral(thunk, at + 0.2);
-    // ② 表面噪声涌起：短噪声过带通~1.9k，针入纹的"呲"一下（渐起不爆音）
-    const swell = noiseBurst(at, 0.16);
-    const bp = ctx.createBiquadFilter(); bp.type = 'bandpass'; bp.frequency.value = 1900; bp.Q.value = 0.7;
-    swell.connect(bp); bp.connect(envG(at, SP.foreground.pageGain * 1.1, 0.03, 0.13));
+    // P0-2（LEDGER）：拆"不锈钢盘"——原 110Hz 硬三角＋1.9k 带通突刺读感金属敲击。
+    // 换"软针落"：① 更低更软的触点"扑"（80→42Hz 正弦·半电平） ② 针入纹＝在库 l1-crackle
+    // 真采样一撮涌起（低通 2.4k·慢起慢收·无金属带通）；资产缺席退软化噪声（低通 1.6k）。
+    const thunk = ctx.createOscillator(); thunk.type = 'sine';
+    thunk.frequency.setValueAtTime(80, at);
+    thunk.frequency.exponentialRampToValueAtTime(42, at + 0.12);
+    thunk.connect(envG(at, SP.foreground.saveGain * 0.55, 0.008, 0.16));
+    thunk.start(at); thunk.stop(at + 0.26); R.ephemeral(thunk, at + 0.26);
+    if (crackleClip) {
+      const n = Math.min(Math.round(0.6 * crackleClip.sr), crackleClip.x.length);
+      const off = Math.floor(keyRng() * Math.max(1, crackleClip.x.length - n));
+      const buf = ctx.createBuffer(1, n, crackleClip.sr);
+      buf.getChannelData(0).set(crackleClip.x.subarray(off, off + n));
+      const src = ctx.createBufferSource(); src.buffer = buf;
+      const lp2 = ctx.createBiquadFilter(); lp2.type = 'lowpass'; lp2.frequency.value = 2400; lp2.Q.value = 0.4;
+      const norm = Math.pow(10, -crackleClip.rmsDb / 20);
+      src.connect(lp2); lp2.connect(envG(at, SP.foreground.pageGain * 1.2 * norm, 0.05, 0.42));
+      src.start(at); src.stop(at + 0.62); R.ephemeral(src, at + 0.62);
+    } else {
+      const swell = noiseBurst(at, 0.2);
+      const lp2 = ctx.createBiquadFilter(); lp2.type = 'lowpass'; lp2.frequency.value = 1600; lp2.Q.value = 0.5;
+      swell.connect(lp2); lp2.connect(envG(at, SP.foreground.pageGain * 0.9, 0.05, 0.18));
+    }
   }
 
   function habFor(cls, at) {

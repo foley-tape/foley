@@ -7,8 +7,12 @@ import { LiveStream } from './live.js';
 import { VuMeter, ChartRecorder, Lamps } from './instruments.js';
 import { ReelDeck, Counter } from './deck.js';
 import { mountLens } from './lens.js';
+import { buildMachine } from './machine.js';
+import { mountPerf } from './perf.js';
 import { DubController } from './dub.js';
 import { SoundBridge } from './soundbridge.js';
+import { mountFlapBoard, mountTrackIndex } from './flapboard.js';
+import { runPost, runPenSweep, postGate } from './post.js';
 
 const params = new URLSearchParams(location.search);
 const deepTape = (params.get('tape') || '').replace(/[^\w-]/g, '');  // 深链 demo
@@ -25,9 +29,24 @@ const fmtDur = (s) => {
   s = Math.round(s); const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60), ss = s % 60;
   return h ? `${h}:${String(m).padStart(2, '0')}:${String(ss).padStart(2, '0')}` : `${m}:${String(ss).padStart(2, '0')}`;
 };
+// P0-4 侧栏诚实版：真会话第三元素＝相对时间（何时收工）；厂盘无时可言仍报时长
+const fmtRel = (ms) => {
+  if (!ms) return '';
+  const s = (Date.now() - ms) / 1000;
+  if (s < 90) return '刚才';
+  if (s < 3600) return `${Math.max(2, Math.round(s / 60))} 分钟前`;
+  if (s < 86400) return `${Math.round(s / 3600)} 小时前`;
+  if (s < 172800) return '昨天';
+  return `${Math.round(s / 86400)} 天前`;
+};
 
 async function boot() {
   if (document.readyState !== 'complete') await new Promise(r => window.addEventListener('load', r, { once: true }));
+
+  // P0-5 滚动数字拆除令：计数轮默认不上常显面（counter:false）——未过棘爪回位律不得回归；
+  // ?counter=1 诊断口限定，供棘爪返工自检，不入正常路径。
+  buildMachine(document.getElementById('machine'), { playCue: true, counter: params.has('counter') });
+  mountPerf();   // 帧医生（?perf=1·P0-1 验收器）   // decree13：机器＝场景板＋动态层（单一数据源 markup·index/demo 同吃）；playCue=真页手势示能灯
 
   const room = document.getElementById('room');
   // 首光·PLAY 呼吸示能（第五号手令 丁-E1／丙.3）：手势前唯一亮起；首个手势即房间醒，示能退场。
@@ -38,15 +57,24 @@ async function boot() {
 
   // ── 持久器件（换带不重建，只清账；声桥手势后 push） ──
   const vu = new VuMeter(document.getElementById('vu-svg'));
+  // ?vufreeze=<dBFS> 诊断口：钉死总线读数（刻度对脸验收器：-20 时针必须砸在画上 0/红区界）
+  if (params.has('vufreeze')) vu.source = () => Number(params.get('vufreeze'));
+  // ② Solari 翻字牌机芯（曲名唯一显示面·被 onRecordChange 唯一驱动·手势前留白=板上空白卡）
+  const flap = mountFlapBoard(document.getElementById('flap-cells'));
+  // ② 甲案曲单纸标签：印刷品域——纸上的字开机即读，不需要手势（catalog=静态出版物）
+  fetch('../sound/records/catalog.json').then((r) => r.json())
+    .then((c) => mountTrackIndex(document.getElementById('track-index'), (c.records || []).map((x) => x.title)))
+    .catch(() => {});
   const blankTape = { splices: [], moments: [], duration: Infinity };
   const chart = new ChartRecorder(document.getElementById('chart-canvas'), blankTape);
   const lamps = new Lamps(document.getElementById('amber-tube'), document.getElementById('emerald'), document.getElementById('pilot'));
   const deck = new ReelDeck(document.getElementById('reel-l'), document.getElementById('reel-r'), document.getElementById('tapeband'));
-  const counter = new Counter(document.getElementById('counter-housing'), document.getElementById('loupe'), deck);
-  const instruments = [vu, chart, lamps, deck, counter];
+  const counterHousing = document.getElementById('counter-housing');   // P0-5：默认不建（诊断口才在）
+  const counter = counterHousing ? new Counter(counterHousing, document.getElementById('loupe'), deck) : null;
+  const instruments = [vu, chart, lamps, deck, ...(counter ? [counter] : [])];
 
   const lens = mountLens(document.getElementById('lens'), document.getElementById('machine'));
-  if (lens) { document.getElementById('grain').style.display = 'none'; document.getElementById('vignette').style.display = 'none'; }
+  if (lens) { document.getElementById('grain').style.display = 'none'; }   // decree13：暗角/暖调留给 CSS #vignette（multiply·恒在），lens 只叠颗粒浮尘
 
   // ── 房间喂包（E1 睡姿）＋总线 ──
   let idleSince = null, lastPktSeen = null;
@@ -83,9 +111,20 @@ async function boot() {
     window.addEventListener('pointerdown', () => {
       if (sb) return; // 丙.1 单引擎：永不二次实例化音频图
       sb = new SoundBridge({ repoKey: 'deck:default', seed: 'deck' });
-      sb.onRecordChange = (name) => { const s = document.querySelector('#now-plate .np-song'); if (s) s.textContent = name; }; // 显示牌读当前曲名
+      // ② 三连里的后两拍：哗啦翻动（onRecordChange 确认上桥才翻·§11 不预写）＋软落针（翻定即落·
+      //    仅真人切曲——上桥/自愈换名只翻不落针，落针是给手的回答不是给机器的）
+      sb.onRecordChange = (name, userSwitch) => {
+        // POST 演出期让位（船长时序令）：台词并入幕三翻牌拍=揭幕滚真曲名——
+        // §11 唯一写者不变，只延时不代笔；非演出期原样即翻。
+        const apply = () => flap?.set(name, { onSettle: () => { if (userSwitch) born.needleDrop?.(); } });
+        if (!postGate.defer(apply)) apply();
+      };
       const born = sb; instruments.push(sb);
-      sb.start(lastPktSeen).then(() => { if (window.__stage) window.__stage.sound = born; onSoundReady?.(); })
+      sb.start(lastPktSeen).then(() => {
+        if (window.__stage) window.__stage.sound = born;
+        if (!params.has('vufreeze')) vu.source = () => born.vuDb();   // ⑤ 修宪：声起之刻 VU 换粮——总线真实包络（耳听即针指）
+        onSoundReady?.();
+      })
         .catch((err) => { instruments.splice(instruments.indexOf(born), 1); sb = null; console.warn('[sound] 声桥未起（视觉照走）：', err); });
     });
   }
@@ -97,6 +136,10 @@ async function boot() {
   live.onMoment.push((m) => { if (liveActive) feedMoment(m); });
   // 状态可诊（E5）：只在 live 上机时把连接健康态落 room[data-signal]
   live.onStatus.push((s) => { if (!liveActive) return; if (s === 'live') delete room.dataset.signal; else room.dataset.signal = s; });
+  // ⑥ LINE 线路灯（机器级·不问上机与否）：SSE 证明即亮（live/gone 皆线路在——gone 是源没了不是线断了），
+  // lost=断链即熄；connecting=未证不亮。
+  lamps.linkUp = false;
+  live.onStatus.push((s) => { lamps.linkUp = (s === 'live' || s === 'gone'); });
   live.connect(); live.flushBuffer();
 
   function stopSource() {
@@ -123,7 +166,7 @@ async function boot() {
     });
   }
   async function mountSource(item) {
-    counter.reset();
+    counter?.reset();
     if (!item) { chart.reset(blankTape); dub = null; return; }   // EMPTY：房间层，无源无带
     if (item.kind === 'live') {
       chart.reset(blankTape);
@@ -146,9 +189,13 @@ async function boot() {
   // ── transport 绑定（rule 2/4：一切读后端字段） ──
   const rackIndex = new Map();
   let curLoaded = null, curPhase = 'EMPTY', controlsLocked = false;
+  let serveEpoch = null;
   function applyTransport(t) {
     if (!t) return;
-    renderRackSelection(t.selected);                 // rule 2：选中标记读后端
+    // 纪元自愈（船长案"架上没看到 AUDIT"）：serve 重启＝新纪元——开着的旧标签页架单已陈旧，重载货架
+    if (serveEpoch !== null && t.epoch !== serveEpoch) { serveEpoch = t.epoch; loadRack(); return; }
+    serveEpoch = t.epoch;
+    renderRackSelection(t);                          // rule 2：选中/在机标记读后端
     updateControls(t);                               // rule 4：键/相读后端
     if (t.phase === 'CUEING' && curPhase !== 'CUEING') sb?.fadeOut();   // rule 1：闭锁期淡出
     curPhase = t.phase;
@@ -168,10 +215,21 @@ async function boot() {
 
   // ── 卡带架 UI（左纵列货架） ──
   const rackEl = document.getElementById('rack-list');
-  function renderRackSelection(sel) {
+  function renderRackSelection(t) {
     if (!rackEl) return;
-    for (const el of rackEl.querySelectorAll('.cassette')) el.classList.toggle('selected', el.dataset.id === sel);
+    for (const el of rackEl.querySelectorAll('.cassette')) {
+      el.classList.toggle('selected', el.dataset.id === t.selected);
+      // RACK_SPEC 二.1：货架只列不在机上的带——上机即离架，退带归位；LIVE 的日常形态即此
+      el.classList.toggle('in-machine', el.dataset.id === t.loaded);
+    }
   }
+  // RACK_SPEC 三.3 路径永不上架（路径属 doctor 诊断域）：展示题从首个路径样 token 处截断；
+  // 原文至多归悬停铭牌（title）。剥空后由垫底链（仓名）扛大字。
+  const stripPaths = (s) => {
+    const t = String(s || '').replace(/\s+/g, ' ').trim();
+    const i = t.search(/(?:^|\s)\S*\//);
+    return (i < 0 ? t : t.slice(0, i)).trim().replace(/[，,、;；:：]+$/, '');
+  };
   async function loadRack() {
     const data = await fetch('/rack').then(r => r.ok ? r.json() : { rack: [] }).catch(() => ({ rack: [] }));
     if (rackEl) rackEl.innerHTML = '';
@@ -184,9 +242,18 @@ async function boot() {
       el.dataset.id = item.id;
       el.innerHTML = `<span class="hub"></span><span class="hub"></span>
         <b class="c-name"></b><span class="c-sum"></span><i class="c-dur"></i>`;
-      el.querySelector('.c-name').textContent = item.name;
-      el.querySelector('.c-sum').textContent = item.summary || '';
-      el.querySelector('.c-dur').textContent = item.kind === 'live' ? '● LIVE' : fmtDur(item.seconds);
+      // RACK_SPEC 三 层级倒置：真会话大字＝开场白（手写体·机器只引用不发明），小角标＝仓名；
+      // 厂带照旧 印刷体名＋摘要（二.2 分区靠字体不靠分割线）。
+      if (item.kind === 'card') {
+        const title = stripPaths(item.summary) || item.name;   // 垫底链：开场白剥路径后空→仓名
+        el.querySelector('.c-name').textContent = title;
+        el.querySelector('.c-sum').textContent = title === item.name ? '' : item.name;
+        if (item.summary) el.title = item.summary;             // 悬停铭牌：原开场白（路径至多在此）
+      } else {
+        el.querySelector('.c-name').textContent = item.name;
+        el.querySelector('.c-sum').textContent = item.summary || '';
+      }
+      el.querySelector('.c-dur').textContent = item.kind === 'live' ? '● LIVE' : item.kind === 'card' ? fmtRel(item.mtime) : fmtDur(item.seconds);
       // rule 2：只请后端选中，不在前端自持选中态。点已上机的带＝退带（船长反馈：退带不直观·清屏生硬——
       // 改为点选中带退带，平滑淡出，不再要右侧 Eject 键）。
       el.addEventListener('click', () => {
@@ -202,14 +269,37 @@ async function boot() {
   // ── 走带显示牌＋诊断式控制（船长十分钟修：去右侧常驻 play/eject 按钮，改机器诊断式）──
   const nowPlate = document.getElementById('now-plate');
   const npTape = nowPlate?.querySelector('.np-tape');
-  const npSong = nowPlate?.querySelector('.np-song');
+  const npMeta = nowPlate?.querySelector('.np-meta');
   function updateControls(t) {
     controlsLocked = t.locked || t.phase === 'CUEING';
     document.body.classList.toggle('tape-loaded', t.phase !== 'EMPTY'); // 上带→架化左抽屉·机器满台（rule 4 读后端相）
     if (nowPlate) {
       nowPlate.dataset.mode = t.phase === 'EMPTY' ? 'empty' : t.phase === 'PAUSED' ? 'paused' : (t.live ? 'live' : 'replay'); // 清晰区分 LIVE/回放
-      // 带名：live 时省去（与"LIVE"模式字重复）；回放/暂停显仓名
-      if (npTape) npTape.textContent = (t.loaded && !t.live) ? (rackIndex.get(t.loaded)?.name ?? '') : '';
+      // RACK_SPEC 二.1：在机之带归走带牌——LIVE 亦然（LIVE 不上架，名在牌上）。
+      // ② 主牌标题法（裁决原文"主牌按标题法蚀刻开场白截断"）：真会话带蚀开场白剥路径截断
+      //   （与货架大字同一把尺 stripPaths·CSS 34ch 裁溢出）；厂带/LIVE 仍印刷名。
+      if (npTape) {
+        const it = t.loaded ? rackIndex.get(t.loaded) : null;
+        npTape.textContent = !t.loaded ? '' : t.live ? 'LIVE'
+          : it?.kind === 'card' ? (stripPaths(it.summary) || it.name || '') : (it?.name ?? '');
+        // 三.1 档案行（圈选②中性编号——C-编号属卡片宪法冻结域，解冻时一次换正）：
+        // 真会话卡=NO.<卡序>·LEN·SESSION／厂带=FACTORY·LEN／LIVE=RECORDING；空机留白
+        if (npMeta) {
+          // ≥1h 走 H/M 制（会话卡 seconds=跨时·17 小时印成 LEN 1182:04 是仪表事故）
+          const fmtLen = (s) => !(s && isFinite(s)) ? ''
+            : s >= 3600 ? `LEN ${Math.floor(s / 3600)}H${String(Math.floor((s % 3600) / 60)).padStart(2, '0')}M`
+              : `LEN ${Math.floor(s / 60)}:${String(Math.round(s % 60)).padStart(2, '0')}`;
+          let meta = '';
+          if (t.loaded) {
+            if (t.live) meta = 'LIVE · RECORDING';
+            else if (it?.kind === 'card') {
+              const no = [...rackIndex.values()].filter((x) => x.kind === 'card').indexOf(it) + 1;
+              meta = [`NO.${String(no).padStart(2, '0')}`, fmtLen(it.seconds), 'SESSION'].filter(Boolean).join(' · ');
+            } else meta = ['FACTORY', fmtLen(it?.seconds)].filter(Boolean).join(' · ');
+          }
+          if (npMeta.textContent !== meta) npMeta.textContent = meta;
+        }
+      }
     }
     const dubKey = document.getElementById('dub-key');
     if (dubKey) dubKey.classList.toggle('switch-locked', controlsLocked); // rule 1：切带期录音键锁
@@ -219,20 +309,53 @@ async function boot() {
     if (controlsLocked || curPhase === 'EMPTY' || curPhase === 'CUEING') return;
     postTransport(curPhase === 'PLAYING' ? 'pause' : 'play');
   });
-  // 背景音乐上下曲（船长反馈：一直那首歌·选了三首）——切当前唱片，不动 transport
-  const bindRec = (sel, dir) => nowPlate?.querySelector(sel)?.addEventListener('click', (e) => {
+  // 背景音乐上下曲（船长反馈：一直那首歌·选了三首）——切当前唱片，不动 transport。
+  // §11 声资产上桥可诊（增补包 v2·随 P0-2）：牌上曲名唯一写者＝onRecordChange（真装上桥才蚀名）；
+  // 切曲不预写——目标未载/载入失败时预写＝蚀一个不在桥上的名。未上桥＝曲名位留白，禁静默装健康。
+  const bindRec = (sel, dir) => document.querySelector('#song-keys ' + sel)?.addEventListener('click', (e) => {
     e.stopPropagation();
-    const name = window.__stage?.sound?.switchRecord?.(dir);
-    if (name && npSong) npSong.textContent = name;
+    window.__stage?.sound?.switchRecord?.(dir);
   });
   bindRec('.np-prev', -1); bindRec('.np-next', 1);
+  // ⑥ 伺服校准钮（户口册定职）：拍一下马达座=滑针自检一趟；POST 演出期 penHead 已借走→静默让位
+  document.getElementById('servo-knob')?.addEventListener('click', (e) => { e.stopPropagation(); runPenSweep(chart); });
+
+  // ⑦POST 开机自检：首手势即跑（3.6s 零文字第一课·恰盖声桥起桥的 2.5s 空窗）。
+  // ?post=0 素面（录证据/回归验收）；?postloop=1 循环放（调参）；?vufreeze 在班时 VU 让位诊断口。
+  const firePost = () => runPost({ vu, chart, lamps, deck, flap }, { skipVu: params.has('vufreeze') })
+    .then(() => { if (params.get('postloop') === '1') setTimeout(firePost, 1600); });
+  if (params.get('post') !== '0') window.addEventListener('pointerdown', firePost, { once: true });
 
   // 调试把手（dev；换源后取当前引用）
-  window.__stage = { live, deck, counter, chart, lamps, sound: sb, transport: () => curPhase,
+  window.__stage = { live, deck, counter, chart, lamps, sound: sb, post: firePost, transport: () => curPhase,
     get replayer() { return replayer; }, get dub() { return dub; } };
 
   // ── 卡片吐卡＋接线（持久，第五号手令 乙/轨乙）──
   setupCardsAndWiring({ live, getDub: () => dub, setOnSoundReady: (fn) => { onSoundReady = fn; }, hasSound: () => !!sb });
+
+  // —— 闸材料声轨抽头（014 乙镜像·?audiotap=1·诊断限定不入正常路径）：等声桥手势后上位，
+  //    master 末端并联 MediaStreamDestination→MediaRecorder(opus)，__gateAudioB64 经 CDP 分片取走。
+  if (params.has('audiotap')) {
+    const poll = setInterval(() => {
+      const snd = window.__stage?.sound, eng = snd?.engine, actx = snd?.ctx;
+      if (!eng?.nodes?.master || !actx) return;
+      clearInterval(poll);
+      try {
+        const dest = actx.createMediaStreamDestination();
+        eng.nodes.master.connect(dest);
+        const mr = new MediaRecorder(dest.stream, { mimeType: 'audio/webm;codecs=opus' });
+        const chunks = [];
+        mr.ondataavailable = e => { if (e.data.size) chunks.push(e.data); };
+        mr.start(1000);
+        window.__tapStartEpoch = Date.now();
+        window.__gateAudioB64 = () => new Promise(res => {
+          mr.onstop = () => { const fr = new FileReader(); fr.onload = () => res(fr.result.split(',')[1]); fr.readAsDataURL(new Blob(chunks, { type: 'audio/webm' })); };
+          mr.stop();
+        });
+        document.title = 'TAP-ON';
+      } catch (err) { document.title = 'TAP-ERR ' + (err?.message ?? err); }
+    }, 250);
+  }
 
   // ── 启动：先架、后深链上机（rule 3 裸门空载） ──
   await loadRack();

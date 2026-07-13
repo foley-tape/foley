@@ -55,12 +55,14 @@ export class LiveStream {
     for (const fn of this.onMoment) fn({ ...obj, stageT: obj.t - this.t0 });
   }
 
-  // 今晨的纸：同步喂完 out 产物流的全史
+  // 今晨的纸：只补**尾窗**（P0-3 根修）。整日 curve 可达几十 MB／几十万行，全史同步回灌会把
+  // 主线程噎死几十秒＝"迟到者开页全不动"（船长 103MB 案）。纸只能显示 ~57s（penX÷13px·s⁻¹），
+  // 尾窗 120s 即全部所需；首包走既有 primed→isFirst=seek 语义：pos/里程一步对齐，SSE 无缝续上。
   async prime() {
     let curveText = null, momentsText = 't\n';
     try {
       const [c, m] = await Promise.all([
-        fetch('/today/curve.csv').then(r => (r.ok ? r.text() : null)),
+        fetch('/today/curve.csv?tailSec=120').then(r => (r.ok ? r.text() : null)),
         fetch('/today/moments.csv').then(r => (r.ok ? r.text() : 't\n')),
       ]);
       curveText = c; momentsText = m;
@@ -70,6 +72,15 @@ export class LiveStream {
     const curve = parseCurve(curveText);
     const moments = parseMoments(momentsText);
     let mi = 0;
+    // 尾窗配套：窗前的陈年时刻整段跳过——旧 STUCK/RESOLVE 在首包炸串回灌会闩错灯态/卡拍态
+    if (curve.n > 0) { while (mi < moments.length && moments[mi].t < curve.t[0]) mi++; }
+    // 回灌须越过水位线（P0-3 根修②）：connect 即到的 serve lastState 把 lastT 钉在"现在"，
+    // 历史行全部 t≤lastT 被去重吞掉——迟到者纸上从来无史（与 75MB 噎死并列的第二根病根）。
+    // 回灌前把钟基与水位回拨到窗口起点：史行升序通过；随后 SSE（t 在窗尾之后）自然续闸。
+    if (curve.n > 0) {
+      this.t0 = Math.min(this.t0 ?? Infinity, curve.t[0]);
+      this.lastT = Math.min(this.lastT, curve.t[0] - 1);
+    }
     for (let i = 0; i < curve.n; i++) {
       // moments 与包流按 t 合流（灯的余温、卡碟态、计数轮里程都要今晨的账）
       while (mi < moments.length && moments[mi].t <= curve.t[i]) this._feedMoment(moments[mi++]);

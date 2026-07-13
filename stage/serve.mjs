@@ -192,11 +192,12 @@ async function makeCard(sid, job) {
   try { await writeRackMeta(dir, tape, job.transcript); } catch { /* 标签失败不阻出卡 */ }
 }
 
-// 卡带架标签（第五号手令 丁-E2）：仓名（源路径末段·非内容）＋录音开头摘要（蒸馏带开头动作族·
-// 脱敏电报，非原文）＋时长（走带轴）。写 rack.json 供 /rack 枚举读；老卡无此文件走回退。
+// 卡带架标签（丁-E2 → P0-4 诚实版）：仓名（源路径末段）＋开场白截断（母带首条真人发言——
+// 母带教义：本地货架读母带，真话合法）＋动作电报（开场白缺席时的回退）＋时长（走带轴）。
 async function writeRackMeta(dir, tapeFile, transcript) {
   const enc = dirname(transcript).split(/[\\/]/).filter(Boolean).pop() || '';
   const repo = enc.split('-').filter(Boolean).pop() || 'session';    // -Users-shadow-tape0 → tape0
+  const opening = openingLine(transcript) ?? '';
   let summary = '会话录音';
   try {
     const lines = (await readFile(tapeFile, 'utf8')).split('\n').slice(1, 60); // 跳 meta 行
@@ -207,7 +208,7 @@ async function writeRackMeta(dir, tapeFile, transcript) {
     }
     if (verbs.length) summary = verbs.join(' · ');   // 如 "READ · EDIT · RUN"（机器语汇·无原文）
   } catch { /* 读不到就用回退 */ }
-  await writeFile(join(dir, 'rack.json'), JSON.stringify({ repo, summary, seconds: stageDurationSec(join(dir, 'curve.csv')) }) + '\n');
+  await writeFile(join(dir, 'rack.json'), JSON.stringify({ repo, opening, summary, seconds: stageDurationSec(join(dir, 'curve.csv')) }) + '\n');
 }
 
 async function drainCardJobs() {
@@ -342,9 +343,14 @@ function transportSetPendingAsk(on) { if (!!on !== transport.pendingAsk) { trans
 
 // ── 卡带架枚举（rule 4 标签＝仓名＋摘要＋时长）──
 const DEMO_TAPES = [
+  // 审计校验带（船长令 2026-07-11）：168s 十一幕全状态巡礼——全部声音族+全器件动效，快速聆听校验专用。
+  // 段落表（策展元数据）住 stage/tools/make-audit-tape.mjs，重生成即重演。
+  { id: 'audit',   name: 'AUDIT',   summary: '审计校验·十一幕全状态巡礼' },
   { id: 'storm',   name: 'STORM',   summary: '暴风工作流·满负荷' },
   { id: 'busy',    name: 'BUSY',    summary: '密集读写·多线程' },
-  { id: 'jam',     name: 'JAM',     summary: '卡带·反复重试' },
+  // RACK_SPEC 二.3 术语撞车：校准带 "JAM"（卡死工况）与性格章 "JAM"（即兴）同名反义——
+  // 展示名改 STUCK（与时刻语汇 STUCK_LOOP 同宗）；内部工程名 id:'jam'（fixtures 文件名）不动。
+  { id: 'jam',     name: 'STUCK',   summary: '卡带·反复重试' },
   { id: 'smooth',  name: 'SMOOTH',  summary: '顺流·一气呵成' },
   { id: 'silence', name: 'SILENCE', summary: '静场·几无动作' },
 ];
@@ -367,31 +373,84 @@ function stageDurationSec(file) {
     return rowCount * interval / 1000;
   } catch { return 0; } finally { if (fd !== undefined) { try { closeSync(fd); } catch { /* 已关 */ } } }
 }
-function buildRack() {
-  const items = [{ id: 'live', kind: 'live', name: 'LIVE', summary: '今晨·实时会话', seconds: null }];
-  for (const d of DEMO_TAPES) {
-    const cv = join(root, 'fixtures', `${d.id}.curve.csv`);
-    if (existsSync(cv)) items.push({ id: d.id, kind: 'demo', name: d.name, summary: d.summary, seconds: stageDurationSec(cv) });
+// ── P0-4 侧栏最小诚实版（LEDGER）：条目＝仓名＋开场白截断＋相对时间——出现哈希即 bug ──
+// 母带教义：脱敏只属出屋的 Dub；本地货架读母带，故显示真名真话。老卡无 rack.json 时
+// 凭 sid 回母带房（~/.claude/projects/*/<sid>.jsonl）找回仓名与开场白，写回 rack.json 自愈（一次性）。
+const PROJECTS_DIR = process.env.FOLEY_PROJECTS || join(homedir(), '.claude', 'projects');
+function findMaster(sid) {
+  try {
+    for (const e of readdirSync(PROJECTS_DIR, { withFileTypes: true })) {
+      if (!e.isDirectory()) continue;
+      const p = join(PROJECTS_DIR, e.name, `${sid}.jsonl`);
+      if (existsSync(p)) return { path: p, repo: e.name.split('-').filter(Boolean).pop() || 'session' };
+    }
+  } catch { /* 无母带房（他机搬来的卡/清过史）：留给 rack.json 或无名兜底 */ }
+  return null;
+}
+// 开场白＝母带首条真人发言（跳过 '<' 开头的命令包装/系统提醒与 Caveat 行）。只读头 256KB——
+// 母带可达百 MB，开场白定居头部；截半的末行 JSON.parse 失败自然跳过。
+function openingLine(path) {
+  let fd;
+  try {
+    fd = openSync(path, 'r');
+    const buf = Buffer.alloc(Math.min(262144, fstatSync(fd).size));
+    readSync(fd, buf, 0, buf.length, 0);
+    for (const line of buf.toString('utf8').split('\n')) {
+      let obj; try { obj = JSON.parse(line); } catch { continue; }
+      if (obj?.type !== 'user' || obj.isSidechain || !obj.message) continue;
+      const c = obj.message.content;
+      const texts = typeof c === 'string' ? [c] : Array.isArray(c) ? c.filter(b => b?.type === 'text').map(b => b.text) : [];
+      for (let t of texts) {
+        t = String(t).trim();
+        if (!t || t.startsWith('<') || t.startsWith('Caveat:')) continue;
+        t = t.replace(/\s+/g, ' ');
+        return t.length > 80 ? t.slice(0, 79) + '…' : t;
+      }
+    }
+  } catch { /* 母带读不动＝无开场白，不算错 */ } finally { if (fd !== undefined) { try { closeSync(fd); } catch { /* 已关 */ } } }
+  return null;
+}
+function ensureCardMeta(dir, sid) {
+  let rj = {};
+  try { rj = JSON.parse(readFileSync(join(dir, 'rack.json'), 'utf8')); } catch { /* 老卡无标签 */ }
+  if (rj.repo && rj.opening !== undefined) return rj;
+  const m = findMaster(sid);
+  if (m) {
+    if (!rj.repo) rj.repo = m.repo;
+    if (rj.opening === undefined) rj.opening = openingLine(m.path) ?? '';
+    if (rj.seconds === undefined) rj.seconds = stageDurationSec(join(dir, 'curve.csv'));
+    writeFile(join(dir, 'rack.json'), JSON.stringify(rj) + '\n').catch(() => { /* 下次再愈 */ });
   }
+  return rj;
+}
+// 架序（P0-4 → RACK_SPEC 一段）：真会话新在前（mtime 供前端算相对时间）→ 厂盘垫底。
+// LIVE 仍入枚举（rackHas/退带后再上架都要它）但 replay-only 不列（无 live 子进程＝无带可录）；
+// "LIVE 不上架"的日常形态由前端执行：在机之带从架上隐去、名归走带牌（货架只列不在机上的带）。
+function buildRack() {
+  const items = replayOnly ? [] : [{ id: 'live', kind: 'live', name: 'LIVE', summary: '今晨·实时会话', seconds: null }];
   const cards = [];
   try {
     for (const e of readdirSync(CARDS_DIR, { withFileTypes: true })) {
       if (!e.isDirectory() || !CARD_SID.test(e.name)) continue;
       const cv = join(CARDS_DIR, e.name, 'curve.csv');
       if (!existsSync(cv)) continue;
-      let rj = {};
-      try { rj = JSON.parse(readFileSync(join(CARDS_DIR, e.name, 'rack.json'), 'utf8')); } catch { /* 老卡无 rack.json → 回退 */ }
+      const rj = ensureCardMeta(join(CARDS_DIR, e.name), e.name);
       cards.push({
         id: `card:${e.name}`, kind: 'card',
-        name: rj.repo || `session·${e.name.slice(0, 8)}`,
-        summary: rj.summary || '会话录音',
+        name: rj.repo || '无名带',
+        summary: rj.opening || rj.summary || '会话录音',
         seconds: rj.seconds ?? stageDurationSec(cv),
-        _m: statSync(cv).mtimeMs,
+        mtime: statSync(cv).mtimeMs,
       });
     }
   } catch { /* 无卡房 */ }
-  cards.sort((a, b) => b._m - a._m); // 新在上
-  return [...items, ...cards.map(({ _m, ...c }) => c)];
+  cards.sort((a, b) => b.mtime - a.mtime);
+  items.push(...cards);
+  for (const d of DEMO_TAPES) {
+    const cv = join(root, 'fixtures', `${d.id}.curve.csv`);
+    if (existsSync(cv)) items.push({ id: d.id, kind: 'demo', name: d.name, summary: d.summary, seconds: stageDurationSec(cv) });
+  }
+  return items;
 }
 function rackHas(id) {
   if (id === 'live') return true;
@@ -412,7 +471,32 @@ createServer(async (req, res) => {
   if (url.pathname === '/today/curve.csv' || url.pathname === '/today/moments.csv') {
     if (!liveOutDir) { res.writeHead(404); res.end(); return; }
     try {
-      const body = await readFile(join(liveOutDir, url.pathname.slice(7)));
+      let body = await readFile(join(liveOutDir, url.pathname.slice(7)));
+      // P0-3 根修（LEDGER·迟到者无界回灌）：整日 curve 可长到几十 MB（20Hz×小时），全量下发＋全史回灌
+      // 会把打开 live 的主线程噎死几十秒＝"该动的全不动"。?tailSec=N 只发「表头＋最后 N 秒行」——
+      // 纸本就只能显示 ~57s 历史，尾窗即全部所需。缺参=全量（dayroll/dub 等旧消费者原样）。
+      const tailSec = Number(url.searchParams.get('tailSec') || 0);
+      if (tailSec > 0) {
+        const text = String(body);
+        const nl0 = text.indexOf('\n');
+        if (nl0 > 0) {
+          const header = text.slice(0, nl0 + 1);
+          // 从尾部按行回扫：首列 t 为毫秒时间戳，收集 t >= tEnd−tailSec*1000 的行（无需整文件解析）
+          let rows = [], end = text.length, guard = 0, tEnd = NaN;
+          while (end > nl0 && guard++ < 4_000_000) {
+            const nl = text.lastIndexOf('\n', end - 2);
+            const line = text.slice(nl + 1, end).trimEnd();
+            end = nl + 1;
+            if (!line) continue;
+            const t = Number(line.slice(0, line.indexOf(',')));
+            if (!Number.isFinite(t)) continue;
+            if (!Number.isFinite(tEnd)) tEnd = t;
+            if (t < tEnd - tailSec * 1000) break;
+            rows.push(line);
+          }
+          body = Buffer.from(header + rows.reverse().join('\n') + '\n');
+        }
+      }
       res.writeHead(200, { 'content-type': 'text/csv; charset=utf-8', 'cache-control': 'no-store' });
       res.end(body);
     } catch { res.writeHead(404); res.end(); }
@@ -675,7 +759,9 @@ createServer(async (req, res) => {
       // 本次启动令牌注入 <head>，供 dub.js 写盘回带（同源可读、跨站取不到）。仅 HTML，且只此一处替换。
       body = Buffer.from(String(body).replace(/<head>/i, `<head><meta name="dub-token" content="${DUB_TOKEN}">`));
     }
-    res.writeHead(200, { 'content-type': MIME[extname(file)] ?? 'application/octet-stream' });
+    // P0-3 加固（LEDGER·013 重建遗祸类）：无缓存头时浏览器启发式缓存会喂"半旧半新"的 JS 模块——
+    // 重建/热修期正是"器件全不动、只剩底噪"一类哑病的温床。localhost 上 no-cache（须再验证）零成本。
+    res.writeHead(200, { 'content-type': MIME[extname(file)] ?? 'application/octet-stream', 'cache-control': 'no-cache' });
     res.end(body);
   } catch {
     // B4 打包态回退：repo 缺件时，白名单内的出厂唱片/床音改从 ~/.foley factory 缓存供出（只读＋fence 前缀闸）。
@@ -702,6 +788,9 @@ createServer(async (req, res) => {
 
 if (!replayOnly) startLive();
 if (!replayOnly) startCardDuty(); // 收工吐卡值守（轨乙①）：replay-only 是静态服务器，不背卡片工序
+// RACK_SPEC 一.3（第一段）：有 LIVE，醒来即"带已在机上转"——起动自装 live 带（LIVE 不上架，
+// 归走带牌）。声音仍候浏览器手势法，不违静默律；replay-only 无 live，醒在带架（EMPTY）。
+if (!replayOnly) transportSelect('live');
 // P1-② 纵深兜底：任何漏网的未捕获 rejection 只记日志不崩进程（防 F1 同类"异步处理器内同步抛"再打断 live 广播/在制 dub）。
 process.on('unhandledRejection', (err) => { console.error('[serve] 未处理 rejection（兜底不崩）：', err); });
 process.on('SIGINT', () => { liveChild?.kill('SIGINT'); process.exit(0); });

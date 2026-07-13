@@ -122,11 +122,23 @@ export class SoundBridge {
     if (!this._catalog?.length || !this.engine || !this.ctx) return null;
     const n = this._catalog.length;
     const i = (((this.recordIdx + dir) % n) + n) % n;
-    const apply = () => { if (this._records[i]) { this.engine.setRecord(i, this.ctx.currentTime + 0.02); this.recordIdx = i; this.onRecordChange?.(this.currentRecordName); } };
+    const apply = () => { if (this._records[i]) { this.engine.setRecord(i, this.ctx.currentTime + 0.02); this.recordIdx = i; this.onRecordChange?.(this.currentRecordName, true); } };  // 第二参=真人切曲（翻字牌软落针只认手）
     if (this._records[i]) apply(); else this._loadRecord(i).then(apply).catch(() => {});
     return this._catalog[i]?.title ?? null;
   }
   get currentRecordName() { return this._records[this.recordIdx]?.title ?? this._catalog?.[this.recordIdx]?.title ?? ''; }
+
+  /** ⑤ VU 入乐（BATCH3 修宪 甲.3）：master 总线 RMS 包络（dBFS）＝VU 针粮——耳听即针指。
+   *  复用轨甲机器代理 analyser（同一只 2048 时域窗·审计庭 RMS 律）；静默地板 −90。 */
+  vuDb() {
+    if (!this.analyser) return -90;
+    if (!this._vuBuf || this._vuBuf.length !== this.analyser.fftSize) this._vuBuf = new Float32Array(this.analyser.fftSize);
+    this.analyser.getFloatTimeDomainData(this._vuBuf);
+    let s = 0; const b = this._vuBuf;
+    for (let i = 0; i < b.length; i++) s += b[i] * b[i];
+    const rms = Math.sqrt(s / b.length);
+    return rms > 1e-5 ? 20 * Math.log10(rms) : -90;
+  }
 
   // ---- 总线订阅面（与器件同鸭型；start 未毕时到的包如实丢弃——下一包 50ms 后就来） ----
   onPacket(pkt) { this._bridge && this._bridge.onPacket(pkt); }

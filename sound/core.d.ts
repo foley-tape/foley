@@ -18,6 +18,7 @@ export interface SoundParams {
     doneSilenceSec: number;
     trimDb: number;      // 床总闸（dB）：EAR-1 沿革；v2 出厂 0，响度由 G7 执法
     breathDepth: number; // 呼吸深度（相对值 0.05–0.20）：方案 B 乘法级，挂 L1 正身
+    underRecordDb?: number; // P0-2 混音宪法：唱片在位时磨损（crackle/hiss）让位 dB；缺省 0＝旧判据兼容
   };
   foreground: {
     peakGain: number; failGain: number; pageGain: number; bellGain: number;

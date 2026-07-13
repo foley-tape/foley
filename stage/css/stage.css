@@ -12,8 +12,8 @@
   --oxblood: #8C2F1B;
   --amber: #FFB000;
   --emerald: #4F8C4A;
-  --ink-silk: #43382A;
-  --rack-w: clamp(248px, 23vw, 340px);  /* 卡带架宽（丁-E2） */
+  --ink-silk: #B09A6F;   /* 落进真页：暗青铜面板上丝印改浅暖（原深墨为浅铝面而设，暗面则隐） */
+  --rack-w: clamp(200px, 16vw, 246px);  /* 卡带架宽（丁-E2 → P0-4 收窄：船长"过宽"） */
 }
 
 * { margin: 0; box-sizing: border-box; }
@@ -55,20 +55,27 @@ body.tape-loaded #rack:hover .rack-spine { opacity: 0; }
 .rack-foot { padding: 8px 14px; margin-top: auto; font-size: 8px; letter-spacing: 0.36em; color: #6B4E30; opacity: 0.6; }
 #rack-list { flex: 1; overflow-y: auto; overflow-x: hidden; padding: 8px 9px 4px; display: flex; flex-direction: column; gap: 6px; }
 #rack-list::-webkit-scrollbar { width: 6px; }
-#rack-list::-webkit-scrollbar-thumb { background: rgba(120,80,40,0.35); border-radius: 4px; }
+#rack-list::-webkit-scrollbar-thumb { background: rgba(120,80,40,0.35); border-radius: 1px; }
 
 /* —— 一盒磁带（紧凑·船长反馈"条目太长"）：单卷轴窗＋名＋时长一行、摘要一小行 —— */
 .cassette {
   position: relative; display: grid; grid-template-columns: 16px 1fr auto; grid-template-rows: auto auto;
   grid-template-areas: "hub name dur" "hub sum sum"; align-items: center; gap: 0 9px;
   width: 100%; text-align: left; border: 0; cursor: pointer;
-  padding: 7px 11px 7px 11px; border-radius: 3px 5px 5px 3px;
+  padding: 7px 10px 7px 10px; border-radius: 1px;   /* P0-4 去现代化：圆角黑框廉价→近方角标签盒 */
   color: var(--ink-silk); font-family: inherit;
   background: linear-gradient(168deg, #29241F 0%, #1E1A16 55%, #16120E 100%);
   box-shadow: 0 1px 3px rgba(0,0,0,0.45), inset 0 1px 0 rgba(255,250,235,0.05);
   transition: transform 0.22s cubic-bezier(.34,1.4,.5,1), box-shadow 0.2s ease, background 0.2s ease;
 }
-.cassette:hover { transform: translateX(4px); background: linear-gradient(168deg, #302A24 0%, #221D18 55%, #18140F 100%); }
+.cassette:hover {
+  transform: translateX(4px);
+  background: linear-gradient(168deg, #302A24 0%, #221D18 55%, #18140F 100%);
+  box-shadow: inset 0 0 14px rgba(255, 214, 150, 0.07), inset 0 1px 0 rgba(255, 236, 190, 0.10);  /* ⑦示能统一：暖晕同语（抽带滑出是货架自己的语法，保留） */
+}
+/* ⑦示能统一：按下=被手攥住（微暗）；未选中的再送半程——退带点选中带时不与 selected 的 11px 打架 */
+.cassette:not(.selected):active { transform: translateX(6px); filter: brightness(0.9); }
+.cassette.selected:active { filter: brightness(0.9); }
 /* 卷轴窗：一枚小暗孔，弱化视觉重心（不再两枚亮红灯） */
 .cassette .hub { grid-area: hub; width: 13px; height: 13px; border-radius: 50%;
   background: radial-gradient(circle at 50% 45%, #5a4d3a 0 2.5px, #221c14 3.5px 5px, #40361f 6px 100%);
@@ -79,8 +86,18 @@ body.tape-loaded #rack:hover .rack-spine { opacity: 0; }
 .cassette .c-sum { grid-area: sum; font-size: 8.5px; color: #8A7658; letter-spacing: 0.01em; margin-top: 1px;
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .cassette .c-dur { grid-area: dur; font-size: 8.5px; font-style: normal; letter-spacing: 0.06em; color: #7E6C50; }
-.cassette.kind-live .c-dur { color: #CC5638; font-weight: 600; }  /* 仅一处红：小小 ● LIVE，不做两红灯 */
+.cassette.kind-live .c-dur { color: #C2A264; font-weight: 600; }  /* 014 丙-2：第二红拆除——红只归 REC；LIVE 以暖字示义（侧栏系脚手架·候 E2 重建，不另打磨） */
 .cassette.kind-demo .c-name { color: #BEAE87; }
+/* RACK_SPEC 二.1：货架只列不在机上的带——上机即离架，退带归位（含 LIVE 的日常形态） */
+.cassette.in-machine { display: none; }
+/* RACK_SPEC 二.2/三 分区靠字体不靠分割线：真会话＝手写标签（大字＝开场白）；厂带＝印刷体照旧 */
+.cassette.kind-card .c-name {
+  font-family: 'Hannotate SC', 'HanziPen SC', 'Kaiti SC', 'Bradley Hand', cursive;
+  font-weight: 400; font-size: 12.5px; letter-spacing: 0.02em; color: #D8C49A;
+}
+.cassette.kind-card .c-sum {  /* 小角标＝仓名（磁带品牌角标位） */
+  font-size: 7.5px; letter-spacing: 0.22em; text-transform: uppercase; color: #7A664A;
+}
 /* 选中：抽出一截＋琥珀边光（更克制的抽带感，船长反馈"弹出效果再优化"） */
 .cassette.selected {
   transform: translateX(11px);
@@ -117,8 +134,7 @@ body.tape-loaded #brand { opacity: 0; transition: opacity 0.3s ease; } /* 上带
 .np-prev, .np-next { border: 0; background: none; color: #B79C6E; font-size: 13px; line-height: 1; cursor: pointer; padding: 2px 3px; opacity: 0.75; transition: opacity 0.15s, transform 0.1s; }
 .np-prev:hover, .np-next:hover { opacity: 1; }
 .np-prev:active, .np-next:active { transform: scale(0.85); }
-.np-song { font-size: 9px; font-style: normal; letter-spacing: 0.08em; color: #9A876A; min-width: 6ch; text-align: center; }
-.np-song::before { content: "♪ "; opacity: 0.7; }
+/* np-song 已死（BATCH3 ②曲名迁翻字牌）——旧骨架样式随葬 */
 @media (prefers-reduced-motion: reduce) { #now-plate[data-mode="live"] .np-tally { animation: none; } }
 /* 诊断式播放/暂停：上带后走带甲板可点（点即播放/暂停）——不常驻按钮（船长反馈） */
 body.tape-loaded #deck { cursor: pointer; }
@@ -180,8 +196,9 @@ body.tape-loaded #deck { cursor: pointer; }
 #signal-cue .beacon {
   width: 12px; height: 12px; border-radius: 50%;
   background: #C6502E; box-shadow: 0 0 15px 3px rgba(198, 80, 46, 0.5);
-  animation: signal-beacon 1.9s ease-in-out infinite;
 }
+/* P0-1③：灯语只在失信号时活着——opacity:0 的容器里空转动画也在烧合成器 */
+#room[data-signal] #signal-cue .beacon { animation: signal-beacon 1.9s ease-in-out infinite; }
 #signal-cue .label { font-size: 10px; letter-spacing: 0.4em; text-indent: 0.4em; color: #D9B79E; }
 #signal-cue .label::after { content: "Signal Lost"; }
 #room[data-signal="gone"] #signal-cue .label::after { content: "Source Gone"; }
@@ -192,30 +209,48 @@ body.tape-loaded #deck { cursor: pointer; }
 }
 @media (prefers-reduced-motion: reduce) { #signal-cue .beacon { animation: none; opacity: 0.85; } }
 
-/* —— 走带甲板：哑光暗金属，反光极克制 —— */
-#deck {
-  position: relative;
-  height: 300px;
-  background:
-    linear-gradient(180deg, #171208 0%, #100B06 55%, #0B0704 100%);
-  box-shadow: inset 0 -4px 10px rgba(0, 0, 0, 0.7), inset 0 1px 0 rgba(255, 235, 200, 0.05);
-}
+/* 旧走带甲板皮（板前时代 #deck 骨架）已葬——其 position:relative 压过 .ov 绝对定位，
+   把甲板命中区钉成 0×0＝"点甲板播放/暂停"死区（⑦示能扫荡抓获·魔眼/琥珀管同族第三案）。
+   甲板几何唯一归 plate.css（渲染打印 bbox）。 */
 .reel {
   position: absolute; width: 300px; height: 300px; top: -12px;
   will-change: transform;
 }
 .reel svg { display: block; width: 100%; height: 100%; }
+.reel-sprite { display: block; width: 100%; height: 100%; will-change: transform; pointer-events: none; }  /* 过闸渲染盘·CSS 旋转 */
 #reel-l { left: calc(59vw - 340px); }
 #reel-r { left: calc(59vw + 40px); }
-#tapeband {
-  position: absolute; left: calc(59vw - 210px); width: 420px; top: 268px; height: 3px;
-  background: linear-gradient(180deg, #241812, #0F0A06);
-  box-shadow: 0 1px 0 rgba(255, 230, 190, 0.06);
+/* —— 头块：录/放/抹三磁头的暗座，落在两盘中缝、带自其上穿过 —— */
+#head-block {
+  position: absolute; left: calc(59vw - 76px); top: 258px;
+  width: 152px; height: 30px; border-radius: 4px 4px 3px 3px; z-index: 3;
+  background: linear-gradient(180deg, #1F1810 0%, #120C07 58%, #090603 100%);
+  box-shadow: 0 4px 7px rgba(0,0,0,0.72), inset 0 1px 0 rgba(255,236,200,0.09), inset 0 -2px 4px rgba(0,0,0,0.6);
 }
+#head-block .head {
+  position: absolute; top: 3px; width: 15px; height: 17px; border-radius: 3px 3px 1px 1px;
+  background: linear-gradient(180deg, #8A7E68 0%, #5E5442 55%, #383024 100%);
+  box-shadow: inset 0 1px 0 rgba(255,246,226,0.4), 0 1px 2px rgba(0,0,0,0.6);
+}
+#head-block .head::after { /* 磁头缝 */
+  content:""; position:absolute; left:50%; top:2px; width:1.2px; height:12px;
+  background: rgba(8,5,2,0.72); transform: translateX(-50%);
+}
+#head-block .head:nth-child(1) { left: 26px; }
+#head-block .head:nth-child(2) { left: 68px; }
+#head-block .head:nth-child(3) { left: 110px; }
+/* —— 磁带：自两盘饼底(≈y266)引出的暗棕氧化带，横穿头块上沿 —— */
+#tapeband {
+  position: absolute; left: calc(59vw - 190px); width: 380px; top: 263px; height: 6px; z-index: 4;
+  background: linear-gradient(180deg, #3B2B1E 0%, #1D130C 46%, #0C0704 100%);
+  box-shadow: 0 -1px 0 rgba(255,224,180,0.12), 0 2px 3px rgba(0,0,0,0.5);
+  border-radius: 1px;
+}
+/* —— 导带辊：钢柱竖高光，带绕其换向 —— */
 .guide {
-  position: absolute; top: 258px; width: 11px; height: 22px; border-radius: 3px;
-  background: linear-gradient(90deg, #6B5C41, #2E2517 70%);
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.7), inset 0 1px 0 rgba(255, 240, 210, 0.2);
+  position: absolute; top: 259px; width: 10px; height: 21px; border-radius: 5px; z-index: 5;
+  background: linear-gradient(90deg, #241C11 0%, #7E6F52 42%, #B2A487 51%, #6B5C41 62%, #201810 100%);
+  box-shadow: 0 1px 3px rgba(0,0,0,0.72), inset 0 1px 0 rgba(255,245,220,0.32);
 }
 
 /* —— 机械计数轮：面板上只是一道暗窗，数字在里面但读不见 —— */
@@ -276,23 +311,17 @@ body.tape-loaded #deck { cursor: pointer; }
 #panel {
   position: relative;
   height: 470px;
-  background:
-    repeating-linear-gradient(180deg,
-      rgba(255, 252, 240, 0.05) 0 1px,
-      rgba(30, 20, 8, 0.05) 1px 2px),
-    linear-gradient(168deg,
-      #E0D2AC 0%, #BCA87F 38%,
-      #9A8760 68%, #67583E 100%);
+  background: url('assets/fascia.png') center / 100% 100% no-repeat;   /* decree12 P0：面板本体＝过闸暗青铜渲染，非 CSS 渐变 */
   box-shadow:
-    inset 0 2px 0 rgba(255, 250, 235, 0.5),   /* 上倒角吃光 */
-    inset 0 -3px 6px rgba(30, 18, 6, 0.35),
-    inset 0 24px 60px rgba(255, 235, 200, 0.10); /* 低角度暖光洒上沿 */
+    inset 0 2px 0 rgba(255, 240, 210, 0.22),   /* 上倒角吃光（收敛） */
+    inset 0 -4px 10px rgba(10, 6, 2, 0.55),
+    inset 0 30px 90px rgba(255, 224, 176, 0.12); /* 低角度暖光洒上沿 */
 }
-#panel::after { /* 画外灯的方向性：左上受光，右下沉入黑暗 */
+#panel::after { /* 画外灯的方向性：左上受光，右下沉入黑暗（对齐 Blender 单键光落差） */
   content: ""; position: absolute; inset: 0; pointer-events: none;
   background: linear-gradient(118deg,
-    rgba(255, 226, 176, 0.10) 0%, transparent 26%,
-    transparent 46%, rgba(14, 8, 3, 0.16) 72%, rgba(10, 5, 2, 0.38) 100%);
+    rgba(255, 216, 156, 0.16) 0%, transparent 30%,
+    transparent 44%, rgba(8, 4, 1, 0.30) 74%, rgba(3, 2, 0, 0.62) 100%);
 }
 
 /* —— 胡桃木底轨 —— */
@@ -333,7 +362,7 @@ body.tape-loaded #deck { cursor: pointer; }
 .silk {
   font-size: 10px; letter-spacing: 0.30em; text-transform: uppercase;
   color: var(--ink-silk);
-  text-shadow: 0 1px 0 rgba(255, 250, 235, 0.28);
+  text-shadow: 0 1px 1px rgba(0, 0, 0, 0.55);   /* 暗面丝印：改暗压凹刻感（原浅高光为浅铝面而设） */
   padding-left: 0.30em; /* 抵消末字距，视觉居中 */
 }
 .silk.small { font-size: 8px; letter-spacing: 0.24em; }
@@ -341,29 +370,49 @@ body.tape-loaded #deck { cursor: pointer; }
 /* —— 表头公共壳：深烟色金属窗 —— */
 .bezel {
   position: relative;
-  padding: 11px;
-  border-radius: 10px;
-  background: linear-gradient(175deg, #2B2217 0%, #191209 55%, #0E0905 100%);
+  padding: 15px;
+  border-radius: 12px;
+  background: linear-gradient(158deg, #3A2E1E 0%, #241A0F 46%, #120C06 78%, #0A0603 100%);
   box-shadow:
-    0 1px 0 rgba(255, 245, 225, 0.24),         /* 外沿上光边 */
-    inset 0 3px 9px rgba(0, 0, 0, 0.85),
-    inset 0 -1px 0 rgba(255, 230, 190, 0.06);
+    /* 凸起金属框上沿/左沿吃键光——厚度感（对齐 Blender 倒角吃光） */
+    inset 0 2px 0 rgba(255, 240, 214, 0.30),
+    inset 2px 0 0 rgba(255, 232, 196, 0.10),
+    /* 框体右下沉入 */
+    inset 0 -3px 3px rgba(0, 0, 0, 0.5),
+    inset -2px 0 3px rgba(0, 0, 0, 0.4),
+    /* 表脸深陷框内 */
+    inset 0 6px 15px rgba(0, 0, 0, 0.9),
+    /* 整件凸出面板·落影（器件坐在面板上而非画在面板上） */
+    0 7px 15px rgba(0, 0, 0, 0.6), 0 2px 5px rgba(0, 0, 0, 0.5);
 }
 
 /* —— VU 表 —— */
-.vu-bezel { width: 322px; }
-#vu-svg { display: block; width: 300px; height: 200px; border-radius: 7px; }
-.dial-mark {
-  font-family: inherit; font-size: 15px; letter-spacing: 0.34em;
-  fill: #3B3225; opacity: 0.85;
+.vu-bezel { width: 330px; }
+#vu-svg.vu-face { position: relative; width: 300px; height: 138px; overflow: hidden; border-radius: 6px; }  /* 2.17:1 短宽表·配渲染脸 */
+.vu-dial { display: block; width: 100%; height: 100%; }
+.vu-needle { /* 指针：轴心落脸下缘(弧心 cy=1.02H)·CSS 转；吃事件能量→rest 靠左(-47°)，事件弹向右(红峰) */
+  position: absolute; left: 50%; bottom: -2%; width: 3px; height: 90%; margin-left: -1.5px;
+  transform-origin: 50% 100%; transform: rotate(-47deg);
+  background: linear-gradient(to top, #2A2014 0%, #241A10 42%, #15100A 100%);
+  border-radius: 2px; box-shadow: 0 0 2px rgba(0, 0, 0, 0.45); pointer-events: none;
+}
+.vu-face::after { /* 轴心毂：脸下缘一枚暗毂（指针即从此长出·同轴不脱） */
+  content: ""; position: absolute; left: 50%; bottom: -5px; width: 14px; height: 14px; margin-left: -7px;
+  border-radius: 50%; background: radial-gradient(circle at 40% 34%, #4A3A26, #17110B 70%);
+  box-shadow: 0 -1px 2px rgba(0, 0, 0, 0.5); pointer-events: none;
+}
+.vu-glass { /* 表罩烟玻璃 sheen（辉光层归 CSS·本体归渲染） */
+  position: absolute; inset: 0; pointer-events: none; border-radius: 6px;
+  background: linear-gradient(118deg, rgba(255,246,224,0.10) 0%, rgba(255,246,224,0.02) 24%,
+    transparent 46%, rgba(12,8,4,0.13) 80%, rgba(12,8,4,0.26) 100%);
 }
 
 /* —— 走纸记录仪 —— */
-.chart-bezel { width: 584px; }
+.chart-bezel { width: 590px; }
 #chart-canvas { display: block; width: 560px; height: 252px; border-radius: 6px; }
 /* 纸槽内阴影（自 canvas 迁出——体温法：静态像素归 CSS，不上每帧账） */
 .chart-bezel .paper-shade {
-  position: absolute; inset: 11px; border-radius: 6px; pointer-events: none;
+  position: absolute; inset: 15px; border-radius: 6px; pointer-events: none;
   background: linear-gradient(180deg,
     rgba(20, 12, 6, 0.35) 0%, rgba(20, 12, 6, 0) 12%,
     rgba(20, 12, 6, 0) 88%, rgba(20, 12, 6, 0.4) 100%);
@@ -371,20 +420,20 @@ body.tape-loaded #deck { cursor: pointer; }
 
 /* 烟色玻璃（M1.9 打磨①）：整体压一层烟，纸不再与 VU 抢亮度 */
 .chart-bezel .glass {
-  position: absolute; inset: 11px; border-radius: 6px; pointer-events: none;
+  position: absolute; inset: 15px; border-radius: 6px; pointer-events: none;
   background:
     linear-gradient(112deg,
       rgba(255, 246, 226, 0.09) 0%, rgba(255, 246, 226, 0.02) 22%,
       transparent 42%, rgba(12, 8, 4, 0.14) 78%, rgba(12, 8, 4, 0.30) 100%),
-    linear-gradient(180deg, rgba(14, 9, 4, 0.16), rgba(14, 9, 4, 0.10));
-  box-shadow: inset 0 0 28px rgba(10, 6, 2, 0.42);
+    linear-gradient(180deg, rgba(14, 9, 4, 0.26), rgba(14, 9, 4, 0.18));
+  box-shadow: inset 0 0 34px rgba(10, 6, 2, 0.52);
 }
 
 /* —— DUB 剪辑组（M-T1 剪刀与纸）——
    齿孔层盖在纸上、烟玻璃下；指针只在这层活动（拖选/撕）。
    键与纸长签是操作件：机械状态（按下/弹起、签的长短）即全部言语，无读数。 */
 #dub-overlay {
-  position: absolute; left: 11px; top: 11px; border-radius: 6px;
+  position: absolute; left: 15px; top: 15px; border-radius: 6px;
   touch-action: none;
 }
 #dub-group {
@@ -450,23 +499,7 @@ body.tape-loaded #deck { cursor: pointer; }
   82% { transform: translateX(-2px); }
 }
 
-/* —— hover 铭牌（轨乙④）：淡蚀刻丝印悬停显影——像面板上本就刻着、平时看不清的说明字；
-   非浮动气泡、无底色无描边（交互法自查：不添现代 UI 味）。铭牌出现在件的上方（组贴视口底缘）。 */
-[data-cap] { position: relative; }
-[data-cap]::after {
-  content: attr(data-cap);
-  position: absolute; left: 50%; bottom: calc(100% + 9px);
-  transform: translateX(-50%);
-  white-space: nowrap;
-  font-size: 9px; letter-spacing: 0.20em;
-  color: var(--ink-silk);
-  text-shadow: 0 1px 0 rgba(255, 250, 235, 0.28);
-  opacity: 0; transition: opacity 0.5s ease 0.3s;
-  pointer-events: none;
-}
-[data-cap]:hover::after { opacity: 0.62; }
-/* DUB 组贴视口右缘：铭牌右对齐向左生长，字不出画（操作件永不出画的姊妹条款） */
-#dub-group [data-cap]::after { left: auto; right: 0; transform: none; }
+/* hover 铭牌系已随①悬浮字全拆下葬（A 案：全机 hover 冒字扫荡·货架悬停铭牌另存 title 属性不走此系） */
 
 /* —— 接线签（轨乙③）：牛皮吊签挂在台沿——面板照旧无字，说明字只住在纸上（纸条 FOLEY 边字同源）。
    live 未接线才由 main.js 挂出；点签收起（slip 滑落）。 */
@@ -538,40 +571,12 @@ body.tape-loaded #deck { cursor: pointer; }
 
 /* —— 灯组 —— */
 .block-lamps { gap: 10px; }
-.tube-housing {
-  padding: 9px;
-  border-radius: 22px;
-  background: linear-gradient(175deg, #2B2217, #0E0905);
-  box-shadow: 0 1px 0 rgba(255, 245, 225, 0.20), inset 0 3px 8px rgba(0, 0, 0, 0.85);
-}
-#amber-tube {
-  position: relative;
-  width: 30px; height: 128px; border-radius: 15px;
-  background: linear-gradient(105deg, rgba(48, 34, 20, 0.92), rgba(24, 16, 9, 0.96) 60%);
-  box-shadow: inset 2px 0 3px rgba(255, 240, 210, 0.10), inset -2px -2px 5px rgba(0, 0, 0, 0.7);
-  overflow: visible;
-}
-#amber-tube::before { /* 玻璃柱暗示（M1.9 打磨④）：一道立缝高光＋顶端口盖微光 */
-  content: ""; position: absolute; inset: 0; border-radius: 15px; z-index: 2; pointer-events: none;
-  background:
-    linear-gradient(90deg, transparent 22%, rgba(255, 246, 226, 0.13) 27%, transparent 34%),
-    radial-gradient(60% 14% at 50% 4%, rgba(255, 246, 226, 0.12), transparent 70%);
-}
-#amber-tube .filament {
-  position: absolute; inset: 6px 7px; border-radius: 10px;
-  background: radial-gradient(60% 90% at 50% 55%, #FFCE55 0%, var(--amber) 45%, #B36F00 100%);
-  opacity: var(--lit);
-}
-#amber-tube .hotcore {
-  position: absolute; inset: 26px 11px; border-radius: 8px;
-  background: radial-gradient(50% 70% at 50% 50%, #FFF3D0 0%, #FFD97A 60%, transparent 100%);
-  opacity: calc(var(--lit) * var(--lit));   /* 钨丝越亮越白 */
-}
-#amber-tube::after { /* 体内光外溢 */
-  content: ""; position: absolute; inset: -22px -26px; border-radius: 40px;
-  background: radial-gradient(50% 50% at 50% 50%, rgba(255, 176, 0, 0.55), transparent 70%);
-  opacity: var(--lit); pointer-events: none;
-}
+
+/* 旧魔眼骨架（decree12 #magic-eye 一族·.eye-body/.eye-screen/.tube-housing/::after 晕）已葬——
+   其 .eye-pupil margin:-20px 与固定像素 ::after 曾泄漏进板魔眼＝"暗核偏左上"主凶（⑦纠偏案）。
+   现行魔眼几何唯一归 plate.css（实测圆心锚定）。 */
+/* 旧琥珀管骨架（#amber-tube 一族·含 ::before/::after/.filament/.hotcore）已葬——
+   光机融合案 df-text 接管该 ID；ID 级 position:relative 曾压过 .ov 绝对定位（清葬欠账咬人实录） */
 
 .gem-row { display: flex; gap: 26px; margin-top: 8px; }
 .gem-cell { display: flex; flex-direction: column; align-items: center; gap: 7px; }
@@ -609,11 +614,19 @@ body.tape-loaded #deck { cursor: pointer; }
 #room[data-phase="IDLE"]       { --idle-dim: 0.55; }
 #room[data-sleep="deep"]       { --idle-dim: 0.34; }   /* 深睡：只余待机粒可辨 */
 
+/* 统一光照场（decree6 乙·镜头法）：把各自匀光的过闸零件重新收拢到"一束画外暖灯"下——
+   multiply 光场·焦点上偏左(画外灯方向)·落差到四角 near-black；魔眼自发光穿透为焦点。
+   这一层是"散乱零件→一台被一束光照亮的机器"的关键（对照 decree10 过闸全机图的光）。 */
+#light-field {
+  position: absolute; inset: 0; pointer-events: none; mix-blend-mode: multiply;
+  background: radial-gradient(118% 128% at 43% 24%,
+    #ffffff 0%, #f4ecdc 17%, #ccbe9f 39%, #897a5b 59%, #453a26 79%, #0b0905 100%);
+}
 #keylight {
   position: absolute; inset: 0; pointer-events: none;
   background:
-    radial-gradient(105vw 85vh at 6% -10%,
-      rgba(255, 200, 124, 0.22) 0%, rgba(255, 176, 90, 0.07) 36%, transparent 62%);
+    radial-gradient(108vw 88vh at 4% -12%,
+      rgba(255, 206, 142, 0.36) 0%, rgba(255, 172, 88, 0.13) 38%, transparent 66%);
   mix-blend-mode: screen;
   opacity: calc(var(--w-dim) * var(--idle-dim));
   transition: opacity 3s ease;
@@ -636,6 +649,17 @@ body.tape-loaded #deck { cursor: pointer; }
   mix-blend-mode: overlay;
   z-index: 60;
 }
+
+/* —— P0-4 ②：空/首启一句蚀刻向导——丝印刻在房间暗处（光场之上·镜头颗粒之下），
+   上带即隐。一行字答"打开然后呢"，无弹窗、无部件。 —— */
+#first-etch {
+  position: absolute; left: 50%; bottom: 4.6%; transform: translateX(-50%); z-index: 8;
+  font-size: 11px; letter-spacing: 0.34em; text-indent: 0.34em; white-space: nowrap;
+  color: rgba(226, 196, 142, 0.52);
+  text-shadow: 0 -1px 0 rgba(0, 0, 0, 0.85), 0 1px 1px rgba(255, 240, 200, 0.06);
+  pointer-events: none; opacity: 0.9; transition: opacity 0.6s ease;
+}
+body.tape-loaded #first-etch { opacity: 0; }
 
 /* —— 暗角 —— */
 #vignette {

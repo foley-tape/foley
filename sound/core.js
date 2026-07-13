@@ -50,17 +50,20 @@ export function bedTargets(s, sp) {
   // 未传 recordOn（旧调用方/金测试）＝false，全部 R2 断言原样成立（判据冻结纪律）。
   const rec = s.recordOn === true;
   const trim = dbToLin(b.trimDb); // 床总闸进 targets：验收能量模型与渲染器同一数字
+  // P0-2 混音宪法（LEDGER）：唱片在位时磨损（crackle/hiss）随之近隐——唱片为主声道。
+  // 缺省（参数缺席）＝0dB：旧 fixtures/金测试旧世界原样（判据冻结纪律的兼容面）。
+  const under = rec ? dbToLin(b.underRecordDb ?? 0) : 1;
   // L1 织体体（真采样为体；IDLE 唯余此层最弱态——白皮书 v1.1 §2.1）
   const l1 = trim * (silence || rec ? 0 : idle ? b.l1IdleGain : b.l1Gain);
   // crackle 磨损织体（T 驱动，与 hiss 同属介质噪声，直达输出）
-  const crackle = trim * (silence ? 0 : dbToLin(b.crackleDbLo + (b.crackleDbHi - b.crackleDbLo) * T));
+  const crackle = trim * under * (silence ? 0 : dbToLin(b.crackleDbLo + (b.crackleDbHi - b.crackleDbLo) * T));
   // L2 和声垫（三关铁律成品；永低于 L1——resolve 已执法）
   const l2 = trim * (silence || idle || rec ? 0 : b.l2Gain);
   const s2gate = clamp01((A - b.s2GateA) / (1 - b.s2GateA));
   const s2 = trim * (silence || idle || rec ? 0 : b.s2Gain * s2gate);
   const s3gate = clamp01((T - b.s3GateT) / (1 - b.s3GateT));
   const s3 = trim * (silence || rec ? 0 : b.s3Gain * s3gate);
-  const hissLin = trim * (silence ? 0 : dbToLin(b.hissDbLo + (b.hissDbHi - b.hissDbLo) * T));
+  const hissLin = trim * under * (silence ? 0 : dbToLin(b.hissDbLo + (b.hissDbHi - b.hissDbLo) * T));
   return {
     l1, crackle, l2, s2, s3, hissLin,
     filterHz: b.filterHzHi + (b.filterHzLo - b.filterHzHi) * T,

@@ -5,7 +5,11 @@ import { loadTape, Replayer, sampleAt } from './replay.js';
 import { VuMeter, ChartRecorder, Lamps } from './instruments.js';
 import { ReelDeck, Counter } from './deck.js';
 import { mountLens } from './lens.js';
+import { buildMachine } from './machine.js';
+import { mountPerf } from './perf.js';
 import { SoundBridge } from './soundbridge.js';
+import { mountFlapBoard, mountTrackIndex } from './flapboard.js';
+import { runPost, runPenSweep, postGate } from './post.js';
 
 const SEEK_S = 920; // 默认取景：风暴前奏——24s 后即 944s 跳针簇，随后高原（demo 的一幕戏）
 
@@ -13,6 +17,9 @@ async function boot() {
   if (document.readyState !== 'complete') {
     await new Promise(r => window.addEventListener('load', r, { once: true }));
   }
+  buildMachine(document.getElementById('machine'));
+  mountPerf();   // 帧医生（?perf=1·P0-1 验收器）   // decree13：机器＝场景板＋动态层（单一数据源 markup）
+
   const tape = await loadTape('storm');
   const replayer = new Replayer(tape);
 
@@ -28,17 +35,14 @@ async function boot() {
     document.getElementById('reel-r'),
     document.getElementById('tapeband'),
   );
-  const counter = new Counter(
-    document.getElementById('counter-housing'),
-    document.getElementById('loupe'),
-    deck,
-  );
-  const instruments = [vu, chart, lamps, deck, counter];
+  // P0-5 拆除令：默认无计数轮 markup（buildMachine counter:false）——有才建，未过棘爪回位律不得回归
+  const counterHousing = document.getElementById('counter-housing');
+  const counter = counterHousing ? new Counter(counterHousing, document.getElementById('loupe'), deck) : null;
+  const instruments = [vu, chart, lamps, deck, ...(counter ? [counter] : [])];
 
   const lens = mountLens(document.getElementById('lens'), document.getElementById('machine'));
   if (lens) {
-    document.getElementById('grain').style.display = 'none';
-    document.getElementById('vignette').style.display = 'none';
+    document.getElementById('grain').style.display = 'none';   // decree13：暗角/暖调留给 CSS #vignette（恒在），lens 只叠颗粒浮尘
   }
 
   const room = document.getElementById('room');
@@ -61,12 +65,45 @@ async function boot() {
   window.addEventListener('resize', () => chart._resize());
 
   replayer.seek(SEEK_S * 1000); // 停机取景：先上一包，机器带妆待命
+  // 机器闸诊断口（?autoplay=1·不入正常路径）：无声起播＋自泵渲染＋墨账写 title。
+  // ⚠️headless 虚拟时两坑（勘定 2026-07-10）：① rAF 不走——须 setInterval 自泵；
+  // ② 2D canvas 后续绘制不再向合成器上屏——截图恒为 canvas 首帧，墨线只能以 getImageData 验真
+  //   （scrpx==pingpx 已证 canvas 本体正确；真浏览器 rAF/上屏均正常，无此二坑）。
+  if (new URLSearchParams(location.search).has('autoplay')) {
+    replayer.play();
+    setInterval(() => {
+      const n = performance.now();
+      instruments.forEach(i => i.render(n));
+      let ink = 'ERR';
+      try {
+        const d = chart.ctx.getImageData(0, 0, chart.canvas.width, chart.canvas.height).data;
+        let k = 0;
+        for (let i = 0; i < d.length; i += 4) { if (d[i] - d[i + 1] > 38 && d[i] > 90) k++; }
+        ink = String(k);
+      } catch (e) { /* keep ERR */ }
+      document.title = `dbg st=${(replayer.stageT / 1000).toFixed(1)} pos=${chart.pos.toFixed(1)} inkScreen=${ink}`;
+    }, 66);
+  }
 
   // POWER：一次人手，声画同启（总线一元论：声桥是回放总线的普通订阅者——画与声吃
   // 同一路包流，橱窗与正页同一条代码路径；唱片异步上桥，先房间层后音乐）
   const bridge = new SoundBridge({ repoKey: 'demo:storm', seed: 'demo' });
   replayer.onPacket.push(pkt => bridge.onPacket(pkt));
   replayer.onMoment.push(m => bridge.onMoment(m));
+  // ② 翻字牌（两页同法）：曲名唯一显示面·onRecordChange 唯一驱动；换曲键橱窗同约
+  const flap = mountFlapBoard(document.getElementById('flap-cells'));
+  fetch('../sound/records/catalog.json').then((r) => r.json())
+    .then((c) => mountTrackIndex(document.getElementById('track-index'), (c.records || []).map((x) => x.title)))
+    .catch(() => {});
+  bridge.onRecordChange = (name, userSwitch) => {
+    // POST 演出期让位（两页同法）：揭幕并入幕三翻牌拍
+    const apply = () => flap?.set(name, { onSettle: () => { if (userSwitch) bridge.needleDrop?.(); } });
+    if (!postGate.defer(apply)) apply();
+  };
+  document.querySelector('#song-keys .np-prev')?.addEventListener('click', (e) => { e.stopPropagation(); bridge.switchRecord(-1); });
+  document.querySelector('#song-keys .np-next')?.addEventListener('click', (e) => { e.stopPropagation(); bridge.switchRecord(1); });
+  // ⑥ 伺服校准钮（两页同法）
+  document.getElementById('servo-knob')?.addEventListener('click', (e) => { e.stopPropagation(); runPenSweep(chart); });
   const powerBtn = document.getElementById('power');
   let on = false;
   powerBtn.addEventListener('click', async () => {
@@ -74,14 +111,46 @@ async function boot() {
     on = true;
     powerBtn.setAttribute('data-on', '');
     powerBtn.textContent = 'PLAYING';
+    // ⑦POST（两页同法）：POWER=开机，同一场自检礼；恰盖声桥 start 的等待窗
+    if (new URLSearchParams(location.search).get('post') !== '0') runPost({ vu, chart, lamps, deck, flap });
     try {
       await bridge.start(sampleAt(tape, SEEK_S * 1000));
+      vu.source = () => bridge.vuDb();   // ⑤ 修宪：声起之刻 VU 换粮——总线真实包络（两页同法）
     } catch (err) {
       console.warn('[demo] 声桥未起（画照走）：', err.message ?? err);
       powerBtn.textContent = 'SILENT';
     }
     replayer.play();
   });
+
+  // —— 闸材料声轨抽头（014 乙·?audiotap=1·诊断限定不入正常路径）：master 总线末端接
+  //    MediaStreamDestination→MediaRecorder(opus)，window.__gateAudioB64() 经 CDP 取走——
+  //    与录屏帧合成 60s 带声闸材料；此录音即"声音回归签"（重建后声桥接点的复核疫苗）。
+  if (new URLSearchParams(location.search).has('audiotap')) {
+    const poll = setInterval(() => {
+      const eng = bridge.engine, actx = bridge.ctx;
+      if (!eng?.nodes?.master || !actx) return;
+      clearInterval(poll);
+      try {
+        const dest = actx.createMediaStreamDestination();
+        eng.nodes.master.connect(dest);                      // 抽头并联：不动原 master→destination 通路
+        const mr = new MediaRecorder(dest.stream, { mimeType: 'audio/webm;codecs=opus' });
+        const chunks = [];
+        mr.ondataavailable = e => { if (e.data.size) chunks.push(e.data); };
+        mr.start(1000);
+        window.__tapStartEpoch = Date.now();
+        window.__gateAudioB64 = () => new Promise(res => {
+          mr.onstop = () => {
+            const fr = new FileReader();
+            fr.onload = () => res(fr.result.split(',')[1]);
+            fr.readAsDataURL(new Blob(chunks, { type: 'audio/webm' }));
+          };
+          mr.stop();
+        });
+        document.title = 'TAP-ON';
+      } catch (err) { document.title = 'TAP-ERR ' + (err?.message ?? err); }
+    }, 200);
+  }
 
   window.__demo = { replayer, tape, bridge, chart, deck }; // 冒烟把手
 }

@@ -314,6 +314,8 @@ export function buildEngine(ctx, SP, opts) {
     ctx, SP, R, ROOT,
     nodes: { master, shelf, lp, wearBus, fgBus, humLevel, crackleLevel, hissLevel, recLP, recG },
     onSound: null,   // 越级检测仪抽头（声资产批§二）：单声上线报 {name, klass, at}——检测先于上线的执法口
+    bedBornAt: null, // POST 温柔苏醒：床（哼/嘶/crackle）压黑至此刻，届时随慢 slew 缓起（乐谱'嗡起偏慢'）
+    vrot: new Map(), // 机枪律轮换账：声名→已发次数（变体=次数%N·种子化=渲染确定性不破）
     transport: null,
     lastGridAt: 0, lastBarAt: 0, lastAskRepeat: -1e9, doneSilentUntil: -1, wxLatch: 0,
     habLog: new Map(),
@@ -346,9 +348,11 @@ export function buildEngine(ctx, SP, opts) {
     E.rec.buf.copyToChannel(m.x, 0);
     E.rec.calibLin = dbToLin(SP.record.targetLufs - m.lufs);
   }
-  /** 起播唱片（at 起、唱片内相位 offsetSec）——startTransport/换曲共用。 */
+  /** 起播唱片（at 起、唱片内相位 offsetSec）——startTransport/换曲共用。
+   *  POST 乐谱序钳（刀三）：holdBedUntil 同时钳唱片进场点——"若有唱片：落针接管"在嗡起之后。 */
   function recStart(at, offsetSec) {
     if (!E.rec.meta) return;
+    if (E.recHoldUntil && at < E.recHoldUntil) at = E.recHoldUntil;
     const s = recMakeSrc();
     const off = ((offsetSec % E.rec.meta.seconds) + E.rec.meta.seconds) % E.rec.meta.seconds;
     s.start(at, off);
@@ -462,9 +466,11 @@ export function buildEngine(ctx, SP, opts) {
       else param.setTargetAtTime(v, at, tc);
     };
     const mg = (n) => (E.mutes.has(n) ? 0 : 1);
-    set(humLevel.gain, bt.hum * mg('hum'), slow);
-    set(hissLevel.gain, bt.hiss * mg('hiss'), fast);      // 嘶随走带即停即起（暂停抬带=嘶止要快）
-    set(crackleLevel.gain, bt.crackle * mg('crackle'), slow);
+    const born = E.bedBornAt == null || at >= E.bedBornAt ? 1 : 0;   // POST 借床：诞生前恒零（imm 起播同受闸）
+    if (born && E.bedBornAt != null) E.bedBornAt = null;             // 诞生即销闸（慢 slew=起势缓）
+    set(humLevel.gain, bt.hum * born * mg('hum'), slow);
+    set(hissLevel.gain, bt.hiss * born * mg('hiss'), fast);      // 嘶随走带即停即起（暂停抬带=嘶止要快）
+    set(crackleLevel.gain, bt.crackle * born * mg('crackle'), slow);
     set(lp.frequency, bt.filterHz, slow);
     set(shelf.gain, bt.hfShelfDb, slow);
   }
@@ -602,6 +608,98 @@ export function buildEngine(ctx, SP, opts) {
     }
   }
 
+  // ---- POST 乐谱声部（声资产批刀三·三层解剖法+阻尼律+机枪律）----------------------
+  // 每声=瞬态(材质之咬)+躯体(中频之重)+尾音(阻尼)；全机禁无阻尼金属振铃；
+  // 机枪律：3–5 轮换+微随机（音高±2%/增益±1dB）——种子化 rng+轮换账=确定性不破。
+  const voiceRng = mulberry32(seedOf('voices:' + (opts.seed || '') + ':' + opts.repoKey));
+  function vshot(name) {
+    const n = (E.vrot.get(name) || 0); E.vrot.set(name, n + 1);
+    // 每发独立但确定：从主流取两枚（顺序即种子链——同渲染两遍逐位同）
+    const pm = 1 + (voiceRng() - 0.5) * 0.04;   // 音高 ±2%
+    const gm = Math.pow(10, ((voiceRng() - 0.5) * 2) / 20); // 增益 ±1dB
+    return { v: n % 4, pm, gm };
+  }
+  /** 继电器合闸"咔"（手感·POST t0/手势）：接点咔(高频 5ms)+线圈闷动(120Hz 短)+板短阻尼震(400Hz 40ms) */
+  function relayClick(at) {
+    if (E.mutes.has('fg')) return;
+    const { v, pm, gm } = vshot('relay');
+    reportSound('relayClick', 'touch', at);
+    const g0 = 0.062 * gm;
+    // 瞬态：接点咔
+    const click = noiseBurst(at, 0.006);
+    const chp = ctx.createBiquadFilter(); chp.type = 'highpass'; chp.frequency.value = (1900 + v * 140) * pm;
+    click.connect(chp); chp.connect(envG(at, g0, 0.001, 0.012));
+    // 躯体：线圈闷动
+    const coil = oneOsc('sine', (118 + v * 6) * pm, at, at + 0.09);
+    coil.connect(envG(at, g0 * 0.7, 0.004, 0.055));
+    // 尾音：机箱板短震（带通窄阻尼——木箱压钢板=闷震）
+    const body = noiseBurst(at + 0.004, 0.05);
+    const bbp = ctx.createBiquadFilter(); bbp.type = 'bandpass'; bbp.frequency.value = 420 * pm; bbp.Q.value = 2.2;
+    body.connect(bbp); bbp.connect(envG(at + 0.004, g0 * 0.5, 0.003, 0.042));
+  }
+  /** 钨丝点火"嗒"（耳语·灯亮瞬间）：极短嘀，近无躯体无尾（灯丝热胀的一粒） */
+  function filamentTick(at) {
+    if (E.mutes.has('fg')) return;
+    const { v, pm, gm } = vshot('filament');
+    reportSound('filamentTick', 'whisper', at);
+    const g0 = 0.016 * gm;
+    const o = oneOsc('sine', (2950 + v * 90) * pm, at, at + 0.02);
+    o.connect(envG(at, g0, 0.001, 0.011));
+    const n = noiseBurst(at, 0.004);
+    const hp = ctx.createBiquadFilter(); hp.type = 'highpass'; hp.frequency.value = 4200;
+    n.connect(hp); hp.connect(envG(at, g0 * 0.5, 0.001, 0.006));
+  }
+  /** 伺服扫摆"吱—嘀嘀"（耳语·POST 探针/校准钮）：滑走窄带吱+端点两嘀 */
+  function servoSweep(at, durSec = 1.6) {
+    if (E.mutes.has('fg')) return;
+    const { pm, gm } = vshot('servo');
+    reportSound('servoSweep', 'whisper', at);
+    const g0 = 0.16 * gm;   // 窄带损耗补偿（Q4 带通吃 ~22dB）——出口带内 ≈−42dBFS=床下温柔可闻
+    const zh = noiseBurst(at, durSec * 0.72);
+    const bp = ctx.createBiquadFilter(); bp.type = 'bandpass'; bp.Q.value = 4;
+    bp.frequency.setValueAtTime(640 * pm, at);
+    bp.frequency.linearRampToValueAtTime(880 * pm, at + durSec * 0.4);
+    bp.frequency.linearRampToValueAtTime(560 * pm, at + durSec * 0.72);
+    zh.connect(bp); bp.connect(envG(at, g0, 0.05, durSec * 0.66));
+    for (const dt of [durSec * 0.74, durSec * 0.86]) {   // 端点嘀×2（落位确认）
+      const o = oneOsc('sine', 1450 * pm, at + dt, at + dt + 0.03);
+      o.connect(envG(at + dt, 0.02 * gm, 0.002, 0.02));   // 嘀走独立小增益（不吃带通损耗补偿）
+    }
+  }
+  /** Solari 哗啦（耳语~手感上限·换曲/POST）：塑片连击程序化（电木=干咔·长度随时长·簇密度前紧后松） */
+  function solariClatter(at, durMs = 1050) {
+    if (E.mutes.has('fg')) return;
+    const { gm } = vshot('solari');
+    reportSound('solariClatter', 'touch', at);
+    const dur = Math.min(Math.max(durMs, 200), 1150) / 1000;   // 值班帽与翻牌同法
+    const clickRng = mulberry32(seedOf('solari:' + (E.vrot.get('solari') || 0) + ':' + opts.repoKey));
+    const n = Math.round(26 + clickRng() * 10);                 // 一环连击数（12 格×2 相 前后错峰）
+    for (let k = 0; k < n; k++) {
+      const u = k / n;
+      const jitter = (clickRng() - 0.5) * 0.018;
+      const tAt = at + u * dur * 0.92 + jitter;
+      if (tAt < at) continue;
+      const pm = 1 + (clickRng() - 0.5) * 0.10;
+      const cg = 0.08 * gm * (0.75 + clickRng() * 0.5);
+      const c = noiseBurst(tAt, 0.004);
+      const hp = ctx.createBiquadFilter(); hp.type = 'bandpass'; hp.frequency.value = (2400 + clickRng() * 900) * pm; hp.Q.value = 1.4;
+      c.connect(hp); hp.connect(envG(tAt, cg, 0.001, 0.008));
+    }
+    // 末翻 thunk（触底重拍——与视觉末翻回弹同性格）
+    const th = noiseBurst(at + dur * 0.94, 0.012);
+    const tb = ctx.createBiquadFilter(); tb.type = 'bandpass'; tb.frequency.value = 700; tb.Q.value = 1.8;
+    th.connect(tb); tb.connect(envG(at + dur * 0.94, 0.06 * gm, 0.002, 0.03));
+  }
+  /** 床诞生（POST 温柔苏醒）：即刻压黑，bornAt 起随慢 slew 缓起（"嗡——"起势缓） */
+  function holdBedUntil(bornAt) {
+    E.bedBornAt = bornAt;
+    E.recHoldUntil = bornAt;   // 乐谱序：唱片在床诞生后接管（fadeIn 1.2s 温柔原样）
+    const now = ctx.currentTime;
+    for (const lv of [humLevel, hissLevel, crackleLevel]) {
+      lv.gain.cancelScheduledValues(now); lv.gain.setValueAtTime(0, now);
+    }
+  }
+
   function habFor(cls, at) {
     if (cls >= 6) return 1;
     const w = SP.foreground.habituationWindowSec;
@@ -691,6 +789,7 @@ export function buildEngine(ctx, SP, opts) {
     setRecord,
     recordPosAt: recPosAt,
     applyBed, startTransport, scheduleGridUntil, trigger, applyBedNow, needleDrop,
+    relayClick, filamentTick, servoSweep, solariClatter, holdBedUntil,   // POST 乐谱声部（刀三）
     pauseRecord, resumeRecord, // 丙.2：暂停＝唱片随带停（房间常在），恢复＝续播不重建
     get recordPaused() { return E.rec.paused; },
     setMute(name, on) { if (on) E.mutes.add(name); else E.mutes.delete(name); },

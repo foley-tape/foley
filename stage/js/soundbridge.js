@@ -67,6 +67,14 @@ export class SoundBridge {
 
     const eng = buildEngine(ctx, sp, { repoKey: this.repoKey, seed: this.seed, assets, records: this._records, recordIndex: 0 });
     this.engine = eng;
+    // POST 乐谱滞留单（刀三）：runPost 在引擎出生前下的单（holdBed/首咔）此刻兑现——
+    // 必须先于 createLiveBridge（其 startTransport 的 imm applyBed 须已见诞生闸）
+    if (this._pendingPost) {
+      const { holdMs, relay } = this._pendingPost; this._pendingPost = null;
+      const now = ctx.currentTime;
+      eng.holdBedUntil(now + Math.max(0, holdMs) / 1000);
+      if (relay) eng.relayClick(now + 0.01);
+    }
 
     // 机器代理（DECREE-003 丁-轨甲验收增补）：master 旁挂 AnalyserNode——回归仪测实际渲染波形，
     // 不是账本（门规：账本永不作发声证明）。人耳终审权不因此让渡。
@@ -110,10 +118,12 @@ export class SoundBridge {
       const win = (sp.classes.meterWindowMs ?? 250) / 1000;
       const delayMs = Math.max(0, at - this.ctx.currentTime) * 1000 + (win + 0.35) * 1000;   // at=音频钟（可在未来）
       setTimeout(() => {
-        const base = ring.filter(([t]) => t >= at - 2.2 && t <= at - 0.15).map(([, d]) => d).sort((a, b) => a - b);
+        // 基线语义（首航勘误）：①就近窗（0.6s）——并发源（唱片淡入）爬坡下的公平参照；
+        // ②设计地板钳（loudness.bedLufs 近似 dBFS）——POST 压黑期床不存在时，阶级仍对"该有的地板"量
+        const base = ring.filter(([t]) => t >= at - 0.6 && t <= at - 0.05).map(([, d]) => d).sort((a, b) => a - b);
         const peakArr = ring.filter(([t]) => t >= at && t <= at + win).map(([, d]) => d);
         if (!base.length || !peakArr.length) return;
-        const baseDb = base[Math.floor(base.length / 2)];
+        const baseDb = Math.max(base[Math.floor(base.length / 2)], sp.loudness.bedLufs);
         const peakDb = Math.max(...peakArr);
         const overDb = peakDb - baseDb;
         const tol = sp.classes.meterToleranceDb ?? 1.5;
@@ -215,6 +225,17 @@ export class SoundBridge {
    *  单一引擎档位切换——永不二次实例化音频图（丙.1）。 */
   pause() { if (this.engine && this.ctx) this.engine.pauseRecord(this.ctx.currentTime + 0.02); }
   resume() { if (this.engine && this.ctx) this.engine.resumeRecord(this.ctx.currentTime + 0.02); }
+
+  // —— POST 乐谱声部把手（刀三·序=乐谱 钟=视觉事件）：引擎未出生则记滞留单/静默让位 ——
+  postOpen(holdMs) {   // t0：床压黑至诞生点＋继电器首咔（引擎未生→滞留单，出生即兑现）
+    if (this.engine && this.ctx) {
+      this.engine.holdBedUntil(this.ctx.currentTime + Math.max(0, holdMs) / 1000);
+      this.engine.relayClick(this.ctx.currentTime + 0.01);
+    } else this._pendingPost = { holdMs, relay: true };
+  }
+  lampTick() { if (this.engine && this.ctx) this.engine.filamentTick(this.ctx.currentTime + 0.005); }
+  servoCue(durSec) { if (this.engine && this.ctx) this.engine.servoSweep(this.ctx.currentTime + 0.005, durSec); }
+  solariCue(durMs) { if (this.engine && this.ctx) this.engine.solariClatter(this.ctx.currentTime + 0.005, durMs); }
 
   /** 切带淡出/淡入（第五号手令 丁-E2 rule 1）：master 增益平滑坡——绝不销毁音频图（免爆破），
    *  换带只是同一引擎上换喂食源。淡出到近零、淡入回额定。 */

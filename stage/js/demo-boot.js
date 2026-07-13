@@ -114,7 +114,7 @@ async function boot() {
   document.querySelector('#song-keys .np-prev')?.addEventListener('click', (e) => { e.stopPropagation(); bridge.switchRecord(-1); });
   document.querySelector('#song-keys .np-next')?.addEventListener('click', (e) => { e.stopPropagation(); bridge.switchRecord(1); });
   // ⑥ 伺服校准钮（两页同法）
-  document.getElementById('servo-knob')?.addEventListener('click', (e) => { e.stopPropagation(); runPenSweep(chart); });
+  document.getElementById('servo-knob')?.addEventListener('click', (e) => { e.stopPropagation(); bridge?.servoCue?.(1.6); runPenSweep(chart); });
   const powerBtn = document.getElementById('power');
   let on = false;
   powerBtn.addEventListener('click', async () => {
@@ -123,7 +123,7 @@ async function boot() {
     powerBtn.setAttribute('data-on', '');
     powerBtn.textContent = 'PLAYING';
     // ⑦POST（两页同法）：POWER=开机，同一场自检礼；恰盖声桥 start 的等待窗
-    if (new URLSearchParams(location.search).get('post') !== '0') runPost({ vu, chart, lamps, deck, flap });
+    if (new URLSearchParams(location.search).get('post') !== '0') runPost({ vu, chart, lamps, deck, flap, sound: bridge });
     try {
       await bridge.start(sampleAt(tape, SEEK_S * 1000));
       vu.source = () => bridge.vuDb();   // ⑤ 修宪：声起之刻 VU 换粮——总线真实包络（两页同法）

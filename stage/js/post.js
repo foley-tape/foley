@@ -18,6 +18,7 @@
 // 让位并入翻牌拍（§11 唯一写者不破·只延时不代笔）。
 
 const T = {
+  bedBirth: 3800,                 // 床诞生（乐谱'2.8s 嗡起'挂视觉钟=翻牌起翻后·起势缓）
   vuKickEnd: 100,                 // 涌流冲击窗：0–0.1s 打满红区
   vuRelease: 900,                 // 甩毕早还（回弹余振 0.1–0.5s 自己收尾）
   eyeOn: 500, eyeFocus: 1500,     // 魔眼预热：浮现+向心对焦
@@ -77,10 +78,14 @@ export const postGate = {
 };
 
 export function runPost(h, opts = {}) {
-  const { vu, chart, lamps, deck, flap } = h;
+  const { vu, chart, lamps, deck, flap, sound } = h;   // sound=声桥（可缺席——乐谱声部静默让位）
   return new Promise((resolve) => {
     const T0 = performance.now();
     postGate.active = true;
+    // POST 乐谱 B（声资产批定稿§四·序=乐谱 钟=视觉事件）：t0 继电器首咔（干脆·手感级）＋
+    // 床压黑至"嗡起"点（温柔苏醒：留白偏长·嗡起偏慢——bedBirth 随慢 slew 缓起）
+    sound?.postOpen?.(T.bedBirth);
+    let tickLine = false, tickWrap = false, tickCue = false, servoCued = false;
     // 阶段一即刻起：涌流粮从第一帧就上桥（0–0.1s 冲击窗不容 rAF 迟到）
     let vuSrc = null, vuPrev = null, vuDone = !vu || !!opts.skipVu;
     if (!vuDone) { vuPrev = vu.source; vuSrc = () => dbAt(performance.now() - T0); vu.source = vuSrc; }
@@ -112,9 +117,16 @@ export function runPost(h, opts = {}) {
           chart.penHead = penEl; chart._penTy = null; penEl = null; penDone = true;
         }
       }
-      // 三 · 翻牌（与探针重叠）：有台词=揭幕；无台词=空翻
+      // 灯序嗒×3（钨丝点火·耳语）：LINE 首帧→WRAP 1.5s→CUE 1.7s（声形同刻=灯亮即嗒）
+      if (!tickLine && t >= 30) { tickLine = true; sound?.lampTick?.(); }
+      if (!tickWrap && t >= T.wrapOn) { tickWrap = true; sound?.lampTick?.(); }
+      if (!tickCue && t >= T.cueOn) { tickCue = true; sound?.lampTick?.(); }
+      // 伺服吱—嘀嘀（耳语）：探针进槽同刻
+      if (!servoCued && t >= T.penOn) { servoCued = true; sound?.servoCue?.((T.penOff - T.penOn) / 1000); }
+      // 三 · 翻牌（与探针重叠）：有台词=揭幕；无台词=空翻——哗啦与起翻同刻
       if (!flapFired && t >= T.flapAt) {
         flapFired = true;
+        sound?.solariCue?.(1050);
         const line = postGate._take();
         if (line) line(); else flap?.sweep?.();
       }

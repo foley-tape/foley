@@ -63,6 +63,12 @@ export interface SoundEngine {
   applyBedNow(pm: number): void;
   needleDrop(atSec: number): void;
   setMute(name: 'hum' | 'hiss' | 'crackle' | 'fg' | 'record', on: boolean): void;   // 隔离板 v3
+  setOnSound(fn: ((e: { name: string; klass: string; at: number }) => void) | null): void;   // 越级检测仪挂钩
+  relayClick(at: number): void;        // POST 乐谱：继电器首咔（手感）
+  filamentTick(at: number): void;      // 钨丝点火嗒（耳语）
+  servoSweep(at: number, durSec?: number): void;   // 伺服吱—嘀嘀（耳语）
+  solariClatter(at: number, durMs?: number): void; // Solari 塑片连击（耳语~手感）
+  holdBedUntil(bornAt: number): void;  // POST 温柔苏醒：床压黑至诞生点
   assetsUsed: { body: boolean; air: boolean; crackle: boolean };
   stackInfo: { hum: StackInfo };   // 三关自述 v3（马达低哼）
   // 唱片面（SOUND-R3）

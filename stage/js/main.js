@@ -318,11 +318,11 @@ async function boot() {
   });
   bindRec('.np-prev', -1); bindRec('.np-next', 1);
   // ⑥ 伺服校准钮（户口册定职）：拍一下马达座=滑针自检一趟；POST 演出期 penHead 已借走→静默让位
-  document.getElementById('servo-knob')?.addEventListener('click', (e) => { e.stopPropagation(); runPenSweep(chart); });
+  document.getElementById('servo-knob')?.addEventListener('click', (e) => { e.stopPropagation(); sb?.servoCue?.(1.6); runPenSweep(chart); });   // 吱—嘀嘀与扫摆同刻（户口册#10）
 
   // ⑦POST 开机自检：首手势即跑（3.6s 零文字第一课·恰盖声桥起桥的 2.5s 空窗）。
   // ?post=0 素面（录证据/回归验收）；?postloop=1 循环放（调参）；?vufreeze 在班时 VU 让位诊断口。
-  const firePost = () => runPost({ vu, chart, lamps, deck, flap }, { skipVu: params.has('vufreeze') })
+  const firePost = () => runPost({ vu, chart, lamps, deck, flap, get sound() { return sb; } }, { skipVu: params.has('vufreeze') })
     .then(() => { if (params.get('postloop') === '1') setTimeout(firePost, 1600); });
   if (params.get('post') !== '0') window.addEventListener('pointerdown', firePost, { once: true });
 

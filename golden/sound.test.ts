@@ -494,3 +494,56 @@ test('75 响度阶级 resolve 执法（声资产批§二）：缺节即抛、阶
   assert.ok(sp.classes.whisperOverBedDb < sp.classes.touchOverBedDb);
   assert.equal(typeof sp.loudness.callPeakLufs, 'number', '仪式级峰值锚（callPeakLufs）在位');
 });
+
+test('76 POST 乐谱声部（刀三）：四声部渲染在场·阶级申报齐·机枪律轮换·确定性逐位', () => {
+  const render = (): { wav: Float32Array; log: { name: string; klass: string }[] } => {
+    const ctx = new OfflineCtx(EAR_SR);
+    const eng = buildEngine(ctx, sp, { repoKey: 'golden-post', seed: 'post' });
+    for (const n of ['hum', 'hiss', 'crackle', 'record'] as const) eng.setMute(n, true);   // 只留声部
+    const log: { name: string; klass: string }[] = [];
+    eng.setOnSound((e) => log.push({ name: e.name, klass: e.klass }));
+    eng.startTransport(0, 1, constTrack(0.3, 0.3, 20000), 20000);
+    eng.relayClick(0.5);
+    eng.filamentTick(1.5); eng.filamentTick(1.7); eng.filamentTick(1.9);
+    eng.servoSweep(3.0, 1.6);
+    eng.solariClatter(5.5, 1050);
+    eng.relayClick(8.0); eng.relayClick(8.5); eng.relayClick(9.0);   // 轮换账（同声连发变体）
+    return { wav: ctx.render(10), log };
+  };
+  const a = render();
+  // 在场：四声部各自窗内非静默
+  assert.ok(rmsDb(a.wav, EAR_SR, 0.5, 0.62) > -60, `首咔在场（${rmsDb(a.wav, EAR_SR, 0.5, 0.62).toFixed(1)}）`);
+  assert.ok(rmsDb(a.wav, EAR_SR, 1.5, 1.53) > -70, '灯嗒在场');
+  assert.ok(rmsDb(a.wav, EAR_SR, 3.2, 4.1) > -70, '伺服吱在场');
+  assert.ok(rmsDb(a.wav, EAR_SR, 5.5, 6.5) > -60, '哗啦在场');
+  assert.ok(rmsDb(a.wav, EAR_SR, 7.0, 7.9) < -80, '声部间静默（无泄漏源）');
+  // 阶级申报：每声一报·名类齐
+  assert.deepEqual(a.log.map((x) => x.name), ['relayClick', 'filamentTick', 'filamentTick', 'filamentTick', 'servoSweep', 'solariClatter', 'relayClick', 'relayClick', 'relayClick']);
+  assert.ok(a.log.every((x) => x.klass === 'touch' || x.klass === 'whisper'), '声部阶级 ∈ {touch, whisper}');
+  // 机枪律：连发三咔不逐位同（变体在轮换）——比较三段 120ms 波形
+  const seg = (t0: number): Float32Array => a.wav.slice(Math.floor(t0 * EAR_SR), Math.floor((t0 + 0.12) * EAR_SR));
+  const s1 = seg(8.0), s2 = seg(8.5);
+  let same = 0;
+  for (let i = 0; i < s1.length; i++) if (s1[i] === s2[i]) same++;
+  assert.ok(same / s1.length < 0.9, `连发同声必有变体（同样本率 ${(same / s1.length).toFixed(2)} < 0.9——机枪律）`);
+  // 渲染确定性：两渲逐位
+  const b = render();
+  assert.equal(a.wav.length, b.wav.length);
+  for (let i = 0; i < a.wav.length; i++) {
+    if (a.wav[i] !== b.wav[i]) assert.fail(`样本 ${i} 不等（种子化轮换破确定性）`);
+  }
+});
+
+test('77 床诞生闸（POST 温柔苏醒）：holdBedUntil 前全黑·诞生后缓起（慢 slew=起势缓）', () => {
+  const ctx = new OfflineCtx(EAR_SR);
+  const eng = buildEngine(ctx, sp, { repoKey: 'golden-birth' });
+  eng.setMute('fg', true); eng.setMute('record', true);
+  eng.holdBedUntil(4.0);
+  eng.startTransport(0, 1, constTrack(0.3, 0.3, 20000), 20000);
+  eng.scheduleGridUntil(12);
+  const wav = ctx.render(12);
+  assert.ok(rmsDb(wav, EAR_SR, 1, 3.8) < -80, `诞生前全黑（${rmsDb(wav, EAR_SR, 1, 3.8).toFixed(1)}）`);
+  const early = rmsDb(wav, EAR_SR, 4.3, 4.8), late = rmsDb(wav, EAR_SR, 9, 11);
+  assert.ok(late > -40, `诞生后床在（${late.toFixed(1)}）`);
+  assert.ok(early < late - 2, `缓起（4.3-4.8s ${early.toFixed(1)} < 稳态 ${late.toFixed(1)} − 2dB——嗡起偏慢）`);
+});

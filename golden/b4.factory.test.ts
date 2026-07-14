@@ -32,7 +32,7 @@ describe('B4 · factory 缓存回退（打包态出厂音频粮道）', () => {
     // 白名单内（catalog 在册）＋白名单外（投毒件）＋一处 HOME 秘密（穿越靶，绝不得泄漏）
     writeFileSync(join(recF, 'saturation.mp3'), Buffer.from('REC-FACTORY-SATURATION'));
     writeFileSync(join(recF, 'evil.mp3'), Buffer.from('POISON-NOT-IN-CATALOG'));
-    writeFileSync(join(astF, 'l1-roomtone.wav'), Buffer.from('AST-FACTORY-ROOMTONE'));
+    writeFileSync(join(astF, 'l1-roomtone.wav'), Buffer.from('AST-FACTORY-ROOMTONE'));   // 织体退役出库后=白名单外→天然 assets 域投毒件（拒供覆盖）
     writeFileSync(join(home, 'SECRET.txt'), Buffer.from('HOME-SECRET-MUST-NOT-LEAK'));
     base = `http://127.0.0.1:${port}`;
     // --replay-only：纯静态态（不 spawn cli live），自举 302 亦不武装——只验声资产粮道
@@ -98,8 +98,8 @@ describe('B4 · factory 缓存回退（打包态出厂音频粮道）', () => {
 
   test('⑥ 回退不误伤 repo 命中：工作树内的 vendored 床音 wav 仍 200', async () => {
     // 回归：我的改动只在 catch（repo 缺件）里加回退——repo 命中路径不得被触碰。
-    if (existsSync(join(repoRoot, 'sound', 'assets', 'l1-roomtone.wav'))) {
-      const r = await fetch(base + '/sound/assets/l1-roomtone.wav');
+    if (existsSync(join(repoRoot, 'sound', 'assets', 'l1-crackle.wav'))) {   // 织体双件已出库·回归锚改幸存的 crackle
+      const r = await fetch(base + '/sound/assets/l1-crackle.wav');
       assert.equal(r.status, 200, 'repo 内床音仍应直供（回退分支不劫持命中路径）');
     }
   });

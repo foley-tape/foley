@@ -29,22 +29,6 @@
   ],
   "assets": [
     {
-      "name": "l1-roomtone",
-      "file": "l1-roomtone.wav",
-      "bytes": 1017644,
-      "sha256": "7067f0b7066dae279bfd4b7fa7b551904502de646c15b803487e0b89fb27c59a",
-      "url": "https://github.com/foley-tape/foley/releases/download/records-v1/l1-roomtone.wav",
-      "provenance": "sound/assets/LICENSES.md"
-    },
-    {
-      "name": "l1-filmstatic",
-      "file": "l1-filmstatic.wav",
-      "bytes": 812844,
-      "sha256": "18750e77904d3e7ce9b0302d2bb341ea44acdcc765de55d585f7f7ad6787b5c2",
-      "url": "https://github.com/foley-tape/foley/releases/download/records-v1/l1-filmstatic.wav",
-      "provenance": "sound/assets/LICENSES.md"
-    },
-    {
       "name": "l1-crackle",
       "file": "l1-crackle.wav",
       "bytes": 1171244,

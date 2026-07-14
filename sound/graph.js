@@ -728,7 +728,8 @@ export function buildEngine(ctx, SP, opts) {
     applyRecord(recordTargets(stateOf(s0), SP), ctx.currentTime, true);
   }
   const stateOf = (s) => ({ T: s[2], A: s[3], wow: s[6], phase: ['IDLE', 'WORKING', 'WAITING', 'DONE'][s[5]] || 'WORKING', weather: 'CLEAR', pendingAsk: s[7] === 1, recordOn: recOn(),
-    moving: !!E.transport && !E.paused, speed: E.transport ? E.transport.speed : 1 });   // 状态表三态真值（v3）
+    moving: !!E.transport && !E.paused, speed: E.transport ? E.transport.speed : 1,
+    test: E.testMode === true });   // 状态表真值（v3）＋第六态 TEST（设计三§六.1·选择器驻留=电源微嗡）
 
   function scheduleGridUntil(untilSec) {
     const { audio0, speed, track, durMs, startPm } = E.transport;
@@ -769,6 +770,13 @@ export function buildEngine(ctx, SP, opts) {
     }
   }
 
+  /** 第六态 TEST（设计三§六.1·选择器 TEST 驻留把手）：电源微嗡——哼降变压器级·嘶/crackle 止。 */
+  function setTestMode(v, at) {
+    E.testMode = v === true;
+    const s = E.transport ? sampleAt(E.transport.track, 0) : [0, 0, 0, 0, 0, 0, 0, 0];
+    applyBed(bedTargets(stateOf(s), SP), at ?? ctx.currentTime, false);
+  }
+
   function applyBedNow(pm) {
     const s = sampleAt(E.transport.track, Math.min(pm, E.transport.durMs));
     applyBed(bedTargets(stateOf(s), SP), ctx.currentTime, true);
@@ -789,7 +797,7 @@ export function buildEngine(ctx, SP, opts) {
     setRecord,
     recordPosAt: recPosAt,
     applyBed, startTransport, scheduleGridUntil, trigger, applyBedNow, needleDrop,
-    relayClick, filamentTick, servoSweep, solariClatter, holdBedUntil,   // POST 乐谱声部（刀三）
+    relayClick, filamentTick, servoSweep, solariClatter, holdBedUntil, setTestMode,   // POST 乐谱声部（刀三）＋第六态把手（页面接线刀）
     pauseRecord, resumeRecord, // 丙.2：暂停＝唱片随带停（房间常在），恢复＝续播不重建
     get recordPaused() { return E.rec.paused; },
     setMute(name, on) { if (on) E.mutes.add(name); else E.mutes.delete(name); },

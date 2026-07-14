@@ -25,7 +25,15 @@
   <!-- 状态可诊·信号灯（第五号手令 丁-E5）：喂食断了机器不装死——一枚灯语＋丝印字报当前态，
        无数字、无浏览器弹窗；live 时不在场。 -->
   <div id="signal-cue" aria-hidden="true"><i class="beacon"></i><span class="label silk"></span></div>
-  <div id="machine"></div>
+  <!-- 高塔（渲染批·镜头即导航）：段A 机器＋段B 带库鞋盒竖排一根长板；镜头下摇=tower translateY -->
+  <div id="tower">
+    <div id="machine"></div>
+    <div id="lib-plate" aria-label="带库">
+      <img class="plate" src="assets/lib.webp" alt="the tape library below the machine" decoding="async" draggable="false">
+      <i class="lib-lamp" aria-hidden="true"></i>
+      <i class="lib-vignette" aria-hidden="true"></i><i class="lib-grain" aria-hidden="true"></i>
+    </div>
+  </div>
 
   <!-- 统一光照场（decree6 乙·镜头法）：一束画外暖灯把散乱匀光零件收拢——multiply 从上偏左焦点落差到四角near-black。 -->
   <!-- P0-4 ②：空/首启一句蚀刻向导（不许现代弹窗）——丝印在房间暗处，上带即隐 -->

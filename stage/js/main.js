@@ -5,14 +5,17 @@
 import { loadTape, Replayer, buildTape } from './replay.js';
 import { LiveStream } from './live.js';
 import { VuMeter, ChartRecorder, Lamps } from './instruments.js';
-import { ReelDeck, Counter } from './deck.js';
+import { ReelDeck } from './deck.js';
 import { mountLens } from './lens.js';
 import { buildMachine } from './machine.js';
 import { mountPerf } from './perf.js';
 import { DubController } from './dub.js';
 import { SoundBridge } from './soundbridge.js';
 import { mountFlapBoard, mountTrackIndex } from './flapboard.js';
-import { runPost, runPenSweep, postGate } from './post.js';
+import { runPost, runPenSweep, postGate, TEST_END_MS } from './post.js';
+import { mountSelector } from './selector.js';
+import { mountCounter } from './counter.js';
+import { mountTower } from './tower.js';
 
 const params = new URLSearchParams(location.search);
 const deepTape = (params.get('tape') || '').replace(/[^\w-]/g, '');  // 深链 demo
@@ -43,16 +46,14 @@ const fmtRel = (ms) => {
 async function boot() {
   if (document.readyState !== 'complete') await new Promise(r => window.addEventListener('load', r, { once: true }));
 
-  // P0-5 滚动数字拆除令：计数轮默认不上常显面（counter:false）——未过棘爪回位律不得回归；
-  // ?counter=1 诊断口限定，供棘爪返工自检，不入正常路径。
-  buildMachine(document.getElementById('machine'), { playCue: true, counter: params.has('counter') });
-  mountPerf();   // 帧医生（?perf=1·P0-1 验收器）   // decree13：机器＝场景板＋动态层（单一数据源 markup·index/demo 同吃）；playCue=真页手势示能灯
+  // 渲染批·页面接线：计数轮回归常显（棘爪律=counter.js·休眠即黑）；play-cue 处决（示能正门=选择器）
+  buildMachine(document.getElementById('machine'));
+  mountPerf();   // 帧医生（?perf=1·P0-1 验收器）   // decree13：机器＝场景板＋动态层（单一数据源 markup·index/demo 同吃）
 
   const room = document.getElementById('room');
-  // 首光·PLAY 呼吸示能（第五号手令 丁-E1／丙.3）：手势前唯一亮起；首个手势即房间醒，示能退场。
+  // 首手势即房间醒（示能=pre-gesture 的选择器呼吸微光·CSS 门随类退场）。
   window.addEventListener('pointerdown', () => {
     room.classList.remove('pre-gesture');
-    document.getElementById('play-cue')?.classList.add('gone');
   }, { once: true });
 
   // ── 持久器件（换带不重建，只清账；声桥手势后 push） ──
@@ -69,10 +70,13 @@ async function boot() {
   const chart = new ChartRecorder(document.getElementById('chart-canvas'), blankTape);
   const lamps = new Lamps(document.getElementById('amber-tube'), document.getElementById('emerald'), document.getElementById('pilot'));
   const deck = new ReelDeck(document.getElementById('reel-l'), document.getElementById('reel-r'), document.getElementById('tapeband'));
-  const counterHousing = document.getElementById('counter-housing');   // P0-5：默认不建（诊断口才在）
-  const counter = counterHousing ? new Counter(counterHousing, document.getElementById('loupe'), deck) : null;
+  // 计数轮回归（渲染批·设计三§三）：鼓条四轮·一只钟律吃盘转角·棘爪律在件内
+  const counter = mountCounter(document.getElementById('counter'), deck);
   const instruments = [vu, chart, lamps, deck, ...(counter ? [counter] : [])];
+  // 高塔导航（镜头即导航·RACK_SPEC 一.2）：滚轮/触摸/点架沿=下摇入带库；光随指针在带库层
+  mountTower({ tower: document.getElementById('tower'), room, lipHint: document.getElementById('lip-hint'), lib: document.getElementById('lib-plate') });
 
+  // 写者分离：lens 慢漂唯一写 #machine transform·tower 导航唯一写 #tower（双写者打架案）
   const lens = mountLens(document.getElementById('lens'), document.getElementById('machine'));
   if (lens) { document.getElementById('grain').style.display = 'none'; }   // decree13：暗角/暖调留给 CSS #vignette（multiply·恒在），lens 只叠颗粒浮尘
 
@@ -336,11 +340,42 @@ async function boot() {
   // ⑥ 伺服校准钮（户口册定职）：拍一下马达座=滑针自检一趟；POST 演出期 penHead 已借走→静默让位
   document.getElementById('servo-knob')?.addEventListener('click', (e) => { e.stopPropagation(); sb?.servoCue?.(1.6); runPenSweep(chart); });   // 吱—嘀嘀与扫摆同刻（户口册#10）
 
-  // ⑦POST 开机自检：首手势即跑（3.6s 零文字第一课·恰盖声桥起桥的 2.5s 空窗）。
-  // ?post=0 素面（录证据/回归验收）；?postloop=1 循环放（调参）；?vufreeze 在班时 VU 让位诊断口。
-  const firePost = () => runPost({ vu, chart, lamps, deck, flap, get sound() { return sb; } }, { skipVu: params.has('vufreeze') })
-    .then(() => { if (params.get('postloop') === '1') setTimeout(firePost, 1600); });
-  if (params.get('post') !== '0') window.addEventListener('pointerdown', firePost, { once: true });
+  // ⑦POST 开机自检 × 主功能选择器（渲染批·两乐章制接线·设计三§四）：
+  // 快拧直达 ON（点旋钮/一气拖到底/机身任意首手势=自动快拧）=压缩版整 POST；
+  // 拖到 TEST 驻留 ≥400ms=电气自检独演（床第六态微嗡·带不走=transport 暂停）；
+  // TEST→ON=尾章（电机降生·床诞生 400ms=起转后嗡起·transport 复走）。
+  // ?post=0 素面；?postloop=1 循环；?vufreeze 在班时 VU 让位诊断口。
+  const postH = { vu, chart, lamps, deck, flap, get sound() { return sb; } };
+  const postOff = params.get('post') === '0';
+  let postDone = false;
+  const firePost = () => runPost(postH, { skipVu: params.has('vufreeze') })
+    .then(() => { postDone = true; if (params.get('postloop') === '1') setTimeout(firePost, 1600); });
+  let pausedForTest = false;
+  const selector = mountSelector(document.getElementById('selector'), {
+    sound: () => sb,
+    onQuick: () => { if (!postOff && !postDone) firePost(); },
+    onTest: () => {                                   // TEST 驻留：机器醒着，带不走（§四.3 合法驻留位）
+      if (postOff || postDone) return;
+      sb?.setTest?.(true);
+      if (curPhase === 'PLAYING') { pausedForTest = true; postTransport('pause'); }
+      runPost(postH, { until: TEST_END_MS, skipVu: params.has('vufreeze') });
+    },
+    onFinale: () => {                                 // TEST→ON 尾章：电机降生+床诞生（起转后 400ms 嗡起）
+      sb?.setTest?.(false);
+      if (pausedForTest) { pausedForTest = false; postTransport('play'); }
+      if (postOff || postDone) return;
+      runPost(postH, { from: TEST_END_MS, bedBirthMs: 400, skipVu: true }).then(() => { postDone = true; });
+    },
+  });
+  if (postOff) selector?.setOn();                     // 素面：旋钮直接 ON 姿态（板同相）
+  // 机身任意首手势=自动快拧+压缩版 POST；手势落在旋钮上则让位（正门自理·不消费路由）
+  const gestureRoute = (e) => {
+    if (e.target?.closest?.('#selector')) return;
+    window.removeEventListener('pointerdown', gestureRoute);
+    selector?.autoTwist();                            // 快拧与通电同刻（拧下去那一刻电已到——POST t0 不迟）
+    if (!postOff && !postDone) firePost();
+  };
+  window.addEventListener('pointerdown', gestureRoute);
 
   // 调试把手（dev；换源后取当前引用）
   window.__stage = { live, deck, counter, chart, lamps, sound: sb, post: firePost, transport: () => curPhase,

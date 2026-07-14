@@ -18,8 +18,8 @@
 #machine {
   position: relative;
   left: auto; top: auto;
-  width: min(100vw, calc(100vh * 1.6));      /* 16:10 英雄框·信箱内等比 */
-  aspect-ratio: 2560 / 1600;
+  width: min(100vw, calc(100vh * (2560 / 1776)));   /* 高板默认取景框（渲染批步二）·信箱内等比 */
+  aspect-ratio: 2560 / 1776;
   filter: drop-shadow(0 40px 72px rgba(0, 0, 0, 0.82));
   will-change: transform;                     /* 慢漂移让给 lens.js */
   transition: filter 1.4s ease;
@@ -47,8 +47,8 @@
 
 /* —— 带盘＝定光胶片条（decree13 丁-②）：bbox＝条渲染 border 的像素对齐值（渲染打印·勿手调）——
    条帧与板同相机同灯，坐标同源 ⇒ 帧1 与板上静盘逐像素重合（加载零跳变·无双重影子） —— */
-#reel-l { left: 52.7734%; top: 5.0625%; width: 28.1250%; height: 45.1250%; will-change: transform; }
-#reel-r { left: 13.9062%; top: 5.0625%; width: 28.1250%; height: 45.1250%; will-change: transform; }
+#reel-l { left: 52.7734%; top: -6.3330%; width: 28.1250%; height: 40.6533%; will-change: transform; }
+#reel-r { left: 13.9062%; top: -6.3330%; width: 28.1250%; height: 40.6533%; will-change: transform; }
 .reel-spin {
   /* P0-1①②：canvas 抠帧 blit——巨图 background-position 逼 GPU 常驻光栅整张雪碧（风暴冻盘元凶），
      canvas 层只有盘那么大；帧不变零绘制。 */
@@ -56,13 +56,13 @@
 }
 #tapeband { left: 0; top: 0; width: 1px; height: 1px; z-index: 4; }   /* 带已烘入板·此元素仅供 deck.js 引用（z=清葬受迁） */
 /* 第三批③：走带活层（placement＝渲染打印铆定·与板同源同灯；canvas 皮同 .reel-spin） */
-#guide-l  { left: 58.3594%; top: 47.0000%; width: 4.5703%; height: 7.2500%; }
-#guide-r  { left: 31.9141%; top: 47.0000%; width: 4.5312%; height: 7.2500%; }
-#band-run { left: 33.6719%; top: 47.1250%; width: 27.5000%; height: 2.6875%; }
+#guide-l { left: 58.3594%; top: 31.4487%; width: 4.5703%; height: 6.5316%; }
+#guide-r { left: 31.9141%; top: 31.4487%; width: 4.5312%; height: 6.5316%; }
+#band-run { left: 33.6719%; top: 31.5613%; width: 27.5000%; height: 2.4212%; }
 
 /* —— 走带甲板命中区：点带盘区＝诊断式播放/暂停（旧约·不常驻按钮） —— */
 #deck {
-  left: 9.6%; top: 3.272%; width: 75.587%; height: 47.848%;
+  left: 9.685%; top: -0.187%; width: 75.428%; height: 35.347%;
   pointer-events: auto; cursor: pointer; background: none;
   z-index: 30;   /* 键面神圣律（悬案二裁决①）：交互面示能辉光永不被收边层压暗 */
 }
@@ -76,7 +76,7 @@ body.tape-loaded #deck:active { background: radial-gradient(closest-side, rgba(0
    overflow:hidden＝针毂在脸沿被表框裁掉（真表针轴本就藏框后）；
    bottom:-2%＝画上弧心在脸沿下 2%（vu_texture.py cy=1.02H）——针转心与画弧同心，
    针尖才谈得上"砸在刻度线上"（旧 3% 比画心高 ~10px，越往两端角误差越大） */
-#vu-svg { left: 69.772%; top: 56.508%; width: 16.584%; height: 12.184%; overflow: hidden; }
+#vu-svg { left: 62.756%; top: 40.015%; width: 16.584%; height: 10.976%; overflow: hidden; }
 #vu-svg .vu-needle {
   position: absolute; left: 50%; bottom: -2%;
   width: 1.5%; height: 84%; margin-left: -0.75%;
@@ -105,12 +105,12 @@ body.tape-loaded #deck:active { background: radial-gradient(closest-side, rgba(0
 /* —— 走纸记录仪（墨＝live canvas·multiply 洇墨·放行④）——
    canvas 生纸理＋#paper-relight（板上自身烘焙光的低频重照层·multiply）＝纸继承渲染光照与色调；
    dub-overlay（齿孔亮起=光）在重照层之上不受压暗。 —— */
-#chart-canvas, #paper-relight, #dub-overlay { left: 24.506%; top: 75.258%; width: 45.889%; height: 14.51%; }
+#chart-canvas, #paper-relight, #dub-overlay { left: 24.506%; top: 56.906%; width: 45.889%; height: 13.073%; }
 #dub-overlay { touch-action: none; }   /* 清葬受迁：纸上拖选/撕纸的触控独占（M-T1 律） */
 /* ④ 伺服滑针（placement=渲染打印铆定·中位姿态渲＝_yOf(0.5) 对齐）；transform 由 ChartRecorder 值变才写。
    滑轨=静件（追修·船长案"剧烈时臂座分离"：滑套恒骑轨，机构闭合） */
-#pen-head { left: 64.9609%; top: 78.8750%; width: 8.5938%; height: 7.5625%; will-change: transform; pointer-events: none; }
-#pen-rail { left: 70.3516%; top: 72.5625%; width: 2.6562%; height: 20.1875%; pointer-events: none; }
+#pen-head { left: 64.9609%; top: 60.1650%; width: 8.5938%; height: 6.8131%; will-change: transform; pointer-events: none; }
+#pen-rail { left: 70.3516%; top: 54.4780%; width: 2.6562%; height: 18.1870%; pointer-events: none; }
 #pen-head img, #pen-rail img { position: absolute; inset: 0; width: 100%; height: 100%; }
 #paper-relight {
   background: url('../assets/paper_relight.png') center / 100% 100% no-repeat;
@@ -118,7 +118,7 @@ body.tape-loaded #deck:active { background: radial-gradient(closest-side, rgba(0
 }
 
 /* —— 魔眼磷光辉光（凹管在板·青绿加性层·--act 调亮度·幽深异于 DONE 宝石绿） —— */
-#magic-eye { left: 43.232%; top: 56.536%; width: 8.428%; height: 13.413%; }
+#magic-eye { left: 43.232%; top: 40.039%; width: 8.428%; height: 12.084%; }
 /* —— 魔眼管（⑦材质重构·船长令）：真空电子管，不是发光按钮。
    层序（孔径内自下而上）：磷光屏（阴极射线荧光粉·临床青绿/深幽翠绿·环带随 --act 向心
    收缩=对焦）→ 扇叶暗影（conic 硬缘楔·act 收拢=电子束缺口）→ 阴极金属帽（实体定径·
@@ -183,7 +183,7 @@ body.tape-loaded #deck:active { background: radial-gradient(closest-side, rgba(0
 
 /* ⑥ 伺服马达座（rec_pivot 实测 bbox）：户口定职=点按一趟滑针校准扫摆；示能同语（⑦） */
 #servo-knob {
-  left: 70.75%; top: 80.0%; width: 3.2%; height: 5.4%;
+  left: 70.75%; top: 61.179%; width: 3.2%; height: 4.865%;
   pointer-events: auto; cursor: pointer; z-index: 30;   /* 键面神圣律 */
   background: none; border: 0; padding: 0; color: transparent;
   box-shadow: none; border-radius: 50%;
@@ -196,7 +196,7 @@ body.tape-loaded #deck:active { background: radial-gradient(closest-side, rgba(0
    placement=coords lamp_* 窗芯 bbox（渲染打印勿手调）。 —— */
 .df-text {
   display: flex; align-items: center; justify-content: center;
-  font: 700 min(0.60vw, 0.96vh)/1 "Univers", "Helvetica Neue", Arial, sans-serif;
+  font: 700 min(0.60vw, 0.865vh)/1 "Univers", "Helvetica Neue", Arial, sans-serif;
   letter-spacing: 0.34em; text-indent: 0.34em; font-style: normal;
   mix-blend-mode: screen; pointer-events: none;
   opacity: min(1, var(--lit, 0));
@@ -204,11 +204,11 @@ body.tape-loaded #deck:active { background: radial-gradient(closest-side, rgba(0
                0 0 calc(min(1, var(--lit, 0)) * 22px) var(--halo);
 }
 #amber-tube {   /* CUE＝氩气放电管：临床氩蓝 */
-  left: 36.985%; top: 56.85%; width: 3.979%; height: 1.94%;
+  left: 36.729%; top: 40.322%; width: 3.979%; height: 1.749%;
   color: #A6C8FF; --halo: rgba(70, 120, 255, 0.75);
 }
 #emerald {      /* WRAP＝灼热钨丝：灼橙点火·余温红=::after 双生层吃 --ember */
-  left: 37.002%; top: 62.157%; width: 3.974%; height: 1.936%;
+  left: 36.746%; top: 45.104%; width: 3.974%; height: 1.743%;
   color: #FFB45E; --halo: rgba(255, 110, 30, 0.8);
 }
 #emerald::after {
@@ -219,32 +219,32 @@ body.tape-loaded #deck:active { background: radial-gradient(closest-side, rgba(0
   text-shadow: 0 0 7px rgba(180, 50, 20, 0.8);
 }
 #pilot {        /* LINE＝暗房红宝石安全灯：恒基底照度·永不呼吸 */
-  left: 37.019%; top: 67.45%; width: 3.969%; height: 1.931%;
+  left: 36.764%; top: 49.872%; width: 3.969%; height: 1.740%;
   color: #C03040; --halo: rgba(150, 20, 26, 0.5);
 }
 
 /* Dymo B 案已随光机融合废除（文字由光承载·无外贴介质） */
 
-/* —— 计数轮（读窗已烘入板·hover 微距 loupe 现滚动数字·复用旧 loupe/wheel 皮） —— */
-/* 整固批·读窗临时压暗（船长令"断电即黑"）：计数轮已拆（P0-5），板上白卡读窗不该亮着——
-   multiply 沉入深铜色（栅缝结构隐约保留＝仍是一扇窗，不是一块补丁）；区域=coords counter
-   （白卡实测即 bbox 全域·185 阈值）；正式窗体候棘爪律返工重渲板。 */
-#counter-dim {
-  left: 56.903%; top: 59.837%; width: 6.666%; height: 5.701%;
-  background: #2A2118; mix-blend-mode: multiply; border-radius: 3px;
+/* —— 计数轮（渲染批回归·设计三§三）：读窗烙板（休眠即黑=dead-front 已烘）·此层=四只数字鼓
+   canvas（鼓条换帧·同径同字律）。棘爪律=counter.js（落卡临界阻尼 ≤250ms/停必落卡位/带惯性）；
+   走带时轮滚（数的是介质·属走带时态），停即落卡，无带即黑（.lit 门）。
+   旧 DOM 轮/loupe 皮随 P0-5 时代档案退役（鼓条转正）。 —— */
+#counter {
+  opacity: 0; transition: opacity 0.9s ease;
 }
-#counter-housing { left: 56.903%; top: 59.837%; width: 6.666%; height: 5.701%; pointer-events: auto; cursor: none; }
-#counter-housing .slot { display: none; }
-#loupe {
-  left: 60.2%; top: 44%; width: 210px; height: 145px; z-index: 80;
-  transform: translate(-50%, -100%) translateY(-6px) scale(0.98);
-}
-#loupe.on { transform: translate(-50%, -100%) scale(1); }
+#counter.lit { opacity: 1; }
+/* 四鼓绝对定位（百分比相对 #counter 自身——flex+百分比 padding 的包含块坑：padding% 相对
+   #machine 宽，把 87px 窗吃成 0 宽·接线刀勘误）；窗内衬 14%/9% 同意图 */
+#counter canvas { position: absolute; top: 14%; bottom: 14%; height: auto; width: 19.2%; }
+#counter canvas:nth-child(1) { left: 9%; }
+#counter canvas:nth-child(2) { left: 30.2%; }
+#counter canvas:nth-child(3) { left: 51.4%; }
+#counter canvas:nth-child(4) { left: 72.6%; }
 
 /* —— 走带牌（decree13 丁-⑥·胶囊拆除）：黄铜牌烘入板·此层只有蚀刻字＋拨杆命中区 ——
    带名/曲名＝蚀刻凹字（暗字＋下缘吃光的刻痕高光）；模式/暂停不落字（盘停灯语即语言）。 */
 #now-plate {
-  left: 36.711%; top: 94.288%; width: 13.289%; height: 2.697%;   /* 底盘重构：裁短收窄（coords nameplate） */
+  left: 36.711%; top: 74.051%; width: 13.289%; height: 2.429%;   /* 底盘重构：裁短收窄（coords nameplate） */
   display: block; pointer-events: none;
   transform: none; padding: 0; gap: 0;      /* 清旧胶囊的居中位移/内距（胶囊已死·牌烘入板） */
   transition: opacity 0.5s ease; z-index: 6;   /* 清葬受迁（原 stage 胶囊块幸存位：牌层序在收边层上） */
@@ -254,7 +254,7 @@ body.tape-loaded #deck:active { background: radial-gradient(closest-side, rgba(0
 #now-plate .np-status { position: absolute; left: 2.4%; top: 0; height: 62%; display: flex; align-items: center; }   /* 题行上移·让位档案行 */
 #now-plate .np-tape {
   /* 轻工③字收敛：字号 −15%·对比 −20%——密度升（档案行）而亮度降＝主牌视觉退后，重心让给翻字牌 */
-  font: 500 min(0.70vw, 1.11vh)/1 "Univers", "Neue Haas Grotesk", "Helvetica Neue", Helvetica, Arial, sans-serif;
+  font: 500 min(0.70vw, 1.009vh)/1 "Univers", "Neue Haas Grotesk", "Helvetica Neue", Helvetica, Arial, sans-serif;
   letter-spacing: 0.34em; text-indent: 0.34em; font-style: normal; text-transform: uppercase;
   color: #3A2C1C; text-shadow: 0 1px 0 rgba(255, 214, 130, 0.44);   /* 光影清洗①：蚀刻凹槽下缘金色受光唇 */
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 38ch;   /* ellipsis=清葬受迁 */
@@ -262,7 +262,7 @@ body.tape-loaded #deck:active { background: radial-gradient(closest-side, rgba(0
 /* 三.1 档案行（圈选②中性编号）：小号蚀刻元数据 NO./LEN/域——工业档案的第二行 */
 #now-plate .np-meta {
   position: absolute; left: 2.4%; bottom: 21%;   /* 收进铜面（7% 骑到牌缘外木底上——首拍抓获） */
-  font: 500 min(0.52vw, 0.83vh)/1 "Univers", "Helvetica Neue", Arial, sans-serif;
+  font: 500 min(0.52vw, 0.750vh)/1 "Univers", "Helvetica Neue", Arial, sans-serif;
   letter-spacing: 0.30em; font-style: normal; text-transform: uppercase;
   color: #4A3A26; text-shadow: 0 1px 0 rgba(255, 214, 130, 0.30);
   white-space: nowrap;
@@ -272,7 +272,7 @@ body.tape-loaded #deck:active { background: radial-gradient(closest-side, rgba(0
 /* 换曲＝板上机械拨杆的左右命中半区（左=上一曲·右=下一曲）；hover 只许辉光 */
 /* —— 操作区（底盘重构·三分法之中）：换曲琴键×2（键帽烙板·盲操体量）。
    命中区=键帽实域（coords key_prev/key_next 渲染打印）；键沉三件套=山形蚀刻下沉+顶缘影加深+键面微暗 —— */
-#song-keys { left: 53.178%; top: 94.629%; width: 10.179%; height: 2.65%; pointer-events: none; z-index: 30; }   /* 键面神圣律 */
+#song-keys { left: 53.178%; top: 74.358%; width: 10.179%; height: 2.387%; pointer-events: none; z-index: 30; }   /* 键面神圣律 */
 #song-keys .np-prev, #song-keys .np-next {
   position: absolute; top: 0; height: 100%; width: 42.5%;
   pointer-events: auto; cursor: pointer;
@@ -288,7 +288,7 @@ body.tape-loaded #deck:active { background: radial-gradient(closest-side, rgba(0
 }
 #song-keys .np-prev::after, #song-keys .np-next::after {
   content: '‹‹'; position: absolute; left: 50%; top: 50%; transform: translate(-50%, -54%);
-  font: 700 min(1.02vw, 1.63vh)/1 "Univers", "Helvetica Neue", Arial, sans-serif;
+  font: 700 min(1.02vw, 1.470vh)/1 "Univers", "Helvetica Neue", Arial, sans-serif;
   color: #241B10; text-shadow: 0 1px 0 rgba(255, 224, 150, 0.36);   /* 蚀刻受光唇（光影清洗①同族） */
   letter-spacing: 0.08em; pointer-events: none;
 }
@@ -305,13 +305,13 @@ body.tape-loaded #deck:active { background: radial-gradient(closest-side, rgba(0
    烙层=壳+铜唇+空白卡（留白态）；活字格只在 .lit 时可见，间隙露出烙的格壁分隔。
    折叶=WAAPI rotateX 0→−180（正=旧字上半·背=新字下半·backface 律），静片先上后下换字。 —— */
 /* flap-plate 层已退役（底盘重构：壳体烙入板=静件归板宪法回正） */
-#flap-cells { left: 64.1654%; top: 94.3292%; width: 19.0480%; height: 3.0155%; display: flex; }   /* ×1.5 窗芯（渲染打印） */
+#flap-cells { left: 64.1654%; top: 74.0878%; width: 19.0480%; height: 2.7167%; display: flex; }   /* ×1.5 窗芯（渲染打印） */
 /* 防尘玻璃罩＝橱窗层（反射分量·压活字之上=层序物理正确；浅弓拉丝烘于层内） */
-#flap-glass { left: 62.8125%; top: 92.9375%; width: 21.9531%; height: 6.3125%; }
+#flap-glass { left: 62.8125%; top: 72.8340%; width: 21.9531%; height: 5.6870%; }
 #flap-glass img { width: 100%; height: 100%; display: block; }
 /* ② 甲案：曲单纸标签（打字机墨·贴壳下唇·印刷品域——胶水粘的纸，不是悬浮 UI；开机即读） */
 #track-index {
-  left: 64.9249%; top: 97.847%; width: 17.5088%; height: 1.15%;
+  left: 64.9249%; top: 77.2570%; width: 17.5088%; height: 1.0360%;
   display: none; align-items: center; justify-content: space-between;
   padding: 0 0.5%; box-sizing: border-box;
   background: linear-gradient(180deg, #EADDC1, #DCCEAE);   /* 光影清洗③：纸签 Albedo 提亮·拉开油墨对比 */
@@ -320,7 +320,7 @@ body.tape-loaded #deck:active { background: radial-gradient(closest-side, rgba(0
 }
 #track-index.on { display: flex; }
 #track-index span {
-  font: 500 min(0.64vw, 1.02vh)/1 "American Typewriter", "Courier New", monospace;   /* 标签随壳放大 */
+  font: 500 min(0.64vw, 0.923vh)/1 "American Typewriter", "Courier New", monospace;   /* 标签随壳放大 */
   color: #33291C; letter-spacing: 0.04em; white-space: nowrap; overflow: hidden;
   text-shadow: 0 0 0.6px rgba(40, 30, 15, 0.5);   /* 油墨洇 */
 }
@@ -341,7 +341,7 @@ body.tape-loaded #deck:active { background: radial-gradient(closest-side, rgba(0
 .fcell b {
   position: absolute; left: 0; width: 100%; height: 200%; top: 0;
   display: flex; align-items: center; justify-content: center;
-  font: 600 min(0.94vw, 1.50vh)/1 "Univers", "Helvetica Neue", Arial, sans-serif;   /* ×1.5 窗芯同步 */
+  font: 600 min(0.94vw, 1.355vh)/1 "Univers", "Helvetica Neue", Arial, sans-serif;   /* ×1.5 窗芯同步 */
   color: #D8CDB6; font-style: normal;
   text-shadow: 0 0.5px 0.4px rgba(0, 0, 0, 0.55);   /* 印墨压凹：字是印上去的，不是浮着的 */
 }
@@ -374,12 +374,12 @@ body.tape-loaded #deck:active { background: radial-gradient(closest-side, rgba(0
 
 /* —— DUB（本体烘入板：键＋纸长签）：隐形命中区；选位＝签缘一线暖光（辉光许可·无字无数字） —— */
 #dub-group {
-  left: 27.479%; top: 58.186%; width: 8.072%; height: 8.952%;
+  left: 10.452%; top: 71.466%; width: 13.670%; height: 5.780%;
   display: block; pointer-events: none;
   z-index: 30;   /* 键面神圣律（悬案二裁决①·原清葬受迁 z5 并入键面层） */
 }
 #dub-key {
-  position: absolute; right: 0; top: 14%; width: 67%; height: 73%;
+  position: absolute; left: 60.66%; top: 6%; width: 39.34%; height: 88%;
   pointer-events: auto; cursor: pointer;
   background: none; border: 0; color: transparent; padding: 0;
   box-shadow: none; border-radius: 0; text-shadow: none;   /* 清旧钢键皮（键体烘入板） */
@@ -403,8 +403,8 @@ body.tape-loaded #deck:active { background: radial-gradient(closest-side, rgba(0
 #dub-key:active { background: linear-gradient(180deg, rgba(0, 0, 0, 0.36), rgba(0, 0, 0, 0.10) 42%, rgba(0, 0, 0, 0.20)); }   /* 键沉：顶缘影加深（凹面键帽的受压读法） */
 #dub-key.latched { background: radial-gradient(closest-side, rgba(255, 176, 90, 0.22), rgba(255, 176, 90, 0) 82%); }
 #dub-lengths {
-  position: absolute; left: 0; top: 0; width: 19.6%; height: 100%;
-  display: flex; flex-direction: column; pointer-events: auto;
+  position: absolute; left: 0.00%; top: 0; width: 51.32%; height: 100%;
+  display: flex; flex-direction: row; gap: 4%; pointer-events: auto;   /* 高板：四签横排（渲染四签一一对应） */
 }
 #dub-lengths .len-tab {
   flex: 1; background: none; border: 0; padding: 0; cursor: pointer; position: relative;
@@ -420,43 +420,82 @@ body.tape-loaded #deck:active { background: radial-gradient(closest-side, rgba(0
   border-radius: 1px;
 }
 
-/* 木轨：机器底缘细带（卡片出片定位锚·几何在暗部） */
-#walnut-rail { left: 0; right: 0; bottom: 0; height: 2.2%; width: auto; }
+/* 木轨：机器底缘细带（卡片出片定位锚·几何在暗部）——高板：机身底缘=前唇梁区（lip 键） */
+#walnut-rail { left: 0; right: 0; top: 82.022%; height: 2.0%; width: auto; }
 
-/* —— PLAY 示能灯（014 丙-1）：光球有主——灯体灯罩烘入板（拨杆旁圆顶小灯），
-   此层只是它的钨丝暖白呼吸辉光＋丝印字；琥珀圣色归 ASK，此处禁用。 —— */
-#play-cue {
-  position: absolute;
-  left: 10.534%; top: 62.147%; width: 4.1%; height: 6.522%;
-  transform: none; display: block; gap: 0;
-  z-index: 55; pointer-events: none;
-  opacity: 0; transition: opacity 1.6s ease;
+/* —— 新件定位（coords v2 渲染打印·勿手调） —— */
+#selector { left: 24.122%; top: 38.630%; width: 10.249%; height: 14.695%; }
+#counter  { left: 77.716%; top: 29.554%; width: 6.717%; height: 4.805%; }
+
+/* —— 高塔（渲染批·镜头下摇导航）：#tower=段A(#machine)+段B(#lib-plate) 竖排一根长板；
+   #room 视口固定，镜头移动=tower translateY（transform-only·惯性缓动·禁 linear——
+   RACK_SPEC 一.2 镜头即导航）。暗角/颗粒收边层各段自带（P0-1 缓存纹理逻辑段内成立）。 —— */
+#tower {
+  position: relative;
+  will-change: transform;
+  display: flex; flex-direction: column; align-items: center;
 }
-#room.pre-gesture #play-cue { opacity: 1; }
-#play-cue .glow {
-  position: absolute; inset: -46%; width: auto; height: auto; border-radius: 50%;
-  background: radial-gradient(circle at 50% 46%,
-     rgba(255, 246, 222, 0.94) 0%, rgba(255, 228, 178, 0.60) 36%, rgba(210, 160, 90, 0.16) 58%, rgba(120, 80, 30, 0) 76%);
-  /* P0-1③：撤 mix-blend——呼吸动画×混合层＝整幅每帧重合成（GPU 常燃元凶）；普通 alpha 辉光观感等同。
-     will-change：强制独立合成层——opacity/scale 呼吸走纯合成器，不再逐帧重绘光罩。 */
-  box-shadow: 0 0 26px 5px rgba(255, 226, 170, 0.22);
+#lib-plate {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 2560 / 2458;
+  filter: drop-shadow(0 40px 72px rgba(0, 0, 0, 0.82));
+}
+#lib-plate .plate { filter: brightness(0.82) contrast(1.10) saturate(1.00); }   /* 库房比机器再暗半档（光度阶梯） */
+/* 光随指针（RACK_SPEC 四.1 简版）：盒脊沉于阴影，指针所至钨丝光晕漫至该脊——
+   跟随层 transform 定位（pointermove 走 rAF），screen 混合只提亮不改色相 */
+#lib-plate .lib-lamp {
+  position: absolute; left: 0; top: 0; width: 34%; aspect-ratio: 1;
+  border-radius: 50%; pointer-events: none; opacity: 0;
+  background: radial-gradient(circle,
+     rgba(255, 216, 150, 0.30) 0%, rgba(255, 196, 120, 0.14) 42%, rgba(120, 80, 30, 0) 72%);
+  mix-blend-mode: screen; will-change: transform, opacity;
+  transform: translate(-50%, -50%);
+}
+#lib-plate:hover .lib-lamp { opacity: 1; }
+/* 架沿导航示能：默认框底部一线（lip+架沿）——悬停轻晕+grab 光标=「可以下去」 */
+#lip-hint {
+  position: absolute; left: 0; top: 82.022%; width: 100%; height: 17.978%;
+  pointer-events: auto; cursor: s-resize; background: none; border: 0; z-index: 28;
+}
+#lip-hint:hover { background: linear-gradient(180deg, rgba(255, 214, 150, 0) 0%, rgba(255, 214, 150, 0.05) 70%, rgba(255, 214, 150, 0.09) 100%); }
+body.lib-view #lip-hint { pointer-events: none; }   /* 已在带库层=架沿命中区退位（回程走上滚/点机器） */
+/* 段B 收边（P0-1 缓存纹理逻辑段内成立·段A 四层 id 原样零回归）：库房自身的暗角+颗粒 */
+#lib-plate .lib-vignette {
+  position: absolute; inset: 0; pointer-events: none;
+  mix-blend-mode: multiply;
+  background: radial-gradient(130% 120% at 50% 40%,
+     #ffffff 0%, #efe6d2 30%, #bfb08c 52%, #6f6247 72%, #0b0905 100%);
+}
+#lib-plate .lib-grain {
+  position: absolute; inset: 0; pointer-events: none;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='140' height='140'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/><feColorMatrix type='saturate' values='0'/></filter><rect width='140' height='140' filter='url(%23n)'/></svg>");
+  opacity: 0.05; mix-blend-mode: overlay;
+}
+
+/* —— 主功能选择器（渲染批·设计三§四）：旋钮本体烘板（ON 姿态）·此层=条帧 canvas（拧动）＋
+   命中区＋pre-gesture 呼吸示能（play-cue 处决后示能正门迁此：OFF 位旋钮=「拧我」）。
+   三档 OFF·TEST·ON：拖拧跟随指针·释放吸附最近档；TEST 驻留 ≥400ms=电气自检独演（两乐章制）；
+   快拧直达 ON=压缩版 POST；ON 后回拧=机械拒绝（关机语义候设计）。 —— */
+#selector {
+  pointer-events: auto; cursor: grab; z-index: 30;   /* 键面神圣律 */
+  touch-action: none;
+}
+#selector.twisting { cursor: grabbing; }
+#selector canvas { position: absolute; inset: 0; width: 100%; height: 100%; }
+#selector .sel-glow {
+  position: absolute; inset: -18%; border-radius: 50%; opacity: 0; pointer-events: none;
+  background: radial-gradient(circle at 50% 48%,
+     rgba(255, 240, 210, 0.32) 0%, rgba(255, 220, 165, 0.16) 46%, rgba(120, 80, 30, 0) 74%);
+  box-shadow: 0 0 22px 4px rgba(255, 226, 170, 0.16);
   will-change: transform, opacity;
 }
-#play-cue .silk {
-  position: absolute; left: 50%; top: 118%; transform: translateX(-50%);
-  font-size: min(0.68vw, 1.09vh); letter-spacing: 0.42em; text-indent: 0.42em;
-  color: #E8DCC0; text-shadow: 0 0 9px rgba(255, 232, 190, 0.4);
-}
-/* 呼吸只在手势前活着（P0-1③：手势后动画归零，不留常燃）——清葬注：旧 stage 侧曾有一条
-   未设门的 #play-cue .glow 常燃动画（板前遗规·手势后仍烧合成器），随清葬下葬，门自此唯一。 */
-#room.pre-gesture #play-cue .glow { animation: play-breathe 3.2s ease-in-out infinite; }
-#room.pre-gesture #play-cue .silk { animation: play-breathe-text 3.2s ease-in-out infinite; }
-#play-cue.gone { opacity: 0 !important; transition: opacity 0.9s ease; }   /* 清葬受迁（main.js 手势后点名） */
+#room.pre-gesture #selector .sel-glow { opacity: 1; animation: play-breathe 3.2s ease-in-out infinite; }
+#selector:hover .sel-glow { opacity: 0.5; }
+#selector.sel-refuse { animation: dub-refuse 0.36s ease; }   /* ON 后回拧=摇头（DUB 拒绝同语） */
 @keyframes play-breathe { 0%, 100% { opacity: 0.42; transform: scale(0.95); } 50% { opacity: 1; transform: scale(1.05); } }
-@keyframes play-breathe-text { 0%, 100% { opacity: 0.5; } 50% { opacity: 0.96; } }
 @media (prefers-reduced-motion: reduce) {
-  /* 特异性修复（清葬后半）：须压过 #room.pre-gesture 动画规则——同选择器复合，后写者胜 */
-  #room.pre-gesture #play-cue .glow, #room.pre-gesture #play-cue .silk { animation: none; opacity: 0.85; }
+  #room.pre-gesture #selector .sel-glow { animation: none; opacity: 0.85; }
 }
 
 /* —— 待机纸暗（014 丙-3）：待机法＝整机睡暗留一粒指示灯——纸受灯照，灯低纸暗。

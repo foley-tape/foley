@@ -60,6 +60,7 @@ const MIME = {
   '.js': 'text/javascript; charset=utf-8',
   '.mjs': 'text/javascript; charset=utf-8',
   '.csv': 'text/csv; charset=utf-8',
+  '.webp': 'image/webp',   // 渲染批：高板/条资产正式化（发现栏旧案清账）
   '.svg': 'image/svg+xml',
   '.json': 'application/json',
   '.mp3': 'audio/mpeg',

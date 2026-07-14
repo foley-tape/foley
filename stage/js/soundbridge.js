@@ -75,6 +75,10 @@ export class SoundBridge {
       eng.holdBedUntil(now + Math.max(0, holdMs) / 1000);
       if (relay) eng.relayClick(now + 0.01);
     }
+    if (this._pendingTest !== undefined) {   // TEST 驻留滞留单（第六态·引擎出生即入态）
+      eng.setTestMode(this._pendingTest, ctx.currentTime + 0.02);
+      this._pendingTest = undefined;
+    }
 
     // 机器代理（DECREE-003 丁-轨甲验收增补）：master 旁挂 AnalyserNode——回归仪测实际渲染波形，
     // 不是账本（门规：账本永不作发声证明）。人耳终审权不因此让渡。
@@ -234,6 +238,9 @@ export class SoundBridge {
     } else this._pendingPost = { holdMs, relay: true };
   }
   lampTick() { if (this.engine && this.ctx) this.engine.filamentTick(this.ctx.currentTime + 0.005); }
+  // 选择器档位咔哒（#17·t0 继电器声迁籍——同声同性格·独立把手供拧档）＋第六态 TEST（§六.1）
+  selectorClick() { if (this.engine && this.ctx) this.engine.relayClick(this.ctx.currentTime + 0.005); }
+  setTest(v) { if (this.engine && this.ctx) this.engine.setTestMode(v, this.ctx.currentTime + 0.02); else this._pendingTest = v === true; }
   servoCue(durSec) { if (this.engine && this.ctx) this.engine.servoSweep(this.ctx.currentTime + 0.005, durSec); }
   solariCue(durMs) { if (this.engine && this.ctx) this.engine.solariClatter(this.ctx.currentTime + 0.005, durMs); }
 

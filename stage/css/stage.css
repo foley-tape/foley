@@ -153,39 +153,6 @@ body.tape-loaded #rack:hover .rack-spine { opacity: 0; }
 
 /* —— ?counter=1 诊断召回件唯一皮（P0-5 拆除令·棘爪律返工自检用）——
    默认不构建（buildMachine counter:false）；plate.css 持其几何，微距镜光学皮在此。 —— */
-#loupe {
-  opacity: 0;
-  transition: opacity 0.22s ease-out, transform 0.26s cubic-bezier(0.2, 0.7, 0.3, 1);
-  pointer-events: none;
-}
-#loupe.on { opacity: 1; }
-.loupe-glass {
-  position: relative; height: 100%;
-  display: flex; align-items: center; justify-content: center; gap: 10px;
-  border-radius: 16px;
-  background: linear-gradient(170deg, #1B1409 0%, #0E0A05 70%);
-  border: 1px solid rgba(235, 223, 194, 0.16);
-  box-shadow:
-    0 14px 40px rgba(0, 0, 0, 0.8),
-    inset 0 1px 0 rgba(255, 245, 225, 0.12),
-    inset 0 0 34px rgba(0, 0, 0, 0.6);
-}
-.loupe-glass::after { /* 浅景深的边缘：微距镜的呼吸感 */
-  content: ""; position: absolute; inset: 0; border-radius: 16px; pointer-events: none;
-  box-shadow: inset 0 0 18px 6px rgba(6, 4, 2, 0.55);
-}
-.wheel {
-  width: 34px; height: 44px; overflow: hidden; border-radius: 4px;
-  background: linear-gradient(180deg, #0A0703, #1C150C 30%, #1C150C 70%, #0A0703);
-  box-shadow: inset 0 2px 5px rgba(0, 0, 0, 0.85), inset 0 -2px 5px rgba(0, 0, 0, 0.85);
-}
-.wheel-strip { will-change: transform; }
-.wheel-strip span {
-  display: block; height: 44px; line-height: 44px; text-align: center;
-  font-size: 24px; color: var(--porcelain);
-  text-shadow: 0 0 6px rgba(242, 230, 204, 0.18);
-  font-variant-numeric: tabular-nums;
-}
 
 /* 旧面板/胡桃木轨/螺丝/器件编队/表头壳（#panel/.screw/#cluster/.block/.bezel 系）已葬——
    机身即板（plate.webp）；旧 VU 皮（.vu-face/.vu-dial/.vu-glass）与旧记录仪壳

@@ -8,12 +8,16 @@
 // P0-1④（LEDGER）：暗场信箱的 min(100vw,160vh) 出小数 CSS 宽 → 板与动态层全体非整设备像素采样
 // （"画面糊/像素乱"元凶之一）。把机器盒吸附到偶数设备像素。
 function snapMachine(el) {
+  const AR = 2560 / 1776;   // 高板默认取景框（渲染批步二·构图稿过闸契约）
   const fit = () => {
     const dpr = window.devicePixelRatio || 1;
-    const target = Math.min(innerWidth, innerHeight * 1.6);
+    const target = Math.min(innerWidth, innerHeight * AR);
     const w = Math.round(target * dpr / 2) * 2 / dpr;
-    const h = Math.round(w * (1600 / 2560) * dpr / 2) * 2 / dpr;
+    const h = Math.round(w * (1776 / 2560) * dpr / 2) * 2 / dpr;
     el.style.width = w + 'px'; el.style.height = h + 'px';
+    // 塔宽随段A（lib-plate width:100% 自适应·段B 高由 aspect-ratio 自撑）
+    const tower = el.closest('#tower');
+    if (tower) tower.style.width = w + 'px';
   };
   fit();
   window.addEventListener('resize', fit);
@@ -25,9 +29,10 @@ export function buildMachine(el, opts = {}) {
   el.innerHTML = `
     <img class="plate" src="assets/plate.webp"
          alt="a reel-to-reel tape machine" decoding="async" draggable="false">
-    <!-- 整固批：计数轮读窗临时压暗（断电即黑）——器件已拆（P0-5），板上印着的白卡不该亮；
-         正式窗体候棘爪律返工重渲。紧贴板、居一切动态层之下。 -->
-    <i class="ov" id="counter-dim" aria-hidden="true"></i>
+    <!-- counter-dim 已随高板退役：读窗休眠即黑烘进板本体（设计三§三·dead-front） -->
+
+    <!-- 架沿导航示能（渲染批·镜头即导航）：默认框底部一线（前唇+架沿）——点按=镜头下摇入带库 -->
+    <button class="ov" id="lip-hint" aria-label="下摇看带库"></button>
 
     <!-- 带盘＝定光胶片条（decree13 丁-②）：同场景同灯 N 帧自转雪碧图·deck.js 换帧；条未到时板上静盘兜底 -->
     <div class="ov reel" id="reel-l"></div>
@@ -66,17 +71,14 @@ export function buildMachine(el, opts = {}) {
     <i class="ov df-text" id="amber-tube" style="--lit:0">CUE</i>
     <i class="ov df-text" id="emerald"   style="--lit:0;--ember:0">WRAP</i>
     <i class="ov df-text" id="pilot"     style="--lit:0">LINE</i>
-    ${opts.playCue ? `
-    <!-- PLAY 示能灯（014 丙-1）：灯体灯罩已烘入板（拨杆旁圆顶灯）——此层＝钨丝暖白呼吸辉光＋丝印 -->
-    <div class="ov" id="play-cue" aria-hidden="true"><i class="glow"></i><span class="silk">Play</span></div>` : ''}
 
-    ${opts.counter ? `
-    <!-- 计数轮（P0-5 拆除令）：滚动数字默认不上常显面——未过棘爪回位律（停必落卡位/上下排一致/
-         滚动带惯性）不得回归。此块仅 ?counter=1 诊断口构建，供棘爪返工自检；板上读窗自此休眠。 -->
-    <div class="ov" id="counter-housing"><i class="slot"></i></div>
-    <div class="ov" id="loupe"><div class="loupe-glass">
-      <div class="wheel"></div><div class="wheel"></div><div class="wheel"></div><div class="wheel"></div>
-    </div></div>` : ''}
+    <!-- 主功能选择器（渲染批·设计三§四）：旋钮烘板（ON 姿态）·条帧 canvas 拧动＋pre-gesture
+         呼吸示能（play-cue 处决后示能正门迁此：OFF 位旋钮=「拧我」）。selector.js 接管。 -->
+    <div class="ov" id="selector"><canvas></canvas><i class="sel-glow" aria-hidden="true"></i></div>
+
+    <!-- 计数轮（渲染批回归·设计三§三）：读窗烙板（休眠即黑）·四只数字鼓 canvas=鼓条换帧。
+         棘爪律归 counter.js（落卡临界阻尼 ≤250ms/停必落卡位/同径同字/带惯性）；走带时亮（.lit）。 -->
+    <div class="ov" id="counter" aria-hidden="true"><canvas></canvas><canvas></canvas><canvas></canvas><canvas></canvas></div>
 
     <!-- 走带牌（decree13 甲-4/乙-5/丁-⑥：现代胶囊拆除）：黄铜牌烘入板，带名/曲名＝蚀刻字层
          （唯一必须动态的字·不可烘死）；换曲＝板上机械拨杆的左右命中半区；模式/暂停不落字——

@@ -83,28 +83,38 @@ export const postGate = {
 
 export function runPost(h, opts = {}) {
   const { vu, chart, lamps, deck, flap, sound } = h;   // sound=声桥（可缺席——乐谱声部静默让位）
+  // 两乐章窗口（选择器接线·§四.2）：until=TEST_END_MS ⇒ 只演电气自检（灯保持不还·驻留态）；
+  // from=TEST_END_MS ⇒ 只演 ON 尾章（电气事件预置已毕·床诞生改 bedBirthMs 相对本段）。
+  const FROM = opts.from ?? 0;
+  const UNTIL = opts.until ?? POST_MS;
+  const bedBirth = opts.bedBirthMs ?? T.bedBirth;
   return new Promise((resolve) => {
-    const T0 = performance.now();
+    const T0 = performance.now() - FROM;
     postGate.active = true;
     // POST 乐谱 B（声资产批定稿§四·序=乐谱 钟=视觉事件）：t0 选择器档位咔哒（原继电器首咔·
     // 设计三§六.3 迁籍——同一声资产同性格，声籍改判归主功能选择器）＋床压黑至"嗡起"点
-    // （温柔苏醒：留白偏长·嗡起偏慢——bedBirth 随慢 slew 缓起=ON 尾章电机降生）
-    sound?.postOpen?.(T.bedBirth);
-    let tickLine = false, tickWrap = false, tickCue = false, servoCued = false;
+    // （温柔苏醒：留白偏长·嗡起偏慢——bedBirth 随慢 slew 缓起=ON 尾章电机降生）。
+    // TEST 驻留段（until 在 TEST_END 前）不压床——床走第六态微嗡（soundbridge.setTest 在调用方）。
+    if (UNTIL > TEST_END_MS) sound?.postOpen?.(FROM ? bedBirth : T.bedBirth);
+    else sound?.selectorClick?.();               // TEST 段：只出档位咔哒（t0 声·无床钳）
+    let tickLine = FROM > 30, tickWrap = FROM > T.wrapOn, tickCue = FROM > T.cueOn, servoCued = FROM > T.penOn;
     // TEST 乐章即刻起：涌流粮从第一帧就上桥（0–0.1s 冲击窗不容 rAF 迟到）。
     // 涌流钟惰性锚定：VU 第一次进食才起表——click 处理器同步工作（demo POWER ~110ms）阻塞 rAF 时，
     // 冲击窗不被吃掉（物理：合闸的涌流从电流到达表头起算，不从拨开关的手起算）。
-    let vuSrc = null, vuPrev = null, vuDone = !vu || !!opts.skipVu, vuT0 = null;
+    let vuSrc = null, vuPrev = null, vuDone = !vu || !!opts.skipVu || FROM > 0, vuT0 = null;
     if (!vuDone) {
       vuPrev = vu.source;
       vuSrc = () => { if (vuT0 === null) vuT0 = performance.now(); return dbAt(performance.now() - vuT0); };
       vu.source = vuSrc;
     }
-    let penEl = null, penDone = false, flapFired = false, reelFired = false;
+    let penEl = null, penDone = FROM > T.penOff, flapFired = FROM > T.flapAt, reelFired = false;
 
     function frame(now) {
       const t = now - T0;
-      if (t >= POST_MS) {
+      if (t >= UNTIL) {
+        if (UNTIL < POST_MS) {                      // TEST 驻留：电气借件已各自归还（vu 0.9s/pen 3.2s/牌 3.35s）；
+          resolve(); return;                        // 灯保持自检态不还（lamps.post 通道持有=机器醒着）·闸不 flush 留给尾章
+        }
         if (vuSrc && vu.source === vuSrc) vu.source = vuPrev;
         if (penEl) { penEl.style.transform = 'translateY(0px)'; chart.penHead = penEl; chart._penTy = null; }
         lamps?.post?.(null);

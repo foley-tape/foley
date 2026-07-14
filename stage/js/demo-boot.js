@@ -3,13 +3,16 @@
 // 浏览器音频本就要一次人手，开机键正是那次人手该落的地方）。
 import { loadTape, Replayer, sampleAt } from './replay.js';
 import { VuMeter, ChartRecorder, Lamps } from './instruments.js';
-import { ReelDeck, Counter } from './deck.js';
+import { ReelDeck } from './deck.js';
 import { mountLens } from './lens.js';
 import { buildMachine } from './machine.js';
 import { mountPerf } from './perf.js';
 import { SoundBridge } from './soundbridge.js';
 import { mountFlapBoard, mountTrackIndex } from './flapboard.js';
 import { runPost, runPenSweep, postGate } from './post.js';
+import { mountSelector } from './selector.js';
+import { mountCounter } from './counter.js';
+import { mountTower } from './tower.js';
 
 // §9 策展令（队列1）：取景是内容决策——哪盘带、哪一幕，读 fixtures/curation.json（舞台秒，
 // 与 replayer.seek 同钟）。册缺席跌落内置取景（离线场景），跌落必自白不装健康。
@@ -46,17 +49,18 @@ async function boot() {
     document.getElementById('reel-r'),
     document.getElementById('tapeband'),
   );
-  // P0-5 拆除令：默认无计数轮 markup（buildMachine counter:false）——有才建，未过棘爪回位律不得回归
-  const counterHousing = document.getElementById('counter-housing');
-  const counter = counterHousing ? new Counter(counterHousing, document.getElementById('loupe'), deck) : null;
+  // 计数轮回归（渲染批·两页同法）：鼓条四轮·一只钟律吃盘转角
+  const counter = mountCounter(document.getElementById('counter'), deck);
   const instruments = [vu, chart, lamps, deck, ...(counter ? [counter] : [])];
+  const room0 = document.getElementById('room');
+  mountTower({ tower: document.getElementById('tower'), room: room0, lipHint: document.getElementById('lip-hint'), lib: document.getElementById('lib-plate') });
 
-  const lens = mountLens(document.getElementById('lens'), document.getElementById('machine'));
+  const lens = mountLens(document.getElementById('lens'), document.getElementById('machine'));   // 写者分离（同 index）
   if (lens) {
     document.getElementById('grain').style.display = 'none';   // decree13：暗角/暖调留给 CSS #vignette（恒在），lens 只叠颗粒浮尘
   }
 
-  const room = document.getElementById('room');
+  const room = room0;
   const feed = (pkt, isFirst) => {
     room.dataset.phase = pkt.phase;
     room.dataset.weather = pkt.weather;
@@ -117,12 +121,20 @@ async function boot() {
   document.getElementById('servo-knob')?.addEventListener('click', (e) => { e.stopPropagation(); bridge?.servoCue?.(1.6); runPenSweep(chart); });
   const powerBtn = document.getElementById('power');
   let on = false;
+  // 主功能选择器（两页同法·demo 简装）：点/拧旋钮=POWER 同义门（快拧开机·TEST 驻留归正页体验）
+  const selector = mountSelector(document.getElementById('selector'), {
+    sound: () => bridge,
+    onQuick: () => powerBtn.click(),
+    onTest: () => powerBtn.click(),
+    onFinale: () => {},
+  });
   powerBtn.addEventListener('click', async () => {
     if (on) return;
     on = true;
     powerBtn.setAttribute('data-on', '');
     powerBtn.textContent = 'PLAYING';
-    // ⑦POST（两页同法）：POWER=开机，同一场自检礼；恰盖声桥 start 的等待窗
+    // ⑦POST（两页同法）：POWER=开机=快拧直达 ON（选择器条动画同刻），同一场自检礼
+    selector?.autoTwist();
     if (new URLSearchParams(location.search).get('post') !== '0') runPost({ vu, chart, lamps, deck, flap, sound: bridge });
     try {
       await bridge.start(sampleAt(tape, SEEK_S * 1000));

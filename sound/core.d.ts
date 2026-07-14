@@ -18,6 +18,7 @@ export interface SoundParams {
     doneSilenceSec: number;
     trimDb: number;      // 床总闸（dB）：G2 遍历域沿革
     underRecordDb?: number; // P0-2 混音宪法：唱片在位床整体让位 dB；缺省 0＝旧判据兼容
+    testHumDb: number;  // 第六态 TEST 电源微嗡（设计三§六.1）：TEST 档哼降此 dB=变压器级（resolve 缺则抛）
   };
   foreground: {
     peakGain: number; failGain: number; pageGain: number; bellGain: number;
@@ -49,6 +50,7 @@ export interface BedState {
   moving?: boolean;   // v3 状态表：带走（transport 在场且未暂停）；未传=true（旧调用方近似）
   speed?: number;     // 走带速度（嘶幂律粮）；未传=1
   leader?: boolean;   // 第五态（设计二§七.1）：引带过头＝哼存嘶止（引带无氧化层）；未传=false（棕带常态）
+  test?: boolean;     // 第六态（设计三§六.1）：TEST 档＝电源微嗡（变压器级·呼吸之下）·嘶/crackle 皆止；未传=false
 }
 
 export interface RecordTargets {

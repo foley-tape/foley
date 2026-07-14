@@ -86,7 +86,7 @@ await browser.close();
 for (const r of rows) {
   console.log(`t=${String(r.t).padStart(4)}  reel=${String(r.reel).padStart(7)}  vu=${String(r.vu).padStart(7)}  pen=${r.pen.padEnd(22)} cue=${r.cue} wrap=${r.wrap} ember=${r.ember} line=${r.line} act=${r.act} flap=${r.flapLit ? 'LIT' : 'off'}/${r.flapAnim}`);
 }
-// —— 断言（5.0s 三阶段：瞬间通电→灯管预热→机械运转与重叠·船长二修令） ——
+// —— 断言（5.0s 两乐章制·设计三§六.2：TEST 电气自检[马达不转]→ON 尾章电机降生·快拧压缩版） ——
 const num = (v) => Number(v) || 0;
 const penTys = rows.map((r) => num((r.pen.match(/-?[\d.]+/) || [0])[0]));
 const vuMax = Math.max(...rows.map((r) => num(r.vu)));
@@ -109,24 +109,34 @@ const tFlap = (rows.find((r) => r.flapAnim > 0) || { t: Infinity }).t;
 // 涌流回弹：0.6–1.1s 窗内针须已退出红区回到左半盘（demo 事件针位≈−29 亦为"零位"之诚实形态）
 const vuBack = Math.min(...rows.filter((r) => r.t >= 600 && r.t <= 1100).map((r) => num(r.vu)));
 const cueLate = Math.max(...rows.filter((r) => r.t >= 4500 && r.t < 5000).map((r) => num(r.cue)));
-const earlyFlap = Math.max(...rows.filter((r) => r.t < 3400).map((r) => r.flapAnim));
-// nudge 刨本底：马达槽 [1900,3800]（demo 的 POWER 并发起转叠加→下界断言）
-const w = rows.filter((r) => r.t >= 1900 && r.t <= 3800 && r.reel != null);
+const earlyFlap = Math.max(...rows.filter((r) => r.t < 2000).map((r) => r.flapAnim));
+// nudge 刨本底：ON 尾章马达槽 [3300,5200]（reelAt 3.4s+惯性 1.5s；demo 的 POWER 并发起转叠加→下界断言）
+const w = rows.filter((r) => r.t >= 3300 && r.t <= 5200 && r.reel != null);
 const nudged = w.length >= 2 ? (w.at(-1).reel - w[0].reel) - base.rate * (w.at(-1).t - w[0].t) / 1000 : NaN;
+// TEST 乐章马达不转（两乐章铁序·index 纯净可测）：[500,3200] 窗刨本底近零转动。
+// demo 免测此条——POWER 并发 transport 起转在案（带妆待命勘误家族），盘转是日常粮非 POST nudge。
+const tw = rows.filter((r) => r.t >= 500 && r.t <= 3200 && r.reel != null);
+const testDrift = tw.length >= 2 ? (tw.at(-1).reel - tw[0].reel) - base.rate * (tw.at(-1).t - tw[0].t) / 1000 : NaN;
+// 涌流口径分房（nudge 下界断言同族）：index=满甩撞钉；demo=POWER 并发装带忙帧→VU 弹簧 dt 钳
+// 保护吃掉撞钉幅度（159ms 卡帧不炸簧的代价）——下界=针冲进红区（红区界 13.16°+余量）
+const vuKickFloor = PROFILE === 'demo' ? 15 : 40;
 const checks = [
-  [`【一·电】VU 涌流打满（0.6s 窗内峰 ${vuKick}°>40 @${tVu}ms）`, vuKick > 40],
-  [`【一·电】VU 半秒回弹（0.6–1.1s 内 ${vuBack}°<−10=退出红区回左半盘）`, vuBack < -10],
-  ['【一·电】LINE 立亮微弱底光（0.26 在场）', Math.abs(lineMax - 0.26) < 0.01],
-  [`【二·热】魔眼预热（0.4–0.8s 暗谷 act=${eyeDip}≤0.45·其后 ${tEye}ms≤1900 对焦 act≥0.8）`, eyeDip <= 0.45 && tEye <= 1900],
-  ['【二·热】WRAP 对焦触发爆亮（峰 >0.9·随后热衰减）', wrapMax > 0.9],
-  ['【二·热】WRAP 余温红（--ember 出现）', emberMax > 0.1],
-  [`【二·热】CUE 闪亮后常亮（4.5–5.0s 仍 ${cueLate}≥0.8）`, cueMax >= 0.8 && cueLate >= 0.8],
-  ['【三·机】探针全幅扫摆（ty 两向越 ±20px）', Math.min(...penTys) < -20 && Math.max(...penTys) > 20],
-  [`【三·机】双盘沉重¼转（刨本底 Δθ=${nudged.toFixed(3)}≥π/2−0.35）`, nudged > Math.PI / 2 - 0.35],
-  ['【三·机】翻牌与探针重叠（动画在场）', flapAnimMax >= 6],
-  [`【时序】电→热→机（VU ${tVu}→魔眼 ${tEye}→WRAP ${tWrap}→CUE ${tCue}→翻牌 ${tFlap}ms 单调）`,
-    tVu < tEye && tEye <= tWrap + 100 && tWrap < tCue && tCue < tFlap],
-  ['【时序】翻牌纪律（3.4s 前零动画=揭幕闸在班）', earlyFlap === 0],
+  [`【TEST·电】VU 涌流打满（0.6s 窗内峰 ${vuKick}°>${vuKickFloor} @${tVu}ms=入红区）`, vuKick > vuKickFloor],
+  [`【TEST·电】VU 半秒回弹（0.6–1.1s 内 ${vuBack}°<−10=退出红区回左半盘）`, vuBack < -10],
+  ['【TEST·电】LINE 立亮微弱底光（0.26 在场）', Math.abs(lineMax - 0.26) < 0.01],
+  [`【TEST·热】魔眼预热（0.4–0.8s 暗谷 act=${eyeDip}≤0.45·其后 ${tEye}ms≤1900 对焦 act≥0.8）`, eyeDip <= 0.45 && tEye <= 1900],
+  ['【TEST·热】WRAP 对焦触发爆亮（峰 >0.9·随后热衰减）', wrapMax > 0.9],
+  ['【TEST·热】WRAP 余温红（--ember 出现）', emberMax > 0.1],
+  [`【TEST·热】CUE 闪亮后常亮（4.5–5.0s 仍 ${cueLate}≥0.8）`, cueMax >= 0.8 && cueLate >= 0.8],
+  ['【TEST·机电】探针全幅扫摆（电气拍加速版·ty 两向越 ±20px）', Math.min(...penTys) < -20 && Math.max(...penTys) > 20],
+  ['【TEST·机电】翻牌与探针重叠（动画在场）', flapAnimMax >= 6],
+  ...(PROFILE === 'demo' ? [] : [
+    [`【TEST 铁序】全乐章马达不转（0.5–3.2s 刨本底漂移 ${testDrift.toFixed(3)} rad<0.3）`, Math.abs(testDrift) < 0.3],
+  ]),
+  [`【ON 尾章】电机降生：双盘沉重¼转（3.3s 后·刨本底 Δθ=${nudged.toFixed(3)}≥π/2−0.35）`, nudged > Math.PI / 2 - 0.35],
+  [`【时序】两乐章单调（VU ${tVu}→魔眼 ${tEye}→WRAP ${tWrap}→CUE ${tCue}→翻牌 ${tFlap}ms·电气拍全在 reelAt 3.4s 前）`,
+    tVu < tEye && tEye <= tWrap + 100 && tWrap < tCue && tCue < tFlap && tFlap < 3400],
+  ['【时序】翻牌纪律（2.0s 前零动画=揭幕闸在班·flapAt 2.2s）', earlyFlap === 0],
   ['终态归还（笔把手归 chart·CUE 熄·LINE 回 0.12·牌动画尽）',
     owned.penOwned && num(last.cue) < 0.02 && last.line === '0.12' && last.flapAnim === 0],
 ];

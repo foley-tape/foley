@@ -17,7 +17,8 @@ export function resolveSoundParams(raw) {
     if (out[k] === undefined || out[k] === null) throw new Error(`sound-params 缺少 ${k}`);
   }
   // 新床 v3（声资产批定稿§三·旧织体床退役令）：马达低哼＋过头嘶两层——地基参数缺一即抛
-  for (const k of ['humGain', 'hissGain', 'hissSpeedPow', 'hissSpeedMax', 'hissWowDepth', 'crackleDbLo', 'crackleDbHi']) {
+  // testHumDb＝第六态 TEST 电源微嗡（设计三§六.1）
+  for (const k of ['humGain', 'hissGain', 'hissSpeedPow', 'hissSpeedMax', 'hissWowDepth', 'crackleDbLo', 'crackleDbHi', 'testHumDb']) {
     if (typeof out.bed[k] !== 'number') throw new Error(`sound-params 缺少 bed.${k}（新床 v3）`);
   }
   // 床铁律 v3：嘶（带走增量）永远不盖过哼的一个量级以上——床是地板不是戏（参数层拦死）
@@ -51,10 +52,12 @@ export const linToDb = (lin) => (lin <= 1e-9 ? -180 : 20 * Math.log10(lin));
 // ---------- 床（连续层）映射律 §2.2 ----------
 
 // 新床 v3（声资产批定稿§三）：房间层身份＝机器自己的运转声——马达低哼＋带过磁头嘶。
-// 状态表（歧义封口原文＋设计二§七.1 第五态）：待机（手势前）＝全静（ctx 未生，本函数不涉）｜POST 后无带走＝哼独存｜
-// 带走（live 录制或唱片播放）＝哼＋嘶（嘶随速度/wow 同变）｜暂停抬带＝嘶止哼存（听得见的安静）｜
+// 状态表（歧义封口原文＋设计二§七.1 第五态＋设计三§六.1 第六态）：待机（手势前）＝全静（ctx 未生，本函数不涉）｜
+// POST 后无带走＝哼独存｜带走（live 录制或唱片播放）＝哼＋嘶（嘶随速度/wow 同变）｜暂停抬带＝嘶止哼存（听得见的安静）｜
 // 引带过头（leader:true·带走照走）＝哼存嘶止——引带无氧化层，物理无嘶；棕带到头瞬间嘶与乐同刻抵达
-// （同刻＝跑入仪式的编排责任，候 C 箱上机/跑入动效供 leader 真值；本表先立法后消费）。
+// （同刻＝跑入仪式的编排责任，候 C 箱上机/跑入动效供 leader 真值；本表先立法后消费）｜
+// TEST（test:true·选择器 TEST 档）＝电源微嗡——马达不转哼无粮，只剩变压器级微嗡（humGain 降 testHumDb·
+// 呼吸级之下），嘶与 crackle 皆止：机器醒着，屏住呼吸（真值候 B 箱选择器旋钮；现拨杆暂代快拧直达 ON 不驻此态）。
 // 旧织体床（L1/L2/S2/S3/呼吸）退役令：直接替换、不并存、不留开关——本函数不再输出作曲层。
 // 混音宪法不动：唱片在位（recordOn）床整体 under（−9dB 近隐但在）；唱片仍为主声道。
 export function bedTargets(s, sp) {
@@ -66,18 +69,20 @@ export function bedTargets(s, sp) {
   // 状态表的三态由页桥/引擎传运输真值（transport 在场且未暂停）。
   const moving = s.moving !== false;
   const speed = typeof s.speed === 'number' && s.speed > 0 ? s.speed : 1;
+  const test = s.test === true;
   const trim = dbToLin(b.trimDb);
   const under = rec ? dbToLin(b.underRecordDb ?? 0) : 1;
-  // 哼：机器上电即在（呼吸级地板）——DONE 滑停带停机不停（听得见的安静），永不随相位熄
-  const hum = trim * under * b.humGain;
-  // 嘶：带走门控·随速度幂律·wow 微摆（读头接触不稳）——暂停抬带即止；引带过头即止（第五态）
+  // 哼：机器上电即在（呼吸级地板）——DONE 滑停带停机不停（听得见的安静），永不随相位熄；
+  // TEST 档马达不转＝哼降为变压器级电源微嗡（第六态·呼吸级之下）
+  const hum = trim * under * b.humGain * (test ? dbToLin(b.testHumDb) : 1);
+  // 嘶：带走门控·随速度幂律·wow 微摆（读头接触不稳）——暂停抬带即止；引带过头即止（第五态）；TEST 带不走即止
   const leader = s.leader === true;
   const spdGain = Math.min(Math.pow(speed, b.hissSpeedPow), b.hissSpeedMax ?? Infinity);   // 饱和：读头噪声随速度有限增长（验收 58× 压缩试听不失控）
-  const hiss = moving && !silence && !leader
+  const hiss = moving && !silence && !leader && !test
     ? trim * under * b.hissGain * spdGain * (1 + b.hissWowDepth * (wow - 0.5) * 2 * 0.5)
     : 0;
-  // crackle：唱片磨损介质噪声（声籍属画外唱机·设计二§一.2——T 驱动照旧·不涉机上引带）
-  const crackle = trim * under * (silence ? 0 : dbToLin(b.crackleDbLo + (b.crackleDbHi - b.crackleDbLo) * T));
+  // crackle：唱片磨损介质噪声（声籍属画外唱机·设计二§一.2——T 驱动照旧·不涉机上引带）；TEST 屏住呼吸同止
+  const crackle = trim * under * (silence || test ? 0 : dbToLin(b.crackleDbLo + (b.crackleDbHi - b.crackleDbLo) * T));
   return {
     hum, hiss, crackle,
     filterHz: b.filterHzHi + (b.filterHzLo - b.filterHzHi) * T,

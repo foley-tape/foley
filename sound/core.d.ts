@@ -48,6 +48,7 @@ export interface BedState {
   recordOn?: boolean; // SOUND-R3：唱片在位——床整体 under（混音宪法）
   moving?: boolean;   // v3 状态表：带走（transport 在场且未暂停）；未传=true（旧调用方近似）
   speed?: number;     // 走带速度（嘶幂律粮）；未传=1
+  leader?: boolean;   // 第五态（设计二§七.1）：引带过头＝哼存嘶止（引带无氧化层）；未传=false（棕带常态）
 }
 
 export interface RecordTargets {

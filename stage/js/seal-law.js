@@ -166,6 +166,8 @@ export function judgeSeal(features, th = SEAL_THRESHOLDS) {
 
 // C-编号吸附阶梯（011-R2 戊.1）：C30/C45/C60/C90/C120；超 120 印真实分钟数（时代诚实：
 // 73 分钟录在一盘 C90 上；C247＝通宵局的荣光）。向上取整——壳必须装得下录音。
+// ⚠️改判在案（设计二§一.1/011-R2 修订记 2026-07-14）：C-编号→盘径阶梯（5/7/10.5 寸·NAB=顶档），
+// 候 C 箱带库空间化施工时换阶——吸附律（向上取整·超档真实数）原样平移，本函数届时改表不改魂。
 export const C_LADDER = [30, 45, 60, 90, 120];
 export function snapC(durS) {
   const min = Math.max(1, Math.ceil(durS / 60));

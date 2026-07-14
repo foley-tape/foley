@@ -84,7 +84,8 @@ export function buildMachine(el, opts = {}) {
     <div class="ov" id="now-plate" data-mode="empty">
       <span class="np-status"><i class="np-tally"></i><b class="np-mode"></b><em class="np-tape"></em></span><i class="np-meta"></i>
     </div>
-    <!-- 操作区（底盘重构·下半区三分法之中）：换曲＝两枚大机械琴键（键帽烙板·盲操体量）；
+    <!-- 操作区（底盘重构·下半区三分法之中）：监听选曲＝两枚大机械琴键（设计二§一.2 语义改判：
+         换的是画外唱机的唱片·机上带只录会话；键帽烙板·盲操体量）；
          命中区=键帽实域；键沉=顶缘影加深+山形蚀刻下沉 -->
     <div class="ov" id="song-keys">
       <button class="np-prev" aria-label="上一曲"></button><button class="np-next" aria-label="下一曲"></button>

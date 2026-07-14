@@ -477,6 +477,116 @@ build_flapboard()
 # ---------- 走纸记录仪归位（第九号手令第一步）：落机器下器件带·带盘之下 ----------
 build_recorder()
 
+# ═════════ 高板（渲染批·步二终渲·构图稿过闸 2026-07-14）═════════
+# 「这套几何就是契约：blockout 的相机即最终相机」——器件重排/新建全按过闸 blockout 落位；
+# 旧模式（plate/strip/sprite 族）零扰：HIGH 分支才搬家/拆建。动件条沿用者（盘/辊/带/滑针/翻牌）不动位。
+HIGH = MODE in ('highplate', 'highplate_b', 'strip_selector', 'strip_counter')
+
+def _mv(prefixes, dx=0.0, dz=0.0):
+    """按名前缀搬家（对象级平移·parent 树随动）。"""
+    for o in list(bpy.data.objects):
+        if any(o.name == p or o.name.startswith(p) for p in prefixes):
+            o.location.x += dx; o.location.z += dz
+
+M_wood   = pmat('shelfwood', base=(0.16,0.115,0.075), metallic=0.0, rough=0.62, spec=0.3, bump=0.10, bump_scale=90, rough_var=0.08)   # 库房架木（深胡桃）
+M_spineA = pmat('spineA', base=(0.235,0.19,0.14), metallic=0.0, rough=0.75, spec=0.25, bump=0.08, bump_scale=300)  # 盒脊·布面帆布（架区暗场压反照）
+M_spineB = pmat('spineB', base=(0.20,0.155,0.11), metallic=0.0, rough=0.68, spec=0.3, bump=0.06, bump_scale=420)   # 盒脊·深纸板
+M_spineC = pmat('spineC', base=(0.30,0.26,0.21), metallic=0.0, rough=0.55, spec=0.35, bump=0.05, bump_scale=380)   # 盒脊·浅卡纸（压反照）
+M_rareTin= pmat('raretin', base=(0.78,0.77,0.74), metallic=1.0, rough=0.28, aniso=0.4, bump=0.08, bump_scale=260)  # 白净金属巨盘盒（全鞋盒最稀藏品）
+M_shoebx = pmat('shoebox', base=(0.115,0.095,0.075), metallic=0.0, rough=0.8, spec=0.2, bump=0.05, bump_scale=200) # 鞋盒·哑光旧纸板
+M_cntdead= pmat('cntdead', base=(0.035,0.033,0.030), metallic=0.0, rough=0.35, spec=0.6)                            # 计数读窗·休眠即黑（dead-front）
+
+def build_high():
+    # ── 器件重排（blockout 过闸落位）──
+    _mv(('rec_bezel', 'rec_jewel'), dz=0.98 - 1.92)                        # REC 下移眉心位（盘裁灯不裁）
+    _mv(('cnt_plate', 'cnt_win', 'cnt_sep'), dx=-2.62 - (-1.0), dz=-0.38 - (-1.12))   # 计数轮：右盘右下象限入团
+    _co = bpy.data.objects.get('cnt_win')
+    if _co: _co.data.materials.clear(); _co.data.materials.append(M_cntdead)          # 休眠即黑（设计三§三参数）
+    _mv(('vuhouse', 'vuface', 'vuneedle', 'vuglass', 'vu_piv'), dx=-1.85 - (-2.4))    # VU 收紧成带
+    _mv(('lamp_ask', 'lamp_done', 'lamp_main'), dx=0.68 - 0.66)                       # 灯组微调净距
+    _mv(('dub_',), dx=2.05 - 1.14, dz=-2.70 - (-1.10))                                # DUB 族迁底部控制轨（键锚 1.14→2.05）
+    # 纸长签：竖排单块改横排三签（blockout 过闸形制·底轨行高内）
+    _dt = bpy.data.objects.get('dub_tags')
+    if _dt: bpy.data.objects.remove(_dt, do_unlink=True)
+    for _i in range(3):
+        cube(f'dub_tag{_i}', size=(0.11,0.04,0.30), loc=(2.45 + _i * 0.16, 0.06, -2.70), mat=M_tagpaper, bev=0.008)
+    # ── 处决：走带拨杆三件+PLAY 圆顶灯（设计三§四·选择器继任）──
+    for _nm in ('lev_base', 'lev_stem', 'lev_knob', 'lever_piv', 'play_bez', 'play_dome', 'play_hood'):
+        _o = bpy.data.objects.get(_nm)
+        if _o: bpy.data.objects.remove(_o, do_unlink=True)
+    # ── 主功能选择器（§四：机加工旋钮 OFF·TEST·ON·Nagra 血统）──
+    sx, sz = 1.42, -1.14
+    cyl('sel_base', 0.40, 0.045, (sx, 0.02, sz), YAX, verts=96, mat=M_dark, bev=0.008)          # 面板座环
+    _knb = cyl('sel_knob', 0.30, 0.16, (sx, 0.09, sz), YAX, verts=96, mat=M_steel, bev=0.010)   # 旋钮本体
+    for _a in range(24):                                                                          # 滚花缘（机加工防滑齿）
+        _ang = radians(_a * 15)
+        cube(f'sel_knurl{_a}', size=(0.018, 0.14, 0.052),
+             loc=(sx + 0.295 * cos(_ang), 0.09, sz + 0.295 * sin(_ang)),
+             rot=(0, -_ang, 0), mat=M_steel, bev=0.003)
+    _cap = cyl('sel_cap', 0.115, 0.20, (sx, 0.10, sz), YAX, verts=64, mat=M_fascia, bev=0.008)   # 深色帽芯
+    _ptr = cube('sel_ptr', size=(0.030, 0.024, 0.20), loc=(sx, 0.185, sz + 0.155), mat=M_ivory, bev=0.004)  # 指针白线（象牙填漆）
+    bpy.ops.object.empty_add(location=(sx, 0.09, sz))
+    _sp = bpy.context.active_object; _sp.name = 'sel_piv'; _sp.rotation_mode = 'XYZ'
+    for _o in ([_knb, _cap, _ptr] + [bpy.data.objects[f'sel_knurl{_a}'] for _a in range(24)]):
+        _o.parent = _sp; _o.matrix_parent_inverse = _sp.matrix_world.inverted()
+    _sp.rotation_euler[1] = radians(38)                                                          # 板姿态=ON 档（绕向实证：+38 指尖落屏右 ON 刻度）
+    for _i, (_lbl, _ang) in enumerate((('OFF', 38), ('TEST', 0), ('ON', -38))):                  # 三档刻度+蚀字
+        _ra = radians(_ang)
+        cube(f'sel_tick{_i}', size=(0.016, 0.03, 0.06),
+             loc=(sx + 0.44 * sin(_ra), 0.045, sz + 0.44 * cos(_ra)), rot=(0, -_ra, 0), mat=M_steel, bev=0.002)
+        bpy.ops.object.text_add(location=(sx + 0.56 * sin(_ra), 0.03, sz + 0.56 * cos(_ra) - 0.03))
+        _tx = bpy.context.active_object; _tx.name = f'sel_txt{_i}'
+        _tx.data.body = _lbl; _tx.data.size = 0.072; _tx.data.align_x = 'CENTER'; _tx.data.extrude = 0.002
+        _tx.rotation_euler = (radians(90), 0, 0)
+        _tx.scale[0] = -1.0                                     # 相机 X 镜像下正读（dub_legend 预翻转同坑同解）
+        _tx.data.materials.append(M_ivory)
+    # ── 前唇（转正·三层地平线）：梁自挡 key=物理半影带 ──
+    cube('lip_beam', size=(9.0, 0.9, 0.50), loc=(0, -0.10, -3.30), mat=M_fascia, bev=0.02)
+    cube('lip_edge', size=(9.0, 0.94, 0.045), loc=(0, -0.10, -3.055), mat=M_brass, bev=0.008)    # 上缘黄铜压条（地平线笔画）
+    # ── 带库（全部的历史）：三层架+盘径阶梯盒脊（blockout 同种子=同布）──
+    cube('lib_back', size=(9.0, 0.3, 8.4), loc=(0, -0.9, -7.75), mat=M_fascia, bev=0)
+    SHELF_Z = (-4.65, -6.35, -8.05)
+    SPINE_H = {5: 0.52, 7: 0.72, 10.5: 1.06}
+    for _i, _szl in enumerate(SHELF_Z):
+        cube(f'lib_shelf{_i}', size=(8.6, 1.0, 0.09), loc=(0, 0.10, _szl), mat=M_wood, bev=0.012)
+        # 格口防尘檐（横档·老档案架构件）：首层檐身横跨段A/B 接缝 z=−4.09——缝落进均匀木条内不可见
+        # （跨缝三维体在两机位下有视差错位·盒脊错位案的解=藏缝入均匀体）；三层同形制=家具语法一致
+        cube(f'lib_eave{_i}', size=(8.72, 0.86, 0.27), loc=(0, 0.19, _szl + 0.495), mat=M_wood, bev=0.012)
+    for _px in (-4.36, 4.36):                                             # 端柱（画外·撑层板与檐的物理暗示）
+        cube(f'lib_post{_px}', size=(0.24, 0.9, 4.8), loc=(_px, 0.14, -6.0), mat=M_wood, bev=0.012)
+    import random as _r
+    _r.seed(7)
+    def _spines(shelf_z, mix, gap_at=None, lean_at=None, pull_at=None, rare_at=None):
+        x = -4.05; n = 0
+        while x < 4.1:
+            size = _r.choice(mix)
+            w = _r.uniform(0.16, 0.22)
+            if gap_at and n in gap_at: x += _r.uniform(0.5, 0.9)
+            h = SPINE_H[size]
+            _m = M_rareTin if (rare_at and n in rare_at) else _r.choice((M_spineA, M_spineB, M_spineB, M_spineC))
+            big = (lean_at or {}).get(n, 0.0)
+            lean = big if big else _r.uniform(-0.02, 0.02)
+            y = 0.10 + (0.42 if (pull_at and n in pull_at) else 0.0)   # 半抽出加大（正面可读性·二审目验）
+            zc = shelf_z + 0.045 + h / 2 - (abs(big) * h * 0.22 if big else 0)
+            o = cube(f'sp{shelf_z}{n}', size=(w, 0.86, h), loc=(x + w / 2, y, zc), mat=_m, bev=0.006)
+            o.rotation_euler[1] = lean
+            if pull_at and n in pull_at: o.rotation_euler[2] = 0.05   # 抽出的带微歪（拔了一半的手感）
+            x += w + _r.uniform(0.015, 0.05) + (abs(big) * h * 0.5 if big else 0)
+            n += 1
+    _spines(SHELF_Z[0], [7, 5, 7], gap_at={5, 14}, lean_at={6: -0.17, 15: -0.13, 22: 0.16})
+    _spines(SHELF_Z[1], [7, 10.5, 5], gap_at={9}, lean_at={10: -0.19, 24: 0.14}, pull_at={17})
+    _spines(SHELF_Z[2], [10.5, 7, 10.5], gap_at=set(), lean_at={4: 0.13, 18: -0.16}, rare_at={11})
+    # ── 鞋盒（封存的历史·一审⑤：矮、带盖、一只半开——去"搬家纸箱"感）──
+    for _i, (_bx, _bz, _bw, _open) in enumerate(((-2.2, -10.35, 2.3, False), (1.35, -10.5, 2.0, True), (3.25, -10.25, 1.3, False))):
+        cube(f'shoe_body{_i}', size=(_bw, 1.5, 0.62), loc=(_bx, 0.30, _bz), mat=M_shoebx, bev=0.012)      # 矮箱身
+        _lid_rot = (radians(-14), 0, radians(3)) if _open else (0, 0, 0)                                   # 半开=盖斜搭
+        _lid_z = _bz + 0.36 if _open else _bz + 0.335
+        _ld = cube(f'shoe_lid{_i}', size=(_bw + 0.06, 1.56, 0.09), loc=(_bx + (0.12 if _open else 0), 0.30, _lid_z), rot=_lid_rot, mat=M_shoebx, bev=0.012)
+    cube('lib_floor', size=(9.0, 2.4, 0.1), loc=(0, 0.6, -11.15), mat=M_wood, bev=0)
+    # ── 库房度光（光度地形图下半：盒脊沉于阴影但可辨=光随指针的基态）──
+    area('lib', (-3.5, 7.0, -4.2), 75, (1.0, 0.74, 0.45), 6.0, target=(0.5, 0, -6.8))
+# （调用点在灯段 area() 定义之后——见「高板点火」段）
+
 # ---------- 笔尖骑线（十一问①）：用与红墨贴图同一套整数谐波反解笔臂摆角，笔尖恒落在线端 ----------
 PEN_HARM=[(3,70,0.40),(5,40,2.1),(7,30,1.10),(11,20,2.30),(17,13,0.70),(23,9,3.4),(31,7,4.00),(43,5,2.00)]
 PEN_MID=0.52; PEN_H=620.0
@@ -651,6 +761,10 @@ world = bpy.data.worlds.new('room'); scene.world=world; world.use_nodes=True
 bg = world.node_tree.nodes['Background']
 bg.inputs['Color'].default_value=(*C['world_color'],1); bg.inputs['Strength'].default_value=C['world_strength']
 
+# ---------- 高板点火（步二终渲）：器件搬家/拆建须在灯与世界就绪后 ----------
+if HIGH:
+    build_high()
+
 # ---------- 相机 ----------
 bpy.ops.object.camera_add(location=C['cam_loc'])
 cam=bpy.context.active_object; scene.camera=cam
@@ -695,6 +809,47 @@ def assert_plate_camera(stage_name):
     if os.environ.get('CAMCHECK'):
         print(f'[camera-contract] CAMCHECK：{stage_name} 签核毕·按令不渲即退')
         _sys.exit(0)
+
+# ── 高板相机契约 v2（步二终渲·构图稿过闸 2026-07-14）────────────────────────
+# 「这套几何就是契约：blockout 的相机即最终相机，coords 与相机签名随本帧版本化，
+#   终渲不得漂移一像素。」契约=机位（段A 同 PLATE_CAM·段B 纵移=镜头下摇）+过闸框
+# +shift_y（blockout 数值解锁死）+res 基（@2x=基×整数倍——免 int 舍入像素漂）。
+# 渲前重解算 shift 对签：|Δ|>5e-4 即几何漂移，拒渲。
+HIGH_CAM = dict(
+    a=dict(loc=(-0.2, 12.6, 0.3), lens=58.0, tgt=(-0.2, 0.05, -0.5), dof=False,
+           frame=(1.34, -4.09), shift_y=-0.10995, res=(1280, 888)),
+    b=dict(loc=(-0.2, 12.6, -7.8), lens=58.0, tgt=(-0.2, 0.05, -8.6), dof=False,
+           frame=(-4.09, -11.6), shift_y=0.10804, res=(1280, 1229)),
+)
+
+def set_high_camera(seg):
+    hc = HIGH_CAM[seg]
+    cam.location = hc['loc']; cam.data.lens = hc['lens']
+    tgt.location = hc['tgt']; cam.data.dof.use_dof = hc['dof']
+    k = max(1, round(RESX / hc['res'][0]))
+    scene.render.resolution_x = hc['res'][0] * k
+    scene.render.resolution_y = hc['res'][1] * k
+    from bpy_extras.object_utils import world_to_camera_view as _w2c
+    from mathutils import Vector as _V
+    lo, hi = -2.0, 2.0
+    for _ in range(40):
+        mid = (lo + hi) / 2
+        cam.data.shift_y = mid
+        bpy.context.view_layer.update()
+        dg = bpy.context.evaluated_depsgraph_get()
+        v = _w2c(scene, cam.evaluated_get(dg), _V((-0.2, 0.0, hc['frame'][0]))).y
+        if v > 1.0: lo = mid
+        else: hi = mid
+    if abs(cam.data.shift_y - hc['shift_y']) > 5e-4:
+        raise RuntimeError(f'[high-cam] 段{seg}: shift 解算 {cam.data.shift_y:.5f} ≠ 契约 {hc["shift_y"]}——几何漂移·拒渲')
+    cam.data.shift_y = hc['shift_y']
+    bpy.context.view_layer.update()
+    print(f'[high-cam] 段{seg} 签核过（解算对签 |Δ|≤5e-4）shift_y={hc["shift_y"]} res={scene.render.resolution_x}x{scene.render.resolution_y}')
+
+def high_cam_signature(seg):
+    hc = HIGH_CAM[seg]
+    return dict(loc=list(hc['loc']), lens=hc['lens'], tgt=list(hc['tgt']), dof=hc['dof'],
+                shift_y=hc['shift_y'], frame=list(hc['frame']), res=list(hc['res']))
 
 # ---------- 动效编排（层分离精神：光不动、盘在转；惯性律；魔眼呼吸；拨杆拨下/回） ----------
 def _linearize(ob):   # 逐帧关键帧→线性插值，防 Bezier 自动柄在转动上过冲抖动（兼容 5.x 槽式 action）
@@ -1025,6 +1180,166 @@ elif MODE == 'plate':
     scene.render.filepath=OUT
     print(f'[hero] plate -> {OUT}  ({scene.render.resolution_x}x{scene.render.resolution_y}, {SAMPLES} spp)')
     bpy.ops.render.render(write_still=True)
+elif MODE in ('highplate', 'highplate_b'):
+    # ── 步二终渲（构图稿过闸）：高板两段。段A=默认取景框（hero/README/OG 门面·一图三用令）；
+    # 段B=带库+鞋盒。板姿态与活动件隐藏沿 plate 惯例（帧1=板姿态·动态层各渲各的）。
+    reelL.rotation_euler[1]=radians(14); reelR.rotation_euler[1]=radians(52)
+    _pp=bpy.data.objects.get('meye_pupil')
+    if _pp: _pp.hide_render=True
+    for _nm in ('vuneedle','rec_arm','rec_tip','rec_touch','pen_link','pen_shank','pen_cone','pen_collar','pen_nut',
+                'pen_rail','pen_screw','pen_house','pen_mount_t','pen_mount_b'):
+        _o=bpy.data.objects.get(_nm)
+        if _o: _o.hide_render=True
+    _rp=bpy.data.objects.get('rec_paper')
+    if _rp:
+        _rp.data.materials.clear()
+        _rp.data.materials.append(img_emissive('paper_plain','/Users/shadow/tape0/stage/assets/paper.png',1.0,rough=0.62))
+    seg = 'a' if MODE == 'highplate' else 'b'
+    import json
+    from bpy_extras.object_utils import world_to_camera_view as _w2c
+    from mathutils import Vector as _V
+    def _P(x,y,z):
+        dg = bpy.context.evaluated_depsgraph_get()
+        co=_w2c(scene, cam.evaluated_get(dg), _V((x,y,z))); return [round(co.x,5), round(1.0-co.y,5)]
+    def _bb(pts):
+        ps=[_P(*p) for p in pts]; xs=[p[0] for p in ps]; ys=[p[1] for p in ps]
+        return [round(min(xs),5), round(min(ys),5), round(max(xs)-min(xs),5), round(max(ys)-min(ys),5)]
+    def _disc(cx,cy,cz,r):
+        return _bb([(cx-r,cy,cz),(cx+r,cy,cz),(cx,cy,cz-r),(cx,cy,cz+r)])
+    if seg == 'a':
+        # coords v2：先以段B相机投影库区 zones，再回段A投影全器件（版本化=双段签名同册）
+        set_high_camera('b')
+        libz = dict(
+            lib_shelf0=_bb([(-4.3,0.1,-4.65),(4.3,0.1,-4.65),(-4.3,0.1,-3.55),(4.3,0.1,-3.55)]),
+            lib_shelf1=_bb([(-4.3,0.1,-6.35),(4.3,0.1,-6.35),(-4.3,0.1,-5.25),(4.3,0.1,-5.25)]),
+            lib_shelf2=_bb([(-4.3,0.1,-8.05),(4.3,0.1,-8.05),(-4.3,0.1,-6.95),(4.3,0.1,-6.95)]),
+            shoebox_zone=_bb([(-3.4,0.3,-10.7),(4.0,0.3,-10.7),(-3.4,0.3,-9.9),(4.0,0.3,-9.9)]),
+        )
+        set_high_camera('a')
+        coords=dict(
+            _camera_a=high_cam_signature('a'), _camera_b=high_cam_signature('b'),
+            _law='步二终渲契约（构图稿过闸 2026-07-14）：blockout 相机即最终相机·不得漂移一像素',
+            res=[scene.render.resolution_x, scene.render.resolution_y],
+            reelL=_disc(-C['reel_cx'],0.12,C['reel_cz'],1.05),
+            reelR=_disc( C['reel_cx'],0.12,C['reel_cz'],1.05),
+            vu=_bb([(-1.85,0.035,-1.42),(-1.85,0.035,-0.82),(-2.5,0.035,-1.12),(-1.2,0.035,-1.12)]),
+            vu_pivot=_P(-1.85,0.05,-1.40),
+            recorder=_bb([(-1.8,0.065,-2.46),(1.8,0.065,-2.46),(-1.8,0.065,-1.74),(1.8,0.065,-1.74)]),
+            eye=_disc(0.0,0.05,-1.15,0.33),
+            counter=_bb([(-2.88,0.07,-0.51),(-2.36,0.07,-0.51),(-2.88,0.07,-0.25),(-2.36,0.07,-0.25)]),
+            lamp_ask=_bb([(0.525,0.082,-0.9275),(0.835,0.082,-0.9275),(0.525,0.082,-0.8325),(0.835,0.082,-0.8325)]),
+            lamp_done=_bb([(0.525,0.082,-1.1875),(0.835,0.082,-1.1875),(0.525,0.082,-1.0925),(0.835,0.082,-1.0925)]),
+            lamp_main=_bb([(0.525,0.082,-1.4475),(0.835,0.082,-1.4475),(0.525,0.082,-1.3525),(0.835,0.082,-1.3525)]),
+            selector=_disc(1.42,0.09,-1.14,0.40),
+            selector_knob=_disc(1.42,0.09,-1.14,0.30),
+            rec_jewel=_P(0.0,0.11,0.98),
+            nameplate=_bb([(-0.20,0.035,-2.8275),(0.85,0.035,-2.8275),(-0.20,0.035,-2.6925),(0.85,0.035,-2.6925)]),
+            key_prev=_bb([(-0.45,0.10,-2.826),(-0.79,0.10,-2.826),(-0.45,0.10,-2.694),(-0.79,0.10,-2.694)]),
+            key_next=_bb([(-0.91,0.10,-2.826),(-1.25,0.10,-2.826),(-0.91,0.10,-2.694),(-1.25,0.10,-2.694)]),
+            dub_key=_bb([(1.84,0.075,-2.86),(2.26,0.075,-2.86),(1.84,0.075,-2.54),(2.26,0.075,-2.54)]),
+            dub_tags=_bb([(2.395,0.06,-2.85),(2.825,0.06,-2.85),(2.395,0.06,-2.55),(2.825,0.06,-2.55)]),
+            deck_zone=_bb([(-2.9,0.12,-0.55),(2.9,0.12,-0.55),(-2.9,0.12,1.34),(2.9,0.12,1.34)]),
+            lip=_bb([(-4.5,0.35,-3.55),(4.5,0.35,-3.55),(-4.5,0.35,-3.05),(4.5,0.35,-3.05)]),
+            flap=_bb([(FLAP['cx']-FLAP['w']/2,0.12,FLAP['cz']-FLAP['h']/2),(FLAP['cx']+FLAP['w']/2,0.12,FLAP['cz']-FLAP['h']/2),
+                      (FLAP['cx']-FLAP['w']/2,0.12,FLAP['cz']+FLAP['h']/2),(FLAP['cx']+FLAP['w']/2,0.12,FLAP['cz']+FLAP['h']/2)]),
+            guideL=_disc(-GUIDE_X,0.205,GUIDE_Z,0.145), guideR=_disc(GUIDE_X,0.205,GUIDE_Z,0.145),
+            band_run=_bb([(-GUIDE_X,0.125,GUIDE_Z+GUIDE_R-0.0275),(GUIDE_X,0.125,GUIDE_Z+GUIDE_R-0.0275),
+                          (-GUIDE_X,0.125,GUIDE_Z+GUIDE_R+0.0275),(GUIDE_X,0.125,GUIDE_Z+GUIDE_R+0.0275)]),
+            _lib_zones_in_b=libz,
+        )
+        _cj=OUT.rsplit('.',1)[0]+'.coords.json'
+        with open(_cj,'w') as f: json.dump(coords, f, indent=1)
+        print('[hero] highplate coords v2 ->', _cj)
+    else:
+        set_high_camera('b')
+    scene.render.filepath=OUT
+    print(f'[hero] {MODE} -> {OUT}  ({scene.render.resolution_x}x{scene.render.resolution_y}, {SAMPLES} spp)')
+    bpy.ops.render.render(write_still=True)
+elif MODE == 'strip_selector':
+    # 选择器旋钮条（设计三§七动件新增）：OFF(+38°)→ON(−38°) 全程拧动 N 帧——同场景同灯、
+    # 只旋钮族对相机可见（其余 visible_camera=False 保 GI=条上光照与板全等·strip 惯例），
+    # border 裁旋钮区、与板同相机同框=页面 crop 天然对位。页面档位吸附由 js 定帧。
+    _spin = {'sel_knob', 'sel_cap', 'sel_ptr'} | {f'sel_knurl{_a}' for _a in range(24)}   # 只转动件入镜
+    for o in bpy.data.objects:
+        if o.type in ('MESH', 'FONT') and o.name not in _spin and not o.name.startswith('sb_'):
+            try: o.visible_camera = False
+            except Exception: pass
+    scene.render.film_transparent = True; scene.render.image_settings.color_mode = 'RGBA'   # 透明底叠板（盘条惯例）
+    set_high_camera('a')
+    import json as _json
+    from bpy_extras.object_utils import world_to_camera_view as _w2c
+    from mathutils import Vector as _V
+    def _uv(x,y,z):
+        dg = bpy.context.evaluated_depsgraph_get()
+        co=_w2c(scene, cam.evaluated_get(dg), _V((x,y,z))); return co.x, co.y
+    _sx, _sz, _r = 1.42, -1.14, 0.46                    # 裁片=转动件本体（刻度蚀字归板·免重影）
+    _us=[]; _vs=[]
+    for _dx,_dz in ((-_r,-_r),(-_r,_r),(_r,-_r),(_r,_r)):
+        _u,_v=_uv(_sx+_dx,0.2,_sz+_dz); _us.append(_u); _vs.append(_v)
+    scene.render.use_border=True; scene.render.use_crop_to_border=True
+    scene.render.border_min_x=max(0,min(_us)); scene.render.border_max_x=min(1,max(_us))
+    scene.render.border_min_y=max(0,min(_vs)); scene.render.border_max_y=min(1,max(_vs))
+    _sp = bpy.data.objects['sel_piv']
+    NF = NFOVR or 25
+    _meta=dict(frames=NF, deg=dict(OFF=-38, TEST=0, ON=38),
+               border=[scene.render.border_min_x, scene.render.border_min_y, scene.render.border_max_x, scene.render.border_max_y])
+    with open(OUT.rstrip('/')+'_meta.json','w') as f: _json.dump(_meta,f,indent=1)
+    for _f in range(NF):
+        _sp.rotation_euler[1] = radians(-38 + 76 * _f / (NF - 1))
+        scene.render.filepath = f'{OUT}f_{_f:02d}.png'
+        bpy.ops.render.render(write_still=True)
+    print(f'[hero] strip_selector {NF} 帧 -> {OUT}f_##.png（OFF +38°→ON −38°·border 已存 meta）')
+elif MODE == 'strip_counter':
+    # 计数轮鼓条（设计三§七动件新增）：读窗后单只数字鼓整周 N 帧（页面 ?counter=1 召回轮换帧粮·
+    # 四轮各自相位）。鼓=轴沿 X 的滚筒+10 枚数字绕鼓面（同径同字律）；窗玻璃休眠即黑=条属召回态亮鼓。
+    _cx, _cz = -2.62, -0.38
+    _cw = bpy.data.objects.get('cnt_win')
+    if _cw: _cw.hide_render = True                       # 揭窗渲鼓（页面窗框仍在板上）
+    bpy.ops.object.empty_add(location=(_cx, 0.02, _cz))
+    _dr = bpy.context.active_object; _dr.name='drum_piv'; _dr.rotation_mode='XYZ'
+    _dc = cyl('drum_body', 0.115, 0.42, (_cx, 0.02, _cz), rot=(0, radians(90), 0), verts=64, mat=M_dark, bev=0)
+    _dc.parent=_dr; _dc.matrix_parent_inverse=_dr.matrix_world.inverted()
+    for _d in range(10):
+        _a = radians(_d * 36)
+        bpy.ops.object.empty_add(location=(_cx, 0.02, _cz))
+        _de = bpy.context.active_object; _de.name=f'dig_piv{_d}'; _de.rotation_mode='XYZ'
+        bpy.ops.object.text_add(location=(_cx, 0.02 + 0.118, _cz))
+        _tx = bpy.context.active_object; _tx.name=f'dig{_d}'
+        _tx.data.body=str(_d); _tx.data.size=0.062; _tx.data.align_x='CENTER'; _tx.data.align_y='CENTER'; _tx.data.extrude=0.001
+        # 字心锚于鼓面（周长 0.72/10 字=弧位 0.072·字高 86% 入位——真机鼓字不重叠）
+        _tx.rotation_euler=(radians(90), 0, 0)           # 顶 +Z 直立·背面朝相机（sel 字同款自洽组合）
+        _tx.scale[0]=-1.0                                # 背面观看=镜像→scale 翻正（相机 X 镜像下正读）
+        _tx.data.materials.append(M_ivory)
+        _tx.parent=_de; _tx.matrix_parent_inverse=_de.matrix_world.inverted()
+        _de.rotation_euler[0]=_a
+        _de.parent=_dr; _de.matrix_parent_inverse=_dr.matrix_world.inverted()
+    for o in bpy.data.objects:
+        if o.type in ('MESH','FONT') and not (o.name.startswith('drum') or o.name.startswith('dig') or o.name.startswith('sb_')):
+            try: o.visible_camera = False
+            except Exception: pass
+    scene.render.film_transparent = True; scene.render.image_settings.color_mode = 'RGBA'   # 透明底叠板
+    set_high_camera('a')
+    import json as _json
+    from bpy_extras.object_utils import world_to_camera_view as _w2c
+    from mathutils import Vector as _V
+    def _uv(x,y,z):
+        dg = bpy.context.evaluated_depsgraph_get()
+        co=_w2c(scene, cam.evaluated_get(dg), _V((x,y,z))); return co.x, co.y
+    _us=[]; _vs=[]
+    for _dx,_dz in ((-0.26,-0.14),(-0.26,0.14),(0.26,-0.14),(0.26,0.14)):
+        _u,_v=_uv(_cx+_dx,0.14,_cz+_dz); _us.append(_u); _vs.append(_v)
+    scene.render.use_border=True; scene.render.use_crop_to_border=True
+    scene.render.border_min_x=max(0,min(_us)); scene.render.border_max_x=min(1,max(_us))
+    scene.render.border_min_y=max(0,min(_vs)); scene.render.border_max_y=min(1,max(_vs))
+    NF = NFOVR or 40
+    _meta=dict(frames=NF, digits=10, note='整周=10 数字·帧 f 转角=f/NF*360°·四轮各自相位',
+               border=[scene.render.border_min_x, scene.render.border_min_y, scene.render.border_max_x, scene.render.border_max_y])
+    with open(OUT.rstrip('/')+'_meta.json','w') as f: _json.dump(_meta,f,indent=1)
+    for _f in range(NF):
+        _dr.rotation_euler[0] = radians(360 * _f / NF)
+        scene.render.filepath = f'{OUT}f_{_f:02d}.png'
+        bpy.ops.render.render(write_still=True)
+    print(f'[hero] strip_counter {NF} 帧 -> {OUT}f_##.png（整周 10 数字·border 已存 meta）')
 elif MODE == 'strip':
     # decree13 乙-2/丁-②：带盘定光胶片条——同场景同灯整周自转 N 帧（badge 破对称→周期须 360° 非 120°）。
     # 只有该盘对相机可见；其余一切仍参与 GI/反射（visible_camera=False 非 hide）→ 盘上光照与场景板全等。

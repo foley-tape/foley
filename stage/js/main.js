@@ -248,8 +248,23 @@ async function boot() {
       if (item.kind === 'card') {
         const title = stripPaths(item.summary) || item.name;   // 垫底链：开场白剥路径后空→仓名
         el.querySelector('.c-name').textContent = title;
-        el.querySelector('.c-sum').textContent = title === item.name ? '' : item.name;
-        if (item.summary) el.title = item.summary;             // 悬停铭牌：原开场白（路径至多在此）
+        // 阶段一（船长点头 2026-07-13·文字服役）：FT 号上架——小角标行=仓名 · FT-####（数带不数卡）
+        // FT 前置保号（编号=第 N 盘的身份·窄行截仓名不截号）
+        const corner = [Number.isInteger(item.ft) ? `FT-${String(item.ft).padStart(4, '0')}` : '',
+          title === item.name ? '' : item.name].filter(Boolean).join(' · ');
+        el.querySelector('.c-sum').textContent = corner;
+        // 章以文字图记：草章=铅笔灰（seal.draft 驱动·阈值立法锁定后自动转牛血红——无开关不追改已出屋）
+        if (item.seal?.en) {
+          el.classList.add('has-seal');
+          const sm = document.createElement('em');
+          sm.className = 'c-seal' + (item.seal.draft ? ' draft' : '');
+          sm.textContent = item.seal.en;
+          el.appendChild(sm);
+        }
+        // 悬停铭牌：开场白＋判章理由（阶段一法定件：悬停显判章理由）
+        const tl = [item.summary, item.seal ? `〔${item.seal.en}·${item.seal.zh}〕${item.seal.reason}` : '']
+          .filter(Boolean).join('\n');
+        if (tl) el.title = tl;
       } else {
         el.querySelector('.c-name').textContent = item.name;
         el.querySelector('.c-sum').textContent = item.summary || '';

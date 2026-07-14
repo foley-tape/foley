@@ -96,6 +96,18 @@ body.tape-loaded #rack:hover .rack-spine { opacity: 0; }
 .cassette.kind-card .c-sum {  /* 小角标＝仓名（磁带品牌角标位） */
   font-size: 7.5px; letter-spacing: 0.22em; text-transform: uppercase; color: #7A664A;
 }
+/* —— 阶段一（船长点头 2026-07-13）：章以文字图记上架——草章＝铅笔灰，阈值立法锁定后
+   随 seal.draft 翻牛血红（同瓶墨 #8C2F1B·无开关·已出屋永不追改归出屋侧执法）；
+   小号大写字距＝章面蚀刻语法的文字服役形（011-R）。has-seal 门：厂带无章格局原样。 —— */
+.cassette.has-seal { grid-template-areas: "hub name dur" "hub sum seal"; }
+.cassette .c-seal {
+  grid-area: seal; justify-self: end; align-self: center;
+  font-size: 7px; font-style: normal; font-weight: 600;
+  letter-spacing: 0.18em; text-transform: uppercase; white-space: nowrap;
+}
+.cassette .c-seal.draft { color: #8F887A; opacity: 0.9; }   /* 铅笔灰＝定标期草章态 */
+.cassette .c-seal:not(.draft) { color: #8C2F1B; }           /* 牛血红＝锁定转正（与墨线同瓶） */
+
 /* 选中：抽出一截＋琥珀边光（更克制的抽带感，船长反馈"弹出效果再优化"） */
 .cassette.selected {
   transform: translateX(11px);

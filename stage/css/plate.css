@@ -27,6 +27,12 @@
 #room.pre-gesture #machine {
   filter: brightness(0.66) saturate(0.92) drop-shadow(0 40px 72px rgba(0, 0, 0, 0.82));
 }
+/* 熄灯态（关机语义·TEST→OFF）：钨丝衰减/磷光记忆渐熄=2.4s 长过渡入暗——机器闭眼；
+   observer 诚实：live 会话照走（agent 不停），OFF 只是机器闭眼。 */
+#room.powered-off #machine {
+  filter: brightness(0.52) saturate(0.82) drop-shadow(0 40px 72px rgba(0, 0, 0, 0.82));
+  transition: filter 2.4s ease;
+}
 
 .plate {
   position: absolute; inset: 0; width: 100%; height: 100%;
@@ -44,6 +50,12 @@
 #amber-tube, #emerald, #pilot, #counter-housing, #loupe, #now-plate, #dub-group, #walnut-rail {
   background: none; border: 0; box-shadow: none; border-radius: 0;
 }
+
+/* —— 带饼环层（设计二§三机上法·审计⑥「必须见带」）：环形贴图×2 垫盘条之下（条窗洞透出）·
+   scale=初始半径随会话长短+播放中供减收增（deck.js 一只钟接线）；法兰投影由条自带。 —— */
+#pack-l { left: 52.775%; top: -6.266%; width: 28.133%; height: 40.538%; }
+#pack-r { left: 13.912%; top: -6.266%; width: 28.133%; height: 40.538%; }
+#pack-l img, #pack-r img { position: absolute; inset: 0; width: 100%; height: 100%; will-change: transform; }
 
 /* —— 带盘＝定光胶片条（decree13 丁-②）：bbox＝条渲染 border 的像素对齐值（渲染打印·勿手调）——
    条帧与板同相机同灯，坐标同源 ⇒ 帧1 与板上静盘逐像素重合（加载零跳变·无双重影子） —— */
@@ -425,6 +437,7 @@ body.tape-loaded #deck:active { background: radial-gradient(closest-side, rgba(0
 
 /* —— 新件定位（coords v2 渲染打印·勿手调） —— */
 #selector { left: 24.122%; top: 38.630%; width: 10.249%; height: 14.695%; }
+#rec-lamp { left: 45.406%; top: 3.725%; width: 4.0%; height: 5.767%; }   /* rec_jewel 点为心（coords v2）·辉光域 */
 #counter  { left: 77.716%; top: 29.554%; width: 6.717%; height: 4.805%; }
 
 /* —— 高塔（渲染批·镜头下摇导航）：#tower=段A(#machine)+段B(#lib-plate) 竖排一根长板；
@@ -472,6 +485,25 @@ body.lib-view #lip-hint { pointer-events: none; }   /* 已在带库层=架沿命
   background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='140' height='140'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/><feColorMatrix type='saturate' values='0'/></filter><rect width='140' height='140' filter='url(%23n)'/></svg>");
   opacity: 0.05; mix-blend-mode: overlay;
 }
+/* 遮蔽令（接线审计①·闸序）：段B 重渲过审前，下滚区以暗场遮蔽——黑即画布，宁暂不可见，
+   不可见违章。过审即撤此罩（一行）。光随指针/颗粒照常压在罩下不可见。 */
+#lib-plate .lib-veil {
+  position: absolute; inset: 0; pointer-events: none; z-index: 9;
+  background: #050403;
+}
+/* —— REC 灯（接线审计②归层）：板上=熄灭暗红罩（重渲）；亮=此加性辉光层——
+   live 录制中呼吸，回放/待机全灭（模式语言基石：全机唯一信号红）。 —— */
+#rec-lamp {
+  border-radius: 50%; pointer-events: none;
+  opacity: var(--rec, 0); transition: opacity 0.5s ease;
+  background: radial-gradient(circle at 50% 44%,
+     rgba(255, 120, 96, 0.95) 0%, rgba(255, 60, 40, 0.55) 38%, rgba(200, 30, 16, 0.18) 62%, rgba(120, 10, 6, 0) 78%);
+  box-shadow: 0 0 18px 4px rgba(255, 60, 30, 0.28);
+  mix-blend-mode: screen; will-change: opacity;
+}
+body.rec-live #rec-lamp { animation: rec-breathe 2.8s ease-in-out infinite; }
+@keyframes rec-breathe { 0%, 100% { opacity: 0.55; } 50% { opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { body.rec-live #rec-lamp { animation: none; opacity: 0.85; } }
 
 /* —— 主功能选择器（渲染批·设计三§四）：旋钮本体烘板（ON 姿态）·此层=条帧 canvas（拧动）＋
    命中区＋pre-gesture 呼吸示能（play-cue 处决后示能正门迁此：OFF 位旋钮=「拧我」）。

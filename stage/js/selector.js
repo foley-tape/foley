@@ -7,7 +7,7 @@ const DEG = { off: -38, test: 0, on: 38 };   // meta 同源（selector_strip.met
 const FRAMES = 25;
 const DWELL_MS = 400;                          // TEST 驻留判定（设计三§四.2）
 
-export function mountSelector(el, { onQuick, onTest, onFinale, sound } = {}) {
+export function mountSelector(el, { onQuick, onTest, onFinale, onStop, onDark, sound } = {}) {
   if (!el) return null;
   const cv = el.querySelector('canvas');
   const ctx = cv.getContext('2d');
@@ -57,10 +57,9 @@ export function mountSelector(el, { onQuick, onTest, onFinale, sound } = {}) {
   };
   el.addEventListener('pointerdown', (e) => {
     // 不 stopPropagation：window 级手势（房间醒/声桥出生）必须照收——快拧路由自己按 target 让位
-    if (state === 'on' || twisting) {           // ON 锁定：机器在跑不许拧回（关机语义候设计）——机械拒绝摇头
-      el.classList.remove('sel-refuse'); void el.offsetWidth; el.classList.add('sel-refuse');
-      return;
-    }
+    // 关机语义（审计余项2 当庭定案）：三档全向合法——ON→TEST 优雅停机·TEST→OFF 熄灯·
+    // OFF→ON 重开机（POST+补撕）。live 回拧不停 agent=观察者诚实（调用方执法）。
+    if (twisting) return;
     dragging = true; el.classList.add('twisting');
     dragBase = angle; ptrBase = ptrAngle(e);
     el.setPointerCapture?.(e.pointerId);
@@ -79,7 +78,7 @@ export function mountSelector(el, { onQuick, onTest, onFinale, sound } = {}) {
     for (const s of snaps) if (Math.abs(angle - s[1]) < Math.abs(angle - best[1])) best = s;
     const [name, deg] = best;
     const changed = name !== state;
-    // 点按（零拖动）=快拧直达 ON（最顺手的开机·Nagra 快拧语义）
+    // 点按（零拖动）=快拧直达 ON（最顺手的开机·Nagra 快拧语义；关机后点按=重开机同门）
     if (!changed && state === 'off' && Math.abs(angle - DEG.off) < 2) {
       autoTwist().then(() => onQuick?.());
       return;
@@ -89,10 +88,13 @@ export function mountSelector(el, { onQuick, onTest, onFinale, sound } = {}) {
     const prev = state; state = name;
     if (changed) sound?.()?.selectorClick?.();                 // 档位咔哒（#17·迁籍声）
     if (name === 'test') {
-      dwellTimer = setTimeout(() => { if (state === 'test') onTest?.(); }, DWELL_MS);   // 驻留 ≥400ms 才算 TEST
+      if (prev === 'on') onStop?.();                           // ON→TEST：优雅停机（歇手不闭眼）
+      else dwellTimer = setTimeout(() => { if (state === 'test') onTest?.(); }, DWELL_MS);   // OFF 来：驻留 ≥400ms
     } else if (name === 'on') {
-      if (prev === 'test') onFinale?.();                       // TEST→ON：只演尾章（电机降生）
+      if (prev === 'test') onFinale?.();                       // TEST→ON：尾章（电机降生/复走）
       else onQuick?.();                                        // OFF→ON 一气（TEST 逗留 <400ms）：压缩版
+    } else if (name === 'off') {
+      onDark?.();                                              // →OFF：熄灯（一气 ON→OFF=停机+熄灯由调用方兜全）
     }
   };
   el.addEventListener('pointerup', finishDrag);

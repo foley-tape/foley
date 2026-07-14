@@ -34,6 +34,9 @@ export function buildMachine(el, opts = {}) {
     <!-- 架沿导航示能（渲染批·镜头即导航）：默认框底部一线（前唇+架沿）——点按=镜头下摇入带库 -->
     <button class="ov" id="lip-hint" aria-label="下摇看带库"></button>
 
+    <!-- 带饼环（设计二§三·审计⑥见带令）：垫盘条之下·条窗洞透出可辨的带饼——scale 随会话/播放演进 -->
+    <div class="ov" id="pack-l" aria-hidden="true"><img src="assets/pack_l.webp" alt="" draggable="false"></div>
+    <div class="ov" id="pack-r" aria-hidden="true"><img src="assets/pack_r.webp" alt="" draggable="false"></div>
     <!-- 带盘＝定光胶片条（decree13 丁-②）：同场景同灯 N 帧自转雪碧图·deck.js 换帧；条未到时板上静盘兜底 -->
     <div class="ov reel" id="reel-l"></div>
     <div class="ov reel" id="reel-r"></div>
@@ -68,6 +71,8 @@ export function buildMachine(el, opts = {}) {
     <!-- 状态灯（光机融合案·Dead-front 暗面显字）：窗体烙板（熄灭=深烟玻近黑·死面纪律无光即无字）；
          激活=光字从窗内点亮——CUE 氩气蓝(递话)/WRAP 钨丝灼橙(收工·点火曲线)/LINE 暗房红宝石(线路基底照度)。
          Dymo B 案随光机融合废除（文字由光承载·无外贴介质） -->
+    <!-- REC 灯加性层（接线审计②归层）：板上熄灭暗红罩·live 录制中此层呼吸——全机唯一信号红 -->
+    <i class="ov" id="rec-lamp" aria-hidden="true"></i>
     <i class="ov df-text" id="amber-tube" style="--lit:0">CUE</i>
     <i class="ov df-text" id="emerald"   style="--lit:0;--ember:0">WRAP</i>
     <i class="ov df-text" id="pilot"     style="--lit:0">LINE</i>

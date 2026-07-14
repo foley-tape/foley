@@ -347,9 +347,11 @@ def build_recorder(cz=-2.1, w=3.6, h=0.72):
         p.parent=pen_piv; p.matrix_parent_inverse=pen_piv.matrix_world.inverted()
     PEN=dict(cz=cz,h=h,w=w,tipx=tipx,dx0=tipx-ex,dz0=tipz-ez)    # 笔尖相对枢轴静止偏移（反解摆角用）
 
-# ---------- REC 红宝石（全机唯一的红） ----------
+# ---------- REC 红宝石（全机唯一的红）——接线审计②：灯光一律加性层，板上只许熄灭的暗红罩
+# （辉光烘死进板=回放/待机泛红违宪）；live 呼吸=页面 #rec-lamp 加性层。 ----------
+M_ruby_off = pmat('ruby_off', base=(0.16,0.022,0.02), metallic=0.0, rough=0.18, spec=0.7, coat=0.6)   # 熄灭深红宝石（透光体质·无自发光）
 cyl('rec_bezel', 0.11, 0.05, (0.0,0.05,1.92), YAX, verts=32, mat=M_steel, bev=0.008)
-sphere('rec_jewel', 0.075, (0.0,0.11,1.92), mat=M_red)
+sphere('rec_jewel', 0.075, (0.0,0.11,1.92), mat=M_ruby_off)
 
 # ---------- 计数轮（机械里程）——立体化（十令乙-3：安装框＋倒角吃光＋下陷投影，从面板长出）----------
 cube('cnt_plate', size=(0.76,0.12,0.48), loc=(-1.0,0.015,-1.12), mat=M_dark, bev=0.026)     # 凸出安装底板·框感·投影
@@ -440,6 +442,10 @@ def build_flapboard():
     pitch = WW/FLAP['cells']
     for k in range(1, FLAP['cells']):
         cube(f'flap_div{k:02d}', size=(0.008,0.016,WH+0.006), loc=(cx-WW/2+pitch*k,0.113,cz2), mat=M_dark, bev=0.001)
+    # 曲目卡金属卡槽（接线审计⑤）：纸卡插于钢槽=印刷品域的实体承载（非丝印）——槽体两轨+底槽
+    cube('flap_cardslot_b', size=(w*0.80, 0.03, 0.012), loc=(cx, 0.118, cz-h/2-0.052), mat=M_steel, bev=0.003)
+    cube('flap_cardslot_l', size=(0.012, 0.03, 0.05), loc=(cx+w*0.40, 0.118, cz-h/2-0.032), mat=M_steel, bev=0.002)
+    cube('flap_cardslot_r', size=(0.012, 0.03, 0.05), loc=(cx-w*0.40, 0.118, cz-h/2-0.032), mat=M_steel, bev=0.002)
     cyl('flap_scr_l', 0.016, 0.014, (cx+w*0.486,0.121,cz), YAX, verts=16, mat=M_steel, bev=0.002)   # 角钉再加粗（×1.5 壳配重）
     cyl('flap_scr_r', 0.016, 0.014, (cx-w*0.486,0.121,cz), YAX, verts=16, mat=M_steel, bev=0.002)
     # 微凸防尘玻璃罩（扁椭球穹）：默认只入 sprite_flapglass 层
@@ -544,33 +550,38 @@ def build_high():
     cube('lip_beam', size=(9.0, 0.9, 0.50), loc=(0, -0.10, -3.30), mat=M_fascia, bev=0.02)
     cube('lip_edge', size=(9.0, 0.94, 0.045), loc=(0, -0.10, -3.055), mat=M_brass, bev=0.008)    # 上缘黄铜压条（地平线笔画）
     # ── 带库（全部的历史）：三层架+盘径阶梯盒脊（blockout 同种子=同布）──
-    cube('lib_back', size=(9.0, 0.3, 8.4), loc=(0, -0.9, -7.75), mat=M_fascia, bev=0)
+    M_libwall = pmat('libwall', base=(0.075,0.058,0.042), metallic=0.0, rough=0.72, spec=0.2, bump=0.06, bump_scale=120)   # 深色墙板（审计①：墙暗于盒=光落盒上的材质面）
+    cube('lib_back', size=(9.0, 0.3, 8.4), loc=(0, -0.9, -7.75), mat=M_libwall, bev=0)
     SHELF_Z = (-4.65, -6.35, -8.05)
     SPINE_H = {5: 0.52, 7: 0.72, 10.5: 1.06}
     for _i, _szl in enumerate(SHELF_Z):
         cube(f'lib_shelf{_i}', size=(8.6, 1.0, 0.09), loc=(0, 0.10, _szl), mat=M_wood, bev=0.012)
-        # 格口防尘檐（横档·老档案架构件）：首层檐身横跨段A/B 接缝 z=−4.09——缝落进均匀木条内不可见
-        # （跨缝三维体在两机位下有视差错位·盒脊错位案的解=藏缝入均匀体）；三层同形制=家具语法一致
-        cube(f'lib_eave{_i}', size=(8.72, 0.86, 0.27), loc=(0, 0.19, _szl + 0.495), mat=M_wood, bev=0.012)
+    # 格口防尘檐=接缝构件（审计①护栏定谳）：仅首层一根——檐身横跨段A/B 接缝 z=−4.09，
+    # 缝落进均匀木条内不可见（跨缝视差案的解）。中/深层无缝可藏——"三层同形制"檐横在格内
+    # 拦腰截断盒脊（审计炉二渲抓获），删；护栏语义自此=接缝檐专职。
+    cube('lib_eave0', size=(8.72, 0.86, 0.27), loc=(0, 0.19, SHELF_Z[0] + 0.495), mat=M_wood, bev=0.012)
     for _px in (-4.36, 4.36):                                             # 端柱（画外·撑层板与檐的物理暗示）
         cube(f'lib_post{_px}', size=(0.24, 0.9, 4.8), loc=(_px, 0.14, -6.0), mat=M_wood, bev=0.012)
     import random as _r
     _r.seed(7)
     def _spines(shelf_z, mix, gap_at=None, lean_at=None, pull_at=None, rare_at=None):
+        import math as _m2
         x = -4.05; n = 0
         while x < 4.1:
             size = _r.choice(mix)
-            w = _r.uniform(0.16, 0.22)
+            w = _r.choice((0.165, 0.19, 0.215))                     # 审计①三档量化：厚度离散三档（配脊高三档=尺寸系统全量化）
             if gap_at and n in gap_at: x += _r.uniform(0.5, 0.9)
             h = SPINE_H[size]
             _m = M_rareTin if (rare_at and n in rare_at) else _r.choice((M_spineA, M_spineB, M_spineB, M_spineC))
             big = (lean_at or {}).get(n, 0.0)
             lean = big if big else _r.uniform(-0.02, 0.02)
-            y = 0.10 + (0.42 if (pull_at and n in pull_at) else 0.0)   # 半抽出加大（正面可读性·二审目验）
-            zc = shelf_z + 0.045 + h / 2 - (abs(big) * h * 0.22 if big else 0)
+            y = 0.10 + (0.42 if (pull_at and n in pull_at) else 0.0)
+            # 审计①坐实公式：任何倾角（含微歪）绕中心旋转后，最低底角必须落回层板顶——
+            # zc = 板顶 + h/2·cos + w/2·|sin|（旧式下沉项=穿透层板元凶·悬浮 3 处=微歪盒底角翘离）
+            zc = shelf_z + 0.045 + (h / 2) * _m2.cos(abs(lean)) + (w / 2) * _m2.sin(abs(lean))
             o = cube(f'sp{shelf_z}{n}', size=(w, 0.86, h), loc=(x + w / 2, y, zc), mat=_m, bev=0.006)
             o.rotation_euler[1] = lean
-            if pull_at and n in pull_at: o.rotation_euler[2] = 0.05   # 抽出的带微歪（拔了一半的手感）
+            if pull_at and n in pull_at: o.rotation_euler[2] = 0.05
             x += w + _r.uniform(0.015, 0.05) + (abs(big) * h * 0.5 if big else 0)
             n += 1
     _spines(SHELF_Z[0], [7, 5, 7], gap_at={5, 14}, lean_at={6: -0.17, 15: -0.13, 22: 0.16})
@@ -584,7 +595,7 @@ def build_high():
         _ld = cube(f'shoe_lid{_i}', size=(_bw + 0.06, 1.56, 0.09), loc=(_bx + (0.12 if _open else 0), 0.30, _lid_z), rot=_lid_rot, mat=M_shoebx, bev=0.012)
     cube('lib_floor', size=(9.0, 2.4, 0.1), loc=(0, 0.6, -11.15), mat=M_wood, bev=0)
     # ── 库房度光（光度地形图下半：盒脊沉于阴影但可辨=光随指针的基态）──
-    area('lib', (-3.5, 7.0, -4.2), 75, (1.0, 0.74, 0.45), 6.0, target=(0.5, 0, -6.8))
+    area('lib', (-2.5, 4.8, -5.2), 92, (1.0, 0.74, 0.45), 4.0, target=(0.3, 0, -7.9))   # 审计①光落盒上：灯入格口前竖直下打——照盒面盒顶·墙吃切角自暗（光斑退位）
 # （调用点在灯段 area() 定义之后——见「高板点火」段）
 
 # ---------- 笔尖骑线（十一问①）：用与红墨贴图同一套整数谐波反解笔臂摆角，笔尖恒落在线端 ----------
@@ -1255,6 +1266,52 @@ elif MODE in ('highplate', 'highplate_b'):
     scene.render.filepath=OUT
     print(f'[hero] {MODE} -> {OUT}  ({scene.render.resolution_x}x{scene.render.resolution_y}, {SAMPLES} spp)')
     bpy.ops.render.render(write_still=True)
+elif MODE == 'strip_pack':
+    # 带饼环贴图×2（设计二§三机上法·审计⑥「必须见带」落地）：正交正面渲 pack 环（透明底·
+    # 同心纹可辨），页面垫盘条之下（条窗洞透出）+scale 随会话长短/播放供减收增（deck 接线）。
+    for _nm, _cx, _pr in (('pack_l', -C['reel_cx'], 0.85), ('pack_r', C['reel_cx'], 0.78)):
+        for o in bpy.data.objects:
+            if o.type in ('MESH', 'FONT') and not o.name.startswith('sb_'):
+                try: o.visible_camera = False
+                except Exception: pass
+        _pk = bpy.data.objects.get('pack') or None
+        # 各盘的 pack 对象同名 'pack'（build_reel 局部）——按位置找
+        for o in bpy.data.objects:
+            if o.name.startswith('pack') and abs(o.location.x - _cx) < 0.1:
+                try: o.visible_camera = True
+                except Exception: pass
+        cam.data.type = 'ORTHO'; cam.data.ortho_scale = 2.2; cam.data.shift_y = 0
+        cam.location = (_cx, 12.0, C['reel_cz']); tgt.location = (_cx, 0.0, C['reel_cz']); cam.data.dof.use_dof = False
+        scene.render.film_transparent = True; scene.render.image_settings.color_mode = 'RGBA'
+        scene.render.resolution_x = RESX; scene.render.resolution_y = RESX
+        scene.render.filepath = f'{OUT}{_nm}.png'
+        print(f'[hero] strip_pack {_nm} -> {OUT}{_nm}.png')
+        bpy.ops.render.render(write_still=True)
+elif MODE == 'strip_spine':
+    # 盒脊变体条（余项1·随段B同炉照准候资产）：3 尺寸×3 品相=9 帧（正交正面·透明底）——
+    # 真带上架的烘焙空白件（RACK_SPEC 五.1·上架接线另刀）
+    import json as _json
+    for o in bpy.data.objects:
+        if o.type in ('MESH', 'FONT') and not o.name.startswith('sb_'):
+            try: o.visible_camera = False
+            except Exception: pass
+    _mats = {'worn': M_spineB, 'fair': M_spineA, 'clean': M_spineC}
+    SPINE_H2 = {'5': 0.52, '7': 0.72, '10.5': 1.06}
+    _f = 0
+    cam.data.type = 'ORTHO'; cam.data.shift_y = 0; cam.data.dof.use_dof = False
+    scene.render.film_transparent = True; scene.render.image_settings.color_mode = 'RGBA'
+    for _sz, _h in SPINE_H2.items():
+        for _cond, _mm in _mats.items():
+            _o = cube(f'spv_{_f}', size=(0.19, 0.86, _h), loc=(30 + _f * 2, 0.1, 0), mat=_mm, bev=0.006)
+            cam.location = (30 + _f * 2, 12.0, 0); tgt.location = (30 + _f * 2, 0.0, 0)
+            cam.data.ortho_scale = 1.3
+            scene.render.resolution_x = 256; scene.render.resolution_y = int(256 * 1.3 / 1.3)
+            scene.render.filepath = f'{OUT}spine_{_sz}_{_cond}.png'
+            bpy.ops.render.render(write_still=True)
+            _f += 1
+    with open(OUT.rstrip('/') + '_meta.json', 'w') as f:
+        _json.dump(dict(sizes=list(SPINE_H2), conds=list(_mats), note='盒脊变体 9 帧·候真带上架接线'), f)
+    print(f'[hero] strip_spine 9 帧 -> {OUT}spine_*.png')
 elif MODE == 'strip_selector':
     # 选择器旋钮条（设计三§七动件新增）：OFF(+38°)→ON(−38°) 全程拧动 N 帧——同场景同灯、
     # 只旋钮族对相机可见（其余 visible_camera=False 保 GI=条上光照与板全等·strip 惯例），

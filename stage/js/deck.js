@@ -90,7 +90,16 @@ function buildReelStrip(host, which) {
 }
 
 export class ReelDeck {
+  /* 带饼环（设计二§三）：packL/R=img 层·初径随会话长短（setPackDepth）·播放中供减收增
+     （render 内随 theta 微演进·一只钟律——盘冻饼冻）。scale 值变才写（体温法）。 */
   constructor(leftEl, rightEl, tapeband) {
+    this._packL = document.getElementById('pack-l')?.querySelector('img') ?? null;
+    this._packR = document.getElementById('pack-r')?.querySelector('img') ?? null;
+    this._packBase = 0.86; this._packDrawn = [0, 0];
+    this.setPackDepth = (sec) => {   // 初始半径随会话长短（带多饼厚·2h 满·空带 0.62）
+      this._packBase = 0.62 + 0.38 * Math.min(1, (sec || 0) / 7200);
+      this._packDrawn = [0, 0];
+    };
     this.reels = [
       { el: leftEl, rot: buildReelStrip(leftEl, 'l'), theta: 0, omega: 0, ratio: 1.0, hadWob: false },
       { el: rightEl, rot: buildReelStrip(rightEl, 'r'), theta: 0.9, omega: 0, ratio: 1.18, hadWob: false }, // 收带盘转快
@@ -166,6 +175,13 @@ export class ReelDeck {
   }
 
   render(now) {
+    // 带饼环演进：供减收增（θ 累计·极慢=一场才可辨）；初径由 setPackDepth 定
+    if (this._packL) {
+      const dv = Math.max(-0.16, Math.min(0.16, (this.reels?.[0]?.theta ?? 0) * 4e-5));
+      const sL = (this._packBase - dv).toFixed(4), sR = (0.66 + (this._packBase - 0.66) * 0.42 + dv).toFixed(4);
+      if (sL !== this._packDrawn[0]) { this._packDrawn[0] = sL; this._packL.style.transform = `scale(${sL})`; }
+      if (sR !== this._packDrawn[1]) { this._packDrawn[1] = sR; this._packR.style.transform = `scale(${sR})`; }
+    }
     if (this._nudge) {
       const n = this._nudge;
       const f = Math.min(1, (now - n.t0) / n.ms);

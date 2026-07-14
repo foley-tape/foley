@@ -121,13 +121,20 @@ async function boot() {
   document.getElementById('servo-knob')?.addEventListener('click', (e) => { e.stopPropagation(); bridge?.servoCue?.(1.6); runPenSweep(chart); });
   const powerBtn = document.getElementById('power');
   let on = false;
-  // 主功能选择器（两页同法·demo 简装）：点/拧旋钮=POWER 同义门（快拧开机·TEST 驻留归正页体验）
+  // 主功能选择器（两页同法·demo 简装三档）：开机=POWER 同义门；关机三档同语义（余项2 定案）
   const selector = mountSelector(document.getElementById('selector'), {
     sound: () => bridge,
-    onQuick: () => powerBtn.click(),
+    onQuick: () => { room.classList.remove('powered-off'); bridge?.fadeIn?.(); if (on) replayer.play(); else powerBtn.click(); },
     onTest: () => powerBtn.click(),
-    onFinale: () => {},
+    onFinale: () => { room.classList.remove('powered-off'); bridge?.setTest?.(false); bridge?.fadeIn?.(); replayer.play(); },
+    onStop: () => { bridge?.setTest?.(true); replayer.pause(); },          // 优雅停机：抬带盘滑停·微嗡·仪表醒着
+    onDark: () => {                                                         // 熄灯：微嗡死·灯灭·回暗
+      bridge?.setTest?.(false); bridge?.fadeOut?.(1.6); replayer.pause();
+      lamps?.post?.({ ask: false, wrap: false, act: 0, line: 0 });
+      room.classList.add('powered-off');
+    },
   });
+  window.__demo && (window.__demo.selector = selector);
   powerBtn.addEventListener('click', async () => {
     if (on) return;
     on = true;
@@ -175,7 +182,7 @@ async function boot() {
     }, 200);
   }
 
-  window.__demo = { replayer, tape, bridge, chart, deck }; // 冒烟把手
+  window.__demo = { replayer, tape, bridge, chart, deck, selector }; // 冒烟把手
 }
 
 boot().catch(err => {

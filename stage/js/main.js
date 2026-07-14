@@ -172,6 +172,7 @@ async function boot() {
   }
   async function mountSource(item) {
     counter?.reset();
+    deck.setPackDepth?.(item?.kind === 'live' ? 7200 : item?.seconds);   // 带饼初径：live=满盘在录·卡/厂按真长
     if (!item) { chart.reset(blankTape); dub = null; return; }   // EMPTY：房间层，无源无带
     if (item.kind === 'live') {
       chart.reset(blankTape);
@@ -202,6 +203,8 @@ async function boot() {
     serveEpoch = t.epoch;
     renderRackSelection(t);                          // rule 2：选中/在机标记读后端
     updateControls(t);                               // rule 4：键/相读后端
+    // REC 灯（审计②）：全机唯一信号红=live 录制中呼吸；回放/待机/暂停全灭（模式语言基石）
+    document.body.classList.toggle('rec-live', !!t.live && t.phase === 'PLAYING');
     if (t.phase === 'CUEING' && curPhase !== 'CUEING') sb?.fadeOut();   // rule 1：闭锁期淡出
     curPhase = t.phase;
     if (t.loaded !== curLoaded) {                    // 上机带变→换源（rule 1 装带→淡入）
@@ -311,7 +314,7 @@ async function boot() {
               : `LEN ${Math.floor(s / 60)}:${String(Math.round(s % 60)).padStart(2, '0')}`;
           let meta = '';
           if (t.loaded) {
-            if (t.live) meta = 'LIVE · RECORDING';
+            if (t.live) meta = '';               // 审计④：模式字样拆除（状态胶囊借尸案）——模式=REC 灯+光温；牌只蚀带名
             else if (it?.kind === 'card') {
               const no = [...rackIndex.values()].filter((x) => x.kind === 'card').indexOf(it) + 1;
               meta = [`NO.${String(no).padStart(2, '0')}`, fmtLen(it.seconds), 'SESSION'].filter(Boolean).join(' · ');
@@ -348,23 +351,51 @@ async function boot() {
   const postH = { vu, chart, lamps, deck, flap, get sound() { return sb; } };
   const postOff = params.get('post') === '0';
   let postDone = false;
-  const firePost = () => runPost(postH, { skipVu: params.has('vufreeze') })
-    .then(() => { postDone = true; if (params.get('postloop') === '1') setTimeout(firePost, 1600); });
+  const firePost = () => { lamps?.post?.(null); return runPost(postH, { skipVu: params.has('vufreeze') })
+    .then(() => { postDone = true; if (params.get('postloop') === '1') setTimeout(firePost, 1600); }); };
   let pausedForTest = false;
+  // 关机三档（审计余项2 当庭定案）：ON→TEST=优雅停机（抬带·盘惯性滑停·床塌缩微嗡·仪表醒着）；
+  // TEST→OFF=熄灯（钨丝衰减·磷光渐熄·微嗡死·回暗房态）；OFF→ON=重开机（POST·重接线·补撕回填）。
+  // 观察者诚实法：live 回拧不停止 agent——OFF 只是机器闭眼（喂食停画·SSE 照连）；再 ON 时 prime 尾窗补撕。
+  const stopMachine = () => {                          // 优雅停机（歇手不闭眼）
+    sb?.setTest?.(true);
+    if (curLoaded === 'live') { liveActive = false; }               // live：闭眼不停 agent
+    else if (curPhase === 'PLAYING') { pausedForTest = true; postTransport('pause'); }
+  };
+  const wakeTransport = async () => {                  // 复走+补撕
+    sb?.setTest?.(false);
+    if (curLoaded === 'live') {
+      try { await live.prime(); } catch { /* 无今晨 */ }            // 补撕机制回填（迟到者法复用：尾窗+水位回拨）
+      liveActive = true;
+    } else if (pausedForTest) { pausedForTest = false; postTransport('play'); }
+  };
   const selector = mountSelector(document.getElementById('selector'), {
     sound: () => sb,
-    onQuick: () => { if (!postOff && !postDone) firePost(); },
-    onTest: () => {                                   // TEST 驻留：机器醒着，带不走（§四.3 合法驻留位）
+    onQuick: () => {                                   // OFF→ON：首次=压缩版 POST；关机后重开=全 POST+复走
+      room.classList.remove('powered-off');
+      sb?.fadeIn?.();
+      wakeTransport();
+      if (!postOff) { postDone = false; firePost(); }
+    },
+    onTest: () => {                                    // OFF→TEST 驻留：机器醒着，带不走（§四.3 合法驻留位）
       if (postOff || postDone) return;
       sb?.setTest?.(true);
       if (curPhase === 'PLAYING') { pausedForTest = true; postTransport('pause'); }
       runPost(postH, { until: TEST_END_MS, skipVu: params.has('vufreeze') });
     },
-    onFinale: () => {                                 // TEST→ON 尾章：电机降生+床诞生（起转后 400ms 嗡起）
-      sb?.setTest?.(false);
-      if (pausedForTest) { pausedForTest = false; postTransport('play'); }
-      if (postOff || postDone) return;
+    onFinale: () => {                                  // TEST→ON 尾章：电机降生+床诞生（起转后 400ms 嗡起）
+      wakeTransport();
+      if (postOff) return;
+      if (postDone) return;                            // 停机后回 ON：复走即可（POST 已演过）
       runPost(postH, { from: TEST_END_MS, bedBirthMs: 400, skipVu: true }).then(() => { postDone = true; });
+    },
+    onStop: stopMachine,                               // ON→TEST：优雅停机
+    onDark: () => {                                    // →OFF：熄灯
+      stopMachine();
+      sb?.setTest?.(false);
+      sb?.fadeOut?.(1.6);                              // 微嗡死（慢坡=衰减感）
+      lamps?.post?.({ ask: false, wrap: false, act: 0, line: 0 });   // 灯全灭持有（钨丝衰减走 CSS/包络过渡）
+      room.classList.add('powered-off');
     },
   });
   if (postOff) selector?.setOn();                     // 素面：旋钮直接 ON 姿态（板同相）

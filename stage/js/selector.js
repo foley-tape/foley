@@ -2,10 +2,8 @@
 // 视觉=条帧 canvas（25 帧 OFF −38°→ON +38°·透明底叠板——板上烙的是 ON 姿态，条首帧 OFF 盖之）；
 // 手势=拖拧跟随指针绕钮心+释放吸附最近档；TEST 驻留 ≥400ms=电气自检独演（两乐章制§四.2）；
 // 快拧直达 ON（点按/一气拖到底·TEST 逗留 <400ms）=压缩版 POST；ON 后回拧=机械拒绝（关机语义候设计）。
-// pre-gesture 呼吸示能（play-cue 处决后的正门继承）走 CSS；本件只管状态机与条帧。
-const DEG = { off: -38, test: 0, on: 38 };   // meta 同源（selector_strip.meta.json·扫程 OFF→ON）
-const FRAMES = 25;
-const DWELL_MS = 400;                          // TEST 驻留判定（设计三§四.2）
+// pre-gesture 呼吸示能（play-cue 处决后的正门继承）走 CSS；本件只管手势/绘制，转移律提纯至 selector-law。
+import { SELECTOR_DEG as DEG, SELECTOR_FRAMES as FRAMES, SELECTOR_DWELL_MS as DWELL_MS, snapState, frameOf, selectorAction } from './selector-law.js';
 
 export function mountSelector(el, { onQuick, onTest, onFinale, onStop, onDark, sound } = {}) {
   if (!el) return null;
@@ -20,7 +18,6 @@ export function mountSelector(el, { onQuick, onTest, onFinale, onStop, onDark, s
   let angle = DEG.off;                         // 当前显示角
   let dwellTimer = null;
 
-  const frameOf = (a) => Math.max(0, Math.min(FRAMES - 1, Math.round((a - DEG.off) / (DEG.on - DEG.off) * (FRAMES - 1))));
   function draw(f, force) {
     if (!fw || (f === drawn && !force)) return;   // 体温法：帧不变零绘制
     drawn = f;
@@ -72,29 +69,23 @@ export function mountSelector(el, { onQuick, onTest, onFinale, onStop, onDark, s
   const finishDrag = () => {
     if (!dragging) return;
     dragging = false; el.classList.remove('twisting');
-    // 吸附最近档
-    const snaps = [['off', DEG.off], ['test', DEG.test], ['on', DEG.on]];
-    let best = snaps[0];
-    for (const s of snaps) if (Math.abs(angle - s[1]) < Math.abs(angle - best[1])) best = s;
-    const [name, deg] = best;
+    const name = snapState(angle);                             // 吸附最近档（律·selector-law）
     const changed = name !== state;
     // 点按（零拖动）=快拧直达 ON（最顺手的开机·Nagra 快拧语义；关机后点按=重开机同门）
     if (!changed && state === 'off' && Math.abs(angle - DEG.off) < 2) {
       autoTwist().then(() => onQuick?.());
       return;
     }
-    settle(deg);
+    settle(DEG[name]);
     if (!changed) return;
     const prev = state; state = name;
-    if (changed) sound?.()?.selectorClick?.();                 // 档位咔哒（#17·迁籍声）
-    if (name === 'test') {
-      if (prev === 'on') onStop?.();                           // ON→TEST：优雅停机（歇手不闭眼）
-      else dwellTimer = setTimeout(() => { if (state === 'test') onTest?.(); }, DWELL_MS);   // OFF 来：驻留 ≥400ms
-    } else if (name === 'on') {
-      if (prev === 'test') onFinale?.();                       // TEST→ON：尾章（电机降生/复走）
-      else onQuick?.();                                        // OFF→ON 一气（TEST 逗留 <400ms）：压缩版
-    } else if (name === 'off') {
-      onDark?.();                                              // →OFF：熄灯（一气 ON→OFF=停机+熄灯由调用方兜全）
+    sound?.()?.selectorClick?.();                              // 档位咔哒（#17·迁籍声）
+    switch (selectorAction(prev, name)) {                      // 关机三档全向转移表（律·selector-law）
+      case 'stop': onStop?.(); break;                          // ON→TEST：优雅停机（歇手不闭眼）
+      case 'testDwell': dwellTimer = setTimeout(() => { if (state === 'test') onTest?.(); }, DWELL_MS); break;  // OFF→TEST：驻留 ≥400ms
+      case 'finale': onFinale?.(); break;                      // TEST→ON：尾章（电机降生/复走）
+      case 'quick': onQuick?.(); break;                        // OFF→ON 一气（TEST 逗留 <400ms）：压缩版
+      case 'dark': onDark?.(); break;                          // →OFF：熄灯（TEST→OFF/ON→OFF 同门·调用方兜停机）
     }
   };
   el.addEventListener('pointerup', finishDrag);

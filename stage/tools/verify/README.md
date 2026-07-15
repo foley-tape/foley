@@ -4,11 +4,22 @@
 
 ## 常驻器具
 
-| 器具 | 职能 | 调用 |
-|---|---|---|
-| `still.mjs` | 静帧截取（暗房/带妆态·英雄帧候选） | `node stage/tools/verify/still.mjs [--url ...]` |
-| `post_probe.mjs` | POST 开机自检验收——六件套逐 100ms 采样+时序断言+终态归还（两页 index/demo） | `node stage/tools/verify/post_probe.mjs --profile index\|demo` |
-| `record.mjs` | 真 Chrome + CDP screencast + audiotap → 合成带声 mp4（分幕证据） | `node stage/tools/verify/record.mjs [--script ...]` |
+| 器具 | 职能 | 何时跑（D4 档） | 调用 |
+|---|---|---|---|
+| `still.mjs` | 静帧截取（暗房/带妆态·英雄帧候选） | 发布前·视觉重铸/英雄帧更新后（**非例行**·L2） | `node stage/tools/verify/still.mjs [--url ...]` |
+| `post_probe.mjs` | POST 开机自检验收——六件套逐 100ms 采样+时序断言+终态归还（两页 index/demo） | 协议疑变（POST/示能改动）·发布前（**非例行**·须浏览器·L2） | `node stage/tools/verify/post_probe.mjs --profile index\|demo` |
+| `record.mjs` | 真 Chrome + CDP screencast + audiotap → 合成带声 mp4（分幕证据） | 船长证据请求·声音改动·发布前（**最贵·永不例行**·L2→L3） | `node stage/tools/verify/record.mjs [--script ...]` |
+
+## 何时跑（D4 触发档·席三工单二.4）
+
+验收分档制（工作法新法3·D4）落到器具：**贵验收器标触发条件，永不入例行回归**；档位由签发人派单盖定，执行者不临场自裁。
+
+- **例行档（每 `npm test`）**：`golden/browser-wiring.test.ts`（拉 `latecomer.mjs`·hermetic·chromium 在则真跑缺则 skip）——唯一入默认回归的浏览器闸；纯 node 金测全数亦例行。
+- **发布前档**：`still.mjs`／`post_probe.mjs`／`record.mjs` 三真机器＋三诚约闸（`prepublishOnly`：sync-readme/readme-contract/pack-budget/ledger-writeback）——发布扳机前一次性全跑。
+- **协议疑变档**：改动契约面即重跑对应器——POST 时序改→`post_probe`；接线/声桥协议改→browser-wiring＋`record`；状态机相位改→transport 相位金测（工单二·§3.2）。
+- **版本升级/真 Claude 档**（最贵·船长派单）：真 Claude producer 探针（ASK 宗教级可靠·night3 privacy/ground/failure repro）＋真耳（LUFS/声资产）——版本升级或双盲复审时触发，不入任何自动流。
+
+**`audit/*/repro/*.mjs` 一律非例行**：各为其审计的一次性证据/复现器（night2/night3/a-live/e-系/p0-系）；重跑触发＝该审计复验或发布前双盲。密闭化转正者（`latecomer`）已升「例行档」入 browser-wiring，余者留审计域按需出具。
 
 ## 接线闸（wiring probe 之入仓正身）
 

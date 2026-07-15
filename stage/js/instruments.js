@@ -114,7 +114,7 @@ export class ChartRecorder {
     this.canvas = canvas;
     this.ctx = canvas.getContext('2d');
     this.tape = tape;
-    this.paperImg = new Image(); this.paperImg.src = 'assets/paper.png';   // decree12：纸理来自渲染管线贴图，非 CSS 手画栅格
+    this.paperImg = new Image(); this.paperImg.src = 'assets/paper.webp';  // decree12：纸理来自渲染管线贴图，非 CSS 手画栅格
     this.paperImg.onload = () => { this.needFull = true; };                 // 贴图到→整窗重画一次
     this.pair = new PacketPair();
     this.points = [];   // {pos, T}（全量重画与指标采样之源）

@@ -118,4 +118,12 @@ test('68 同源特征管线·实带回归：storm=抢救（叙事同款）·sile
   assert.equal(fsil.asks, 4, 'silence 四枚问询事件（ASK_CLEARED 特殊行不计事件账）');
   assert.equal(fsil.fails, 0);
   assert.equal(judgeSeal(fsil).id, 'ONE_TAKE');
+
+  // captain 包体裁样契约：46.3h 源件取原生 10Hz 连续策展窗；缩体不许磨平卡针叙事。
+  const fcap = extractFeatures(load('captain'));
+  assert.ok(fcap.durS >= 219 && fcap.durS <= 221, `captain 代表切片应约 220s（得 ${fcap.durS}s）`);
+  assert.equal(fcap.stuckEdges, 1);
+  assert.equal(fcap.cleared, 1);
+  assert.ok(fcap.maxSameSigLocal >= 3);
+  assert.equal(judgeSeal(fcap).id, 'LOCKED_GROOVE');
 });

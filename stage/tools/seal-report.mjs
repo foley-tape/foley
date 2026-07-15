@@ -2,7 +2,7 @@
 // 阶段〇·章分布报告器（增补包 v2 队列2＋定标语料条款）。
 //
 // 语料圈定（增补包 五·即日生效）：五厂带（storm/busy/jam/silence/smooth）＋现有真卡
-// （$FOLEY_HOME/cards）＋滚动累积的船长真实会话蒸馏（captain 第六带即首笔滚动）。
+// （$FOLEY_HOME/cards）＋滚动累积的船长真实会话代表切片（captain 第六带即首笔滚动）。
 // audit＝校验仪器带（生而策展的合成巡礼）：列出供对照，**不计分布**。
 // 对照目标（词汇表 v1）：兜底 30–40%／类型各 5–15%／稀有 1–5%。阈值锁定最低语料量 30 场。
 //
@@ -21,7 +21,7 @@ const args = process.argv.slice(2);
 const outFile = args.includes('--out') ? args[args.indexOf('--out') + 1] : null;
 
 const FACTORY = ['storm', 'busy', 'jam', 'silence', 'smooth'];   // 五厂带（audit 除外＝仪器带）
-const ROLLING = ['captain'];                                     // 滚动语料首笔（第六带·船长真实蒸馏）
+const ROLLING = ['captain'];                                     // 滚动语料首笔（第六带·已签源件代表切片）
 
 function judgeFiles(name, curvePath, momentsPath) {
   const curve = readFileSync(curvePath, 'utf8');

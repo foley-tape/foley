@@ -27,7 +27,7 @@
 
 ## 第六带（B8 案结·2026-07-13）
 
-`stage/fixtures/captain.{curve,moments}.csv`——46.3 小时真会话的**回放派生 CSV**（与本目录
-.tape.jsonl 骨架同尺不同形：t 相对化、verb 枚举、sig/slot 加盐哈希、零自由文本）。
-六向量扫描全过后经船长终裁转正入库，凭据见 `audit/B8_captain第六带_六向量扫描签署.md`。
-再蒸馏/替换须重扫重签。
+`stage/fixtures/captain.{curve,moments}.csv`——从 46.3 小时真会话已签回放件中裁出的
+**220 秒原生 10Hz 代表切片**（与本目录 .tape.jsonl 骨架同尺不同形：t 相对化、verb 枚举、
+sig/slot 加盐哈希、零自由文本）。源件六向量扫描全过后经船长终裁转正，凭据见
+`audit/B8_captain第六带_六向量扫描签署.md`；本切片只做连续窗口裁样与时轴归零，未重蒸馏。

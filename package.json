@@ -44,7 +44,8 @@
     "hunt": "node cli/index.ts hunt",
     "sync:readme": "node scripts/sync-readme.mjs",
     "check:media": "node scripts/check-heavy-media.mjs",
-    "prepublishOnly": "node scripts/sync-readme.mjs --check && npm test"
+    "check:pack": "node scripts/check-pack-budget.mjs",
+    "prepublishOnly": "node scripts/sync-readme.mjs --check && node scripts/check-pack-budget.mjs && npm test"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",

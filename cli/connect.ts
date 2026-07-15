@@ -32,9 +32,15 @@ export function isFoleyHook(cmd: unknown): boolean {
   return /cli[\\/]hook\.ts/.test(s) || (/\shook(\s|$)/.test(s) && /cli[\\/]index\.ts|foley/.test(s));
 }
 export function wiredIn(settings: unknown): boolean {
-  const groups = (settings as { hooks?: { SessionEnd?: unknown } })?.hooks?.SessionEnd;
-  if (!Array.isArray(groups)) return false;
-  return groups.some((g) => Array.isArray(g?.hooks) && g.hooks.some((h: { command?: unknown }) => isFoleyHook(h?.command)));
+  const hasEvent = (event: 'SessionEnd' | 'SessionStart'): boolean => {
+    const groups = (settings as { hooks?: Record<string, unknown> })?.hooks?.[event];
+    if (!Array.isArray(groups)) return false;
+    return groups.some((g) => Array.isArray((g as { hooks?: unknown })?.hooks)
+      && (g as { hooks: { command?: unknown }[] }).hooks.some((h) => isFoleyHook(h?.command)));
+  };
+  // D2 迁移完成判据：收工吐卡（SessionEnd）＋生产者心跳（SessionStart）两钩子俱在才算「接线齐全」——
+  // 旧装仅 SessionEnd＝未齐（心跳缺席则 REC 会撒谎·NIGHT3 病），再 connect 一次即幂等补齐（加法·不动他人钩子）。
+  return hasEvent('SessionEnd') && hasEvent('SessionStart');
 }
 
 interface OnboardState { wiredAt?: number; declinedAt?: number }
@@ -54,7 +60,8 @@ function backupAndWrite(settings: object): void {
   writeFileSync(SETTINGS, JSON.stringify(settings, null, 2) + '\n');
 }
 
-// 分层写：settings.json 里只动 hooks.SessionEnd 一处；幂等（在位即更新命令，不重复追加）
+// 分层写：settings.json 里只动 hooks.SessionEnd＋hooks.SessionStart 两处；幂等（在位即更新命令，不重复追加）。
+// SessionStart＝席二工单 2 生产者心跳（PID 报到）；同一条钩子命令，hook.ts 按 hook_event_name 分流。
 export function wireSettings(): { changed: boolean } {
   let settings: Record<string, unknown> = {};
   if (existsSync(SETTINGS)) {
@@ -65,22 +72,27 @@ export function wireSettings(): { changed: boolean } {
     }
   }
   const hooks = ((settings.hooks as Record<string, unknown>) ??= {});
-  const groups = ((hooks.SessionEnd as unknown[]) ??= []) as { hooks?: { type?: string; command?: string }[] }[];
   const cmd = hookCommand();
-  for (const g of groups) {
-    if (!Array.isArray(g?.hooks)) continue;
-    for (const h of g.hooks) {
-      if (isFoleyHook(h?.command)) {
-        if (h.command === cmd) return { changed: false };
-        h.command = cmd; // 装包位置挪了：原位换命令
-        backupAndWrite(settings);
-        return { changed: true };
+  const wireEvent = (eventName: 'SessionEnd' | 'SessionStart'): boolean => {
+    const groups = ((hooks[eventName] as unknown[]) ??= []) as { hooks?: { type?: string; command?: string }[] }[];
+    for (const g of groups) {
+      if (!Array.isArray(g?.hooks)) continue;
+      for (const h of g.hooks) {
+        if (isFoleyHook(h?.command)) {
+          if (h.command === cmd) return false;
+          h.command = cmd; // 装包位置挪了：原位换命令
+          return true;
+        }
       }
     }
-  }
-  groups.push({ hooks: [{ type: 'command', command: cmd }] });
-  backupAndWrite(settings);
-  return { changed: true };
+    groups.push({ hooks: [{ type: 'command', command: cmd }] });
+    return true;
+  };
+  const changedEnd = wireEvent('SessionEnd');
+  const changedStart = wireEvent('SessionStart');
+  const changed = changedEnd || changedStart;
+  if (changed) backupAndWrite(settings);
+  return { changed };
 }
 
 // 针落声：只读消费在位的 wav（repo 真身 → foley records 的 factory 缓存）；
@@ -108,7 +120,7 @@ function needleDrop(): void {
 function printTerms(): void {
   const foleyHome = process.env.FOLEY_HOME || '~/.foley';
   console.log('接线单：把「收工吐卡」接进你的 Claude Code——');
-  console.log('  · 写入 ~/.claude/settings.json 一条 SessionEnd 钩子（原有内容分层保留，写前留底 .foley-bak）');
+  console.log('  · 写入 ~/.claude/settings.json 两条钩子 SessionEnd＋SessionStart（收工吐卡＋生产者心跳·原有内容分层保留，写前留底 .foley-bak）');
   console.log(`  · 会话收工时钩子往 ${foleyHome}/spool/ 落一行纸；正在跑的 foley 据此蒸馏（默认脱敏）并自撕一张卡`);
   console.log(`  · 首条真人发言默认成为本地磁带标题（最多 80 字）；启动时设 FOLEY_NO_LOCAL_TITLES=1，或在 ${foleyHome}/config.json 关闭；配置坏档会关闭并告警，读架即原子清旧缓存`);
   console.log('  · resume（延续会话）不落卡；clear（清屏翻章）落卡；同一会话后卡替前卡');
@@ -150,7 +162,7 @@ export async function runConnect(argv: string[]): Promise<void> {
   }
   const { changed } = wireSettings();
   remember('wiredAt');
-  console.log(changed ? '钩子已写入 ~/.claude/settings.json（SessionEnd）。' : '钩子本就在位（幂等，未重写）。');
+  console.log(changed ? '钩子已写入 ~/.claude/settings.json（SessionEnd＋SessionStart）。' : '钩子本就在位（幂等，未重写）。');
   try { appendSpool({ kind: 'hello' }); } catch { /* spool 落不下不拦宣告 */ }
   needleDrop();
 }
@@ -163,18 +175,21 @@ export async function offerConnect(timeoutMs = 15000): Promise<void> {
     if (!process.stdin.isTTY || !process.stdout.isTTY) return;
     if (!existsSync(CLAUDE_DIR)) return;
     const st = readOnboard();
-    if (st.wiredAt || st.declinedAt) return;
+    if (st.declinedAt) return;                          // 谢绝过＝尊重，不再催（含迁移征询之谢绝）
     let settings: unknown = {};
     try { settings = JSON.parse(readFileSync(SETTINGS, 'utf8')); } catch { /* 无档或坏档：按未接线待之 */ }
-    if (wiredIn(settings)) { remember('wiredAt'); return; }
-    console.log('见你在用 Claude Code，而收工吐卡还没接线——60 秒接好：');
+    if (wiredIn(settings)) { if (!st.wiredAt) remember('wiredAt'); return; }   // 两钩子俱在＝真接好（不再单凭 wiredAt 短路·席一 D2 复审#迁移）
+    // 到此＝未接齐（新用户·或旧装仅 SessionEnd 而 wiredAt 是旧账）——征询补心跳，让迁移到达存量用户
+    console.log(st.wiredAt
+      ? '你早接过收工吐卡，但生产者心跳（SessionStart）还没装——REC 靠它才不撒谎，60 秒补上：'
+      : '见你在用 Claude Code，而收工吐卡还没接线——60 秒接好：');
     printTerms();
     const a = await ask('现在接吗？[y/N] ', timeoutMs);
     if (a === 'timeout') return;
     if (a !== 'y') { remember('declinedAt'); console.log('好。想通了随时：foley connect'); return; }
     const { changed } = wireSettings();
     remember('wiredAt');
-    console.log(changed ? '钩子已写入 ~/.claude/settings.json（SessionEnd）。' : '钩子本就在位（幂等，未重写）。');
+    console.log(changed ? '钩子已写入 ~/.claude/settings.json（SessionEnd＋SessionStart）。' : '钩子本就在位（幂等，未重写）。');
     try { appendSpool({ kind: 'hello' }); } catch { /* 同上 */ }
     needleDrop();
   } catch (err) {

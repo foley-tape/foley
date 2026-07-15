@@ -109,6 +109,9 @@
 - 2026-07-12 · ASK/DONE/MAIN 三灯现依赖发光悬浮字标注——**①悬浮字拆除的前置规划项**：物理标识落地方式候选＝Dymo 塑料压纹标签 vs 板上蚀刻（船长附加审计①）· 出处：底盘重构令附加
 - 2026-07-12 · 磁带路径实体厚度：双盘间磁头组区磁带走线/厚度视觉不清——候走带族后续项（穿导带轮与磁头时的实体厚度感与光泽度·船长附加审计②）· 出处：底盘重构令附加
 - 2026-07-14 · **LINE 首嗒（POST 30ms）冷启必丢**：引擎起桥 ~1.4s，soundbridge.lampTick 无滞留单制（engine 缺席静默丢）——t0 咔哒有滞留单（postOpen）灯嗒族没有；旧编排同刻同病非两乐章引入；候声资产批滞留单族扩编 · 出处：设计三刀二挂表账（首申报 filamentTick @1456=WRAP 嗒·LINE 嗒缺席）
+- 2026-07-15 · **[D2 修复批·席二继任]** 单一事实源半成品实证：derive 纯函数金测全绿（穷举 1536）而运行时被 Lamps 包旁路覆写（onPacket 直写 pkt.pendingAsk）——函数对·集成错；＋`connect.ts` 只装 SessionEnd 从没装 SessionStart→真 `foley connect` 永不注册 PID 心跳→producer 恒 null→REC 撒谎（探针 --settings 双注入掩盖=生产侧假绿）；＋`producer_probe` 空过（杀前从没证 REC 亮·点 (640,60) 落 #deck）。**已修**：契约 v1.3 asking⟹recording＋settled 入 derive＋Lamps 退纯渲染器＋connect 双钩子＋探针非空过 · 证据：audit/seat2-state-d2/D2_完工报告.md（金测 192/192·producer_probe 真 Claude 三案非空过 PASS·ask_probe clean HOME PASS）
+- 2026-07-15 · **纯文本 claude 不点 REC**：无工具任务不产引擎活动包→live.js `link` 恒 `connecting`（onmessage 首包才转 live）→REC 五因子缺 link 永不亮；验收 live-REC 必喂真工具活动（producer_probe 已改 Bash 序列）· 出处：D2 producer_probe A2 倒查
+- 2026-07-15 · **?machine 诊断口未登记**：main.js refreshMachineState 挂 window.__stage.machine={S,d}（probe 读真实 power/link/导出态）——按诊断口登记律候入 docs/诊断口.md（本分支无该文）· 出处：D2 非空过验收
 - ~~2026-07-13 · plate.css 两条死规则~~ **已结（清葬后半）**：.np-rec 规则拔除＋#light-field 元素（index/demo 静态尸体）与压熄规则同穴
 - ~~2026-07-13 · prefers-reduced-motion 特异性败诉~~ **已结（清葬后半）**：媒体块补 #room.pre-gesture 前缀＝同特异性后写者胜
 - ~~2026-07-13 · #now-plate/#dub-group 骑收边层~~ **已裁（悬案二·派工包§三）**：有条件合法两律——键面神圣律执法＝#deck/#servo-knob/#song-keys/#dub-group 四交互面统一 z30 升出收边层（示能辉光永不被镜头压暗）；#now-plate(z6)非键面、系在册走带牌，终局几何归设计第三轮重构图同板同裁；排查无"无名装饰条"遮挡键面

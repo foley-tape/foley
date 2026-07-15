@@ -1,0 +1,72 @@
+{
+  "probe": "producer_probe（席二 D2 复审二·完全合成隔离·完整轨迹）",
+  "kill": {
+    "mode": "kill",
+    "sessionId": "prodprobe-yslw7q",
+    "gesture": {
+      "x": 1150,
+      "y": 80,
+      "closestId": "machine"
+    },
+    "before": {
+      "producer": "alive",
+      "rec": true,
+      "power": "on",
+      "link": "live"
+    },
+    "recLitBefore": true,
+    "producerSeq": [
+      "dead"
+    ],
+    "recWasLit": true,
+    "producerBecameMs": 2838,
+    "want": "dead",
+    "recAfter": false,
+    "signalAfter": "dead",
+    "deadFlash": true,
+    "PASS": true,
+    "serveLogTail": [
+      "  live 默认；?tape=storm 走 replay；?mode=live 强制实流；--verbose 看机器内务",
+      "[live] TAPE0 live ｜ /private/var/folders/s_/jyj2mk250k56kxj25b7tcyk00000gn/T/prodprobe-proj-5GUIME/-prodprobe/probe.jsonl",
+      "params aac8e0db ｜ 20Hz（snap 50ms）｜ 追赶完成：行 6/6，落地事件 3，episode 1，采样 6",
+      "产物流 → /Users/shadow/tape0-seat-d2/runs/live-2026-07-15/{curve.csv,moments.csv}",
+      "广播 NDJSON → stdout（state/moment）。Ctrl-C 停机出摘要。",
+      "[producer] PID 45747 消失·宽限 2000ms 无 session-end→dead（真猝死·死相如实）"
+    ]
+  },
+  "ended": {
+    "mode": "ended",
+    "sessionId": "prodprobe-q6tazu",
+    "gesture": {
+      "x": 1150,
+      "y": 80,
+      "closestId": "machine"
+    },
+    "before": {
+      "producer": "alive",
+      "rec": true,
+      "power": "on",
+      "link": "live"
+    },
+    "recLitBefore": true,
+    "producerSeq": [
+      "ended"
+    ],
+    "recWasLit": true,
+    "producerBecameMs": 1014,
+    "want": "ended",
+    "recAfter": false,
+    "signalAfter": null,
+    "deadFlash": false,
+    "PASS": true,
+    "serveLogTail": [
+      "[live] TAPE0 live ｜ /private/var/folders/s_/jyj2mk250k56kxj25b7tcyk00000gn/T/prodprobe-proj-sEw5A6/-prodprobe/probe.jsonl",
+      "params aac8e0db ｜ 20Hz（snap 50ms）｜ 追赶完成：行 6/6，落地事件 3，episode 1，采样 6",
+      "产物流 → /Users/shadow/tape0-seat-d2/runs/live-2026-07-15/{curve.csv,moments.csv}",
+      "广播 NDJSON → stdout（state/moment）。Ctrl-C 停机出摘要。",
+      "[producer] PID 45816 消失·见本会话 session-end→ended（善终·不闪 dead）",
+      "[card] prodprob… 纸已备好（候台上撕卡）"
+    ]
+  },
+  "PASS": true
+}

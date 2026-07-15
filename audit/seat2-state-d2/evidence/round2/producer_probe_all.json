@@ -1,0 +1,124 @@
+{
+  "probe": "producer_probe（席二工单 2·D2 非空过·真 claude 三案）",
+  "A1_sigterm": {
+    "pid": 18962,
+    "pidCommand": "claude -p Count from 1 to 300, one number per line, each wit",
+    "gesture": {
+      "x": 1150,
+      "y": 80,
+      "el": "IMG",
+      "closestId": "machine"
+    },
+    "before": {
+      "producer": "alive",
+      "rec": true,
+      "signal": null,
+      "phase": "PLAYING",
+      "live": true,
+      "power": "on",
+      "link": "live",
+      "liveStatus": "live"
+    },
+    "sigterm": {
+      "recLitBefore": true,
+      "producerSeq": [
+        "ended"
+      ],
+      "producerBecameMs": 1015,
+      "want": "ended",
+      "recAfter": false,
+      "signalAfter": null,
+      "deadFlash": false
+    },
+    "PASS": true,
+    "serveLogTail": [
+      "  stage @ http://127.0.0.1:45896/",
+      "  live 默认；?tape=storm 走 replay；?mode=live 强制实流；--verbose 看机器内务",
+      "[live] TAPE0 live ｜ /Users/shadow/.claude/projects/-private-var-folders-s--jyj2mk250k56kxj25b7tcyk00000gn-T-prodprobe-cwd-UG8SdI/81fdc448-613c-4920-aceb-05900325160c.jsonl",
+      "params aac8e0db ｜ 20Hz（snap 50ms）｜ 追赶完成：行 3/3，落地事件 0，episode 0，采样 0",
+      "产物流 → /Users/shadow/tape0-seat-d2/runs/live-2026-07-15/{curve.csv,moments.csv}",
+      "广播 NDJSON → stdout（state/moment）。Ctrl-C 停机出摘要。",
+      "[producer] PID 18962 消失·见 session-end→ended（善终·不闪 dead）",
+      "[card] 81fdc448… 纸已备好（候台上撕卡）"
+    ]
+  },
+  "A2_sigkill": {
+    "pid": 19041,
+    "pidCommand": "claude -p Count from 1 to 300, one number per line, each wit",
+    "gesture": {
+      "x": 1150,
+      "y": 80,
+      "el": "IMG",
+      "closestId": "machine"
+    },
+    "before": {
+      "producer": "alive",
+      "rec": true,
+      "signal": null,
+      "phase": "PLAYING",
+      "live": true,
+      "power": "on",
+      "link": "live",
+      "liveStatus": "live"
+    },
+    "sigkill": {
+      "recLitBefore": true,
+      "producerSeq": [
+        "dead"
+      ],
+      "producerBecameMs": 3030,
+      "want": "dead",
+      "recAfter": false,
+      "signalAfter": "dead",
+      "deadFlash": true
+    },
+    "PASS": true,
+    "serveLogTail": [
+      "♪ TAPE·ZERO · 监听中",
+      "  stage @ http://127.0.0.1:45894/",
+      "  live 默认；?tape=storm 走 replay；?mode=live 强制实流；--verbose 看机器内务",
+      "[live] TAPE0 live ｜ /Users/shadow/.claude/projects/-private-var-folders-s--jyj2mk250k56kxj25b7tcyk00000gn-T-prodprobe-cwd-TlhfOO/406976de-7226-4d48-b040-0a1dfa202e2a.jsonl",
+      "params aac8e0db ｜ 20Hz（snap 50ms）｜ 追赶完成：行 3/3，落地事件 0，episode 0，采样 0",
+      "产物流 → /Users/shadow/tape0-seat-d2/runs/live-2026-07-15/{curve.csv,moments.csv}",
+      "广播 NDJSON → stdout（state/moment）。Ctrl-C 停机出摘要。",
+      "[producer] PID 19041 消失·宽限 2000ms 无 session-end→dead（真猝死·死相如实）"
+    ]
+  },
+  "B_natural": {
+    "pid": 19140,
+    "pidCommand": "claude -p Reply with exactly: done. Do not use any tools. --",
+    "gesture": {
+      "x": 1150,
+      "y": 80,
+      "el": "IMG",
+      "closestId": "machine"
+    },
+    "before": {
+      "producer": "alive",
+      "rec": true,
+      "signal": null,
+      "phase": "PLAYING",
+      "live": true,
+      "power": "on",
+      "link": "live",
+      "liveStatus": "live"
+    },
+    "natural": {
+      "claudeExit": 0,
+      "producer": "ended",
+      "signalAfter": null
+    },
+    "PASS": true,
+    "serveLogTail": [
+      "  stage @ http://127.0.0.1:45888/",
+      "  live 默认；?tape=storm 走 replay；?mode=live 强制实流；--verbose 看机器内务",
+      "[live] TAPE0 live ｜ /Users/shadow/.claude/projects/-private-var-folders-s--jyj2mk250k56kxj25b7tcyk00000gn-T-prodprobe-cwd-kY4IIp/e5c6bdd7-4750-461c-90ed-9e77475e078e.jsonl",
+      "params aac8e0db ｜ 20Hz（snap 50ms）｜ 追赶完成：行 3/3，落地事件 0，episode 0，采样 0",
+      "产物流 → /Users/shadow/tape0-seat-d2/runs/live-2026-07-15/{curve.csv,moments.csv}",
+      "广播 NDJSON → stdout（state/moment）。Ctrl-C 停机出摘要。",
+      "[card] e5c6bdd7… 纸已备好（候台上撕卡）",
+      "[card] 收工卡落盘 /var/folders/s_/jyj2mk250k56kxj25b7tcyk00000gn/T/prodprobe-home-L5b0q3/cards/e5c6bdd7-4750-461c-90ed-9e77475e078e/card.png"
+    ]
+  },
+  "PASS": true
+}

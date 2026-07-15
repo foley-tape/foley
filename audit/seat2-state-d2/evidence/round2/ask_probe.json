@@ -1,0 +1,28 @@
+{
+  "probe": "ask_probe（席二工单1·D2·clean HOME·三幕）",
+  "gesture": {
+    "x": 1300,
+    "y": 80,
+    "closestId": "machine"
+  },
+  "baseline": {
+    "rms": 0.0687,
+    "askBefore": false
+  },
+  "ask": {
+    "latencyToLampMs": 500,
+    "sustainedFlag": true,
+    "litPeaks": 3,
+    "recDuringAsk": true,
+    "duckedRms": 0.0399,
+    "duckDb": -4.7,
+    "cueLitPeak": 1
+  },
+  "clear": {
+    "askCleared": true,
+    "recoveredRms": 0.1012,
+    "recoverDb": 3.4
+  },
+  "pageErrors": [],
+  "PASS": true
+}

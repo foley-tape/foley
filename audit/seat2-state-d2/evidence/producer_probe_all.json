@@ -1,0 +1,116 @@
+{
+  "probe": "producer_probe（席二工单 2·D2 非空过·真 claude 三案）",
+  "A1_sigterm": {
+    "pid": 77613,
+    "pidCommand": "claude -p Use the Bash tool to run 24 commands, ONE tool cal",
+    "gesture": {
+      "x": 1150,
+      "y": 80,
+      "el": "IMG",
+      "closestId": "machine"
+    },
+    "before": {
+      "producer": "alive",
+      "rec": true,
+      "signal": null,
+      "phase": "PLAYING",
+      "live": true,
+      "power": "on",
+      "link": "live",
+      "liveStatus": "live"
+    },
+    "sigterm": {
+      "recLitBefore": true,
+      "producerBecameMs": 607,
+      "want": "ended",
+      "recAfter": false,
+      "signalAfter": null
+    },
+    "PASS": true,
+    "serveLogTail": [
+      "  stage @ http://127.0.0.1:45889/",
+      "  live 默认；?tape=storm 走 replay；?mode=live 强制实流；--verbose 看机器内务",
+      "[live] TAPE0 live ｜ /Users/shadow/.claude/projects/-private-var-folders-s--jyj2mk250k56kxj25b7tcyk00000gn-T-prodprobe-cwd-MQaUUm/fe992947-0320-4d28-8ad0-748bb4b50587.jsonl",
+      "params aac8e0db ｜ 20Hz（snap 50ms）｜ 追赶完成：行 6/6，落地事件 0，episode 0，采样 0",
+      "产物流 → /Users/shadow/tape0-seat-d2/runs/live-2026-07-15/{curve.csv,moments.csv}",
+      "广播 NDJSON → stdout（state/moment）。Ctrl-C 停机出摘要。",
+      "[card] fe992947… 纸已备好（候台上撕卡）",
+      "[card] fe992947… 无戏可剪，销账"
+    ]
+  },
+  "A2_sigkill": {
+    "pid": 77727,
+    "pidCommand": "claude -p Use the Bash tool to run 24 commands, ONE tool cal",
+    "gesture": {
+      "x": 1150,
+      "y": 80,
+      "el": "IMG",
+      "closestId": "machine"
+    },
+    "before": {
+      "producer": "alive",
+      "rec": true,
+      "signal": null,
+      "phase": "PLAYING",
+      "live": true,
+      "power": "on",
+      "link": "live",
+      "liveStatus": "live"
+    },
+    "sigkill": {
+      "recLitBefore": true,
+      "producerBecameMs": 1210,
+      "want": "dead",
+      "recAfter": false,
+      "signalAfter": "dead"
+    },
+    "PASS": true,
+    "serveLogTail": [
+      "♪ TAPE·ZERO · 监听中",
+      "  stage @ http://127.0.0.1:45888/",
+      "  live 默认；?tape=storm 走 replay；?mode=live 强制实流；--verbose 看机器内务",
+      "[live] TAPE0 live ｜ /Users/shadow/.claude/projects/-private-var-folders-s--jyj2mk250k56kxj25b7tcyk00000gn-T-prodprobe-cwd-rEkQXd/cdfa3bff-3190-452c-983d-de502a6ce81c.jsonl",
+      "params aac8e0db ｜ 20Hz（snap 50ms）｜ 追赶完成：行 6/6，落地事件 0，episode 0，采样 0",
+      "产物流 → /Users/shadow/tape0-seat-d2/runs/live-2026-07-15/{curve.csv,moments.csv}",
+      "广播 NDJSON → stdout（state/moment）。Ctrl-C 停机出摘要。",
+      "[producer] 生产者 PID 77727 心跳消失——REC 熄·死相如实"
+    ]
+  },
+  "B_natural": {
+    "pid": 77823,
+    "pidCommand": "claude -p Reply with exactly: done. Do not use any tools. --",
+    "gesture": {
+      "x": 1150,
+      "y": 80,
+      "el": "IMG",
+      "closestId": "machine"
+    },
+    "before": {
+      "producer": "ended",
+      "rec": false,
+      "signal": null,
+      "phase": "PLAYING",
+      "live": true,
+      "power": "on",
+      "link": "connecting",
+      "liveStatus": "connecting"
+    },
+    "natural": {
+      "claudeExit": 0,
+      "producer": "ended",
+      "signalAfter": null
+    },
+    "PASS": true,
+    "serveLogTail": [
+      "  stage @ http://127.0.0.1:45888/",
+      "  live 默认；?tape=storm 走 replay；?mode=live 强制实流；--verbose 看机器内务",
+      "[live] TAPE0 live ｜ /Users/shadow/.claude/projects/-private-var-folders-s--jyj2mk250k56kxj25b7tcyk00000gn-T-prodprobe-cwd-x0K7v7/63e8a34b-1f92-41f3-a7a2-531b33fa57bb.jsonl",
+      "params aac8e0db ｜ 20Hz（snap 50ms）｜ 追赶完成：行 3/3，落地事件 0，episode 0，采样 0",
+      "产物流 → /Users/shadow/tape0-seat-d2/runs/live-2026-07-15/{curve.csv,moments.csv}",
+      "广播 NDJSON → stdout（state/moment）。Ctrl-C 停机出摘要。",
+      "[card] 63e8a34b… 纸已备好（候台上撕卡）",
+      "[card] 63e8a34b… 无戏可剪，销账"
+    ]
+  },
+  "PASS": true
+}

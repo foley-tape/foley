@@ -5,6 +5,7 @@
 import { loadTape, Replayer, buildTape } from './replay.js';
 import { LiveStream } from './live.js';
 import { VuMeter, ChartRecorder, Lamps } from './instruments.js';
+import { deriveMachineState } from './derive.js';
 import { ReelDeck } from './deck.js';
 import { mountLens } from './lens.js';
 import { buildMachine } from './machine.js';
@@ -69,6 +70,19 @@ async function boot() {
   const blankTape = { splices: [], moments: [], duration: Infinity };
   const chart = new ChartRecorder(document.getElementById('chart-canvas'), blankTape);
   const lamps = new Lamps(document.getElementById('amber-tube'), document.getElementById('emerald'), document.getElementById('pilot'));
+
+  // ── 状态收集器（席二工单 3 立法·D2 修法归一）：五源（四源＋done）→inputs→deriveMachineState→单点渲染 ──
+  // rec-live/死相 cue/LINE 门/琥珀门/绿宝石 自此只有一个写者；非法帧（OFF∧REC 红、琥珀先于红 等）在函数上不可能。
+  const S = { power: 'off', phase: 'EMPTY', sourceKind: 'none', link: 'connecting', producer: null, pendingAsk: false, done: false };
+  function refreshMachineState() {
+    const d = deriveMachineState(S);
+    document.body.classList.toggle('rec-live', d.recording);
+    if (d.signalCue) room.dataset.signal = d.signalCue; else delete room.dataset.signal;
+    lamps.linkUp = d.linkLit > 0;
+    lamps.pendingAsk = d.asking;
+    lamps.settled = d.settled;   // D2：绿宝石归 derive 单写（R5·旧版 Lamps 私算 pkt.phase==='DONE' 已拆）
+    if (params.has('machine') && window.__stage) window.__stage.machine = { S: { ...S }, d };   // 诊断口 ?machine：仅带参暴露真实五源＋导出态（probe/doctor 用·正常路径零暴露·登记 docs/诊断口.md）
+  }
   const deck = new ReelDeck(document.getElementById('reel-l'), document.getElementById('reel-r'), document.getElementById('tapeband'));
   // 计数轮回归（渲染批·设计三§三）：鼓条四轮·一只钟律吃盘转角·棘爪律在件内
   const counter = mountCounter(document.getElementById('counter'), deck);
@@ -85,6 +99,8 @@ async function boot() {
   const feedRaw = (pkt, isFirst) => {
     lastPktSeen = pkt;
     room.dataset.phase = pkt.phase; room.dataset.weather = pkt.weather;
+    const nowDone = pkt.phase === 'DONE';
+    if (nowDone !== S.done) { S.done = nowDone; refreshMachineState(); }   // settled 单写：引擎 DONE 入收集器（R5·非 Lamps 私算）
     if (pkt.phase === 'IDLE') {
       if (idleSince === null) idleSince = performance.now();
       const deep = performance.now() - idleSince >= 300000;
@@ -139,18 +155,16 @@ async function boot() {
   const live = new LiveStream();
   live.onPacket.push((pkt, first) => { if (liveActive) feedPacket(pkt, first); });
   live.onMoment.push((m) => { if (liveActive) feedMoment(m); });
-  // 状态可诊（E5）：只在 live 上机时把连接健康态落 room[data-signal]
-  live.onStatus.push((s) => { if (!liveActive) return; if (s === 'live') delete room.dataset.signal; else room.dataset.signal = s; });
-  // ⑥ LINE 线路灯（机器级·不问上机与否）：SSE 证明即亮（live/gone 皆线路在——gone 是源没了不是线断了），
-  // lost=断链即熄；connecting=未证不亮。
-  lamps.linkUp = false;
-  live.onStatus.push((s) => { lamps.linkUp = (s === 'live' || s === 'gone'); });
+  // 状态可诊（E5·席二工单 3 收编）：连接健康态喂收集器——死相 cue 与 LINE 门由 derive 单点渲染
+  // （gone=源没了线没断·LINE 照亮=契约 v1.2 R3；lost=断链即熄；OFF/TEST 无 cue 由 power 因子执法）。
+  refreshMachineState();   // 初帧灯态归 derive 单写（S.power=off → LINE 熄·REC 灭·非裸写 linkUp）
+  live.onStatus.push((st) => { S.link = st; refreshMachineState(); });
   live.connect(); live.flushBuffer();
 
   function stopSource() {
     liveActive = false;
     if (replayer) { replayer.pause(); replayer = null; }
-    delete room.dataset.signal;
+    S.done = false; refreshMachineState();   // 源停即撤"场成了"＋死相——单写者复算（不裸删 dataset.signal）
   }
   async function loadTapeData(item) {
     if (item.kind === 'demo') return await loadTape(item.id);
@@ -203,8 +217,12 @@ async function boot() {
     serveEpoch = t.epoch;
     renderRackSelection(t);                          // rule 2：选中/在机标记读后端
     updateControls(t);                               // rule 4：键/相读后端
-    // REC 灯（审计②）：全机唯一信号红=live 录制中呼吸；回放/待机/暂停全灭（模式语言基石）
-    document.body.classList.toggle('rec-live', !!t.live && t.phase === 'PLAYING');
+    // REC/死相/灯门（席二工单 3 归一）：transport 四因子喂收集器，渲染唯 deriveMachineState 一个写者。
+    S.phase = t.phase;
+    S.sourceKind = t.live ? 'live' : (t.loaded ? 'session' : 'none');
+    S.producer = t.producer ?? null;
+    S.pendingAsk = !!t.pendingAsk;
+    refreshMachineState();
     if (t.phase === 'CUEING' && curPhase !== 'CUEING') sb?.fadeOut();   // rule 1：闭锁期淡出
     curPhase = t.phase;
     if (t.loaded !== curLoaded) {                    // 上机带变→换源（rule 1 装带→淡入）
@@ -217,7 +235,6 @@ async function boot() {
       if (t.phase === 'PAUSED' && replayer.playing) replayer.pause();
       else if (t.phase === 'PLAYING' && !replayer.playing) replayer.play();
     }
-    if (t.live) lamps.pendingAsk = t.pendingAsk;     // rule 4：live ASK 待机读后端保活字段
   }
   live.es?.addEventListener('transport', e => { try { applyTransport(JSON.parse(e.data)); } catch { /* 坏包 */ } });
 
@@ -351,8 +368,9 @@ async function boot() {
   const postH = { vu, chart, lamps, deck, flap, get sound() { return sb; } };
   const postOff = params.get('post') === '0';
   let postDone = false;
-  const firePost = () => { lamps?.post?.(null); return runPost(postH, { skipVu: params.has('vufreeze') })
-    .then(() => { postDone = true; if (params.get('postloop') === '1') setTimeout(firePost, 1600); }); };
+  let postRunId = 0;   // POST 代际（席一复审二·issue 4）：OFF/换档 +1 令在跑的 POST 自中止——不再重借灯、不复活旧动画
+  const firePost = () => { const id = ++postRunId; lamps?.post?.(null); return runPost(postH, { skipVu: params.has('vufreeze'), abort: () => postRunId !== id })
+    .then(() => { if (postRunId !== id) return; postDone = true; if (params.get('postloop') === '1') setTimeout(firePost, 1600); }); };
   let pausedForTest = false;
   // 关机三档（审计余项2 当庭定案）：ON→TEST=优雅停机（抬带·盘惯性滑停·床塌缩微嗡·仪表醒着）；
   // TEST→OFF=熄灯（钨丝衰减·磷光渐熄·微嗡死·回暗房态）；OFF→ON=重开机（POST·重接线·补撕回填）。
@@ -372,38 +390,44 @@ async function boot() {
   const selector = mountSelector(document.getElementById('selector'), {
     sound: () => sb,
     onQuick: () => {                                   // OFF→ON：首次=压缩版 POST；关机后重开=全 POST+复走
+      S.power = 'on'; refreshMachineState();           // 工单 3：power 因子（OFF∧REC 红非法帧执法）
       room.classList.remove('powered-off');
       sb?.fadeIn?.();
       wakeTransport();
       if (!postOff) { postDone = false; firePost(); }
     },
     onTest: () => {                                    // OFF→TEST 驻留：机器醒着，带不走（§四.3 合法驻留位）
+      S.power = 'test'; refreshMachineState();
       if (postOff || postDone) return;
       sb?.setTest?.(true);
       if (curPhase === 'PLAYING') { pausedForTest = true; postTransport('pause'); }
-      runPost(postH, { until: TEST_END_MS, skipVu: params.has('vufreeze') });
+      const _pid = ++postRunId; runPost(postH, { until: TEST_END_MS, skipVu: params.has('vufreeze'), abort: () => postRunId !== _pid });
     },
     onFinale: () => {                                  // TEST→ON 尾章：电机降生+床诞生（起转后 400ms 嗡起）
+      S.power = 'on'; refreshMachineState();
       wakeTransport();
       if (postOff) return;
       if (postDone) return;                            // 停机后回 ON：复走即可（POST 已演过）
-      runPost(postH, { from: TEST_END_MS, bedBirthMs: 400, skipVu: true }).then(() => { postDone = true; });
+      const _pid = ++postRunId; runPost(postH, { from: TEST_END_MS, bedBirthMs: 400, skipVu: true, abort: () => postRunId !== _pid }).then(() => { if (postRunId === _pid) postDone = true; });
     },
-    onStop: stopMachine,                               // ON→TEST：优雅停机
+    onStop: () => { S.power = 'test'; refreshMachineState(); stopMachine(); },   // ON→TEST：优雅停机
     onDark: () => {                                    // →OFF：熄灯
+      postRunId++;                                     // 中止在跑的 POST/旧动画（issue 4：OFF 生命周期闭环·不复活）
+      S.power = 'off'; refreshMachineState();
       stopMachine();
       sb?.setTest?.(false);
       sb?.fadeOut?.(1.6);                              // 微嗡死（慢坡=衰减感）
-      lamps?.post?.({ ask: false, wrap: false, act: 0, line: 0 });   // 灯全灭持有（钨丝衰减走 CSS/包络过渡）
+      lamps?.post?.(null);   // 归还灯（席一 D2 复审 #4）：借灯必还——power=off 时 refreshMachineState 已令各灯灭，Lamps 包络自然衰减；旧 post({全灭}) 是不归还的借灯，会永久遮蔽 derived
       room.classList.add('powered-off');
     },
   });
-  if (postOff) selector?.setOn();                     // 素面：旋钮直接 ON 姿态（板同相）
+  if (postOff) { selector?.setOn(); S.power = 'on'; refreshMachineState(); }   // 素面：旋钮直接 ON 姿态（板同相）
   // 机身任意首手势=自动快拧+压缩版 POST；手势落在旋钮上则让位（正门自理·不消费路由）
   const gestureRoute = (e) => {
     if (e.target?.closest?.('#selector')) return;
     window.removeEventListener('pointerdown', gestureRoute);
     selector?.autoTwist();                            // 快拧与通电同刻（拧下去那一刻电已到——POST t0 不迟）
+    S.power = 'on'; refreshMachineState();
     if (!postOff && !postDone) firePost();
   };
   window.addEventListener('pointerdown', gestureRoute);

@@ -3,6 +3,7 @@
 // 浏览器音频本就要一次人手，开机键正是那次人手该落的地方）。
 import { loadTape, Replayer, sampleAt } from './replay.js';
 import { VuMeter, ChartRecorder, Lamps } from './instruments.js';
+import { deriveMachineState } from './derive.js';
 import { ReelDeck } from './deck.js';
 import { mountLens } from './lens.js';
 import { buildMachine } from './machine.js';
@@ -61,9 +62,21 @@ async function boot() {
   }
 
   const room = room0;
+  // D2 单写者（席一复审二·issue 3）：demo 走 derive 但**不伪装 live**——demo 是回放橱窗（sourceKind=session），
+  // 故 recording=false·REC 不亮·琥珀不亮（回放不是在录）；LINE 随通电亮、WRAP 随包 DONE 亮，皆契约导出。
+  const S = { power: room.classList.contains('powered-off') ? 'off' : 'on', phase: 'PLAYING', sourceKind: 'session', link: 'connecting', producer: null, pendingAsk: false, done: false };
+  function refreshDemoLamps() {
+    const d = deriveMachineState(S);
+    document.body.classList.toggle('rec-live', d.recording);
+    lamps.pendingAsk = d.asking;
+    lamps.settled = d.settled;
+    lamps.linkUp = d.linkLit > 0;
+  }
+  refreshDemoLamps();
   const feed = (pkt, isFirst) => {
     room.dataset.phase = pkt.phase;
     room.dataset.weather = pkt.weather;
+    S.pendingAsk = !!pkt.pendingAsk; S.done = pkt.phase === 'DONE'; refreshDemoLamps();   // 机器态归 derive 单写
     instruments.forEach(i => i.onPacket(pkt, isFirst));
   };
   replayer.onPacket.push(feed);
@@ -121,16 +134,19 @@ async function boot() {
   document.getElementById('servo-knob')?.addEventListener('click', (e) => { e.stopPropagation(); bridge?.servoCue?.(1.6); runPenSweep(chart); });
   const powerBtn = document.getElementById('power');
   let on = false;
+  let postRunId = 0;   // POST 代际（席一复审二·issue 4）：OFF +1 令在跑的 POST 自中止·不复活旧动画
   // 主功能选择器（两页同法·demo 简装三档）：开机=POWER 同义门；关机三档同语义（余项2 定案）
   const selector = mountSelector(document.getElementById('selector'), {
     sound: () => bridge,
-    onQuick: () => { room.classList.remove('powered-off'); bridge?.fadeIn?.(); if (on) replayer.play(); else powerBtn.click(); },
-    onTest: () => powerBtn.click(),
-    onFinale: () => { room.classList.remove('powered-off'); bridge?.setTest?.(false); bridge?.fadeIn?.(); replayer.play(); },
-    onStop: () => { bridge?.setTest?.(true); replayer.pause(); },          // 优雅停机：抬带盘滑停·微嗡·仪表醒着
+    onQuick: () => { S.power = 'on'; refreshDemoLamps(); room.classList.remove('powered-off'); bridge?.fadeIn?.(); if (on) replayer.play(); else powerBtn.click(); },
+    onTest: () => { S.power = 'test'; refreshDemoLamps(); powerBtn.click(); },
+    onFinale: () => { S.power = 'on'; refreshDemoLamps(); room.classList.remove('powered-off'); bridge?.setTest?.(false); bridge?.fadeIn?.(); replayer.play(); },
+    onStop: () => { S.power = 'test'; refreshDemoLamps(); bridge?.setTest?.(true); replayer.pause(); },          // 优雅停机：抬带盘滑停·微嗡·仪表醒着
     onDark: () => {                                                         // 熄灯：微嗡死·灯灭·回暗
+      postRunId++;                                                         // 中止在跑的 POST（issue 4：OFF 生命周期闭环·不复活）
+      S.power = 'off'; refreshDemoLamps();                                  // 灯归 derive 单写（power=off 全灭）
       bridge?.setTest?.(false); bridge?.fadeOut?.(1.6); replayer.pause();
-      lamps?.post?.({ ask: false, wrap: false, act: 0, line: 0 });
+      lamps?.post?.(null);                                                  // 归还借灯（不再 post({全灭}) 永久遮 derived·席一 D2 复审 #4）
       room.classList.add('powered-off');
     },
   });
@@ -142,7 +158,7 @@ async function boot() {
     powerBtn.textContent = 'PLAYING';
     // ⑦POST（两页同法）：POWER=开机=快拧直达 ON（选择器条动画同刻），同一场自检礼
     selector?.autoTwist();
-    if (new URLSearchParams(location.search).get('post') !== '0') runPost({ vu, chart, lamps, deck, flap, sound: bridge });
+    if (new URLSearchParams(location.search).get('post') !== '0') { const id = ++postRunId; runPost({ vu, chart, lamps, deck, flap, sound: bridge }, { abort: () => postRunId !== id }); }
     try {
       await bridge.start(sampleAt(tape, SEEK_S * 1000));
       vu.source = () => bridge.vuDb();   // ⑤ 修宪：声起之刻 VU 换粮——总线真实包络（两页同法）

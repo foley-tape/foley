@@ -9,12 +9,12 @@ import { createServer } from 'node:http';
 import { readFile, writeFile, mkdir, mkdtemp, rm } from 'node:fs/promises';
 import {
   existsSync, readdirSync, statSync, readFileSync, writeFileSync, renameSync, rmSync,
-  openSync, readSync, closeSync, fstatSync,
+  openSync, readSync, closeSync, fstatSync, realpathSync,
 } from 'node:fs';
 import { homedir } from 'node:os';
 import { join, extname, normalize, dirname, basename } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { spawn } from 'node:child_process';
+import { spawn, execSync } from 'node:child_process';
 import { randomBytes } from 'node:crypto';
 // 阶段〇真相层（纯函数·页内同源）：装配与章律各一份，serve 只做 IO 壳
 import { buildTape } from './js/replay.js';
@@ -280,7 +280,19 @@ function onSpoolLine(line) {
     broadcastEvent('wired', { ok: 1 });
     return;
   }
+  if (e.kind === 'session-start') { onSessionStartLine(e); return; }   // 生产者报到（席二工单 2）
   if (e.kind !== 'session-end') return;
+  // 收工≠猝死：session-end＝「不再录了」的协议硬证据。terminal='ended' 持久入注册册（退带/重选/重启不退回 null·
+  // 避已收工会话重亮 REC·席一 D2 复审 #3）；当下正尾随即 REC 熄（'ended'·非死相·SIGTERM 优雅退同路）。resume 延续不算收工。
+  if (e.reason !== 'resume') {
+    const k = producerKey(e.transcriptPath);
+    markSessionEnded(k, e.sessionId);
+    // 只有当前尾随会话（transcript ∧ sessionId 皆当前）收工才熄当前 REC；旧会话迟到 session-end 不碰新 producer（issue 1）
+    if (transport.live && liveTranscript && k === liveTranscript && String(producerReg.get(k)?.sessionId) === String(e.sessionId)) {
+      producerGen++; clearInterval(producerTimer); producerTimer = null;
+      transportSetProducer('ended');
+    }
+  }
   if (e.reason === 'resume') return; // 延续不是终章（三号手令·丁-轨乙裁定）
   const sid = String(e.sessionId ?? '').replace(/[^\w-]/g, '').slice(0, 64);
   const transcript = String(e.transcriptPath ?? '');
@@ -387,6 +399,7 @@ async function pollSpool() {
 
 function startCardDuty() {
   try { spoolOffset = Number(JSON.parse(readFileSync(SPOOL_CURSOR, 'utf8')).offset) || 0; } catch { spoolOffset = 0; }
+  primeProducerReg();   // 席二工单 2：cursor 断点续读会跳过历史 session-start——PID 注册册整卷重建
   setInterval(pollSpool, 1500);
   pollSpool();
 }
@@ -405,7 +418,14 @@ function startLive() {
     ...(rawPath ? [rawPath] : ['--latest', ...(process.env.FOLEY_PROJECTS ? [process.env.FOLEY_PROJECTS] : [])]),
     '--out', liveOutDir];
   liveChild = spawn('node', liveArgs, { cwd: repoRoot, stdio: ['ignore', 'pipe', 'pipe'] });
-  liveChild.stderr.on('data', d => { if (verbose) process.stderr.write(`[live] ${d}`); });
+  if (rawPath) { liveTranscript = producerKey(rawPath); armProducerWatch(); }   // 显式喂带：尾随目标即刻已知
+  liveChild.stderr.on('data', d => {
+    // 生产者心跳锚定：cli live --latest 在 stderr 自报尾随目标（"latest → <path>"）——
+    // 抓之与 spool session-start 的 transcriptPath 对表，PID 心跳才知道该盯谁。
+    const m = String(d).match(/latest → (.+)/);
+    if (m) { liveTranscript = producerKey(m[1].trim()); armProducerWatch(); }
+    if (verbose) process.stderr.write(`[live] ${d}`);
+  });
   let buf = '';
   liveChild.stdout.on('data', chunk => {
     buf += chunk;
@@ -442,6 +462,7 @@ const transport = {
   cursor: 0,           // 播放游标 ms（rule 3 重启清零）
   paused: false,       // 暂停标记（rule 3 重启清零）
   pendingAsk: false,   // live 待机保活（rule 4；由 live 状态流回填）
+  producer: null,      // 生产者心跳（席二工单 2）四值：null=unknown（无 PID·不判死）/'alive'/'dead'（PID 心跳消失=猝死）/'ended'（session-end=收工·REC 熄但非死相）
   live: false,         // 上机的是否 live 带
   locked: false,       // 键锁（CUEING 期真，rule 1）
   epoch: Date.now(),   // 本次进程纪元（客户端据此识别 serve 重启＝历史不继承）
@@ -464,6 +485,7 @@ function transportSelect(tapeId) {
     transport.live = tapeId === 'live';
     transport.cursor = 0;
     transport.phase = 'PLAYING';
+    if (transport.live) armProducerWatch(); else disarmProducerWatch();  // 心跳只属 live 带（席二工单 2）
     pushTransport();
   }, CUE_FADE_MS);
   return true;
@@ -473,9 +495,111 @@ function transportPause() { if (transport.phase === 'PLAYING') { transport.phase
 function transportEject() {
   clearTimeout(cueTimer);
   Object.assign(transport, { phase: 'EMPTY', selected: null, loaded: null, cursor: 0, paused: false, live: false });
+  disarmProducerWatch();   // 退带即撤心跳（producer 回 unknown·不留尸表）
   pushTransport();
 }
 function transportSetPendingAsk(on) { if (!!on !== transport.pendingAsk) { transport.pendingAsk = !!on; pushTransport(); } }
+
+// ── 生产者心跳（席二工单 2·状态契约 R1 的 producer 因子）──
+// 病灶：机器监听的是尾随器不是生产者——真 Claude 死 26s REC 照亮（NIGHT3 左耳铁证）。
+// 法：SessionStart 钩子报到 PID（spool session-start 行）→ kill -0 轮询为主判据（2s·≤5s REC 熄）；
+//     无 PID＝unknown（null·不判死——安静思考≠死亡，纯活动窗误报不可接受，右耳自辩成立）；
+//     复用防护＝首验 ps command 对表（PID 被 OS 转租给别人＝按无 PID 处理）；
+//     死后停表——复活唯一通道是新 session-start（resume/重启天然发行新行）。
+const producerReg = new Map();   // transcriptPath → { pid, command, sessionId, at }
+let liveTranscript = null;       // live 子进程当前尾随的原始 jsonl（stderr "latest → …" 或显式 rawPath）
+let producerTimer = null;
+let producerGen = 0;   // 代际（席一 D2 复审二·issue 1）：每次 arm/disarm/当前会话 ended +1——旧 timer/resolver 认代际，非当前即弃，绝不覆盖新 producer
+
+function transportSetProducer(v) {   // v ∈ null|'alive'|'dead'|'ended'
+  if (transport.producer !== v) { transport.producer = v; pushTransport(); }
+}
+function producerPidLooksSane(reg) {
+  try { process.kill(reg.pid, 0); } catch { return false; }
+  if (!reg.command) return true;                     // 老行无 command：只能信 kill -0
+  try {
+    const out = execSync(`ps -o command= -p ${reg.pid}`, { encoding: 'utf8', timeout: 1200 }).trim();
+    return out.slice(0, 40) === reg.command.slice(0, 40);   // 前缀对表：不是当年那个进程＝转租
+  } catch { return false; }
+}
+// 收工/猝死是持久事实（席一 D2 复审 #2/#3）：写回注册册 terminal——退带/重选/重启后 armProducerWatch
+// 见之不复活成 null/alive，已收工会话永不重亮 REC。dead 已成事实不被 ended 覆盖；复活唯一通道＝新 session-start。
+function markSessionEnded(key, sessionId) {
+  const reg = key && producerReg.get(key);   // 只标记匹配 sessionId 的当前 reg——旧会话的迟到 session-end 不碰新代际
+  if (reg && String(reg.sessionId) === String(sessionId) && reg.terminal !== 'dead') reg.terminal = 'ended';
+}
+function spoolHasSessionEnd(key, sessionId) {   // 该 transcript ∧ 该 sessionId 的 session-end（代际隔离·独立于 pollSpool 游标）
+  try {
+    for (const line of readFileSync(SPOOL_EVENTS, 'utf8').split('\n')) {
+      if (!line.includes('"session-end"')) continue;
+      try { const e = JSON.parse(line); if (e.kind === 'session-end' && e.reason !== 'resume' && producerKey(e.transcriptPath) === key && String(e.sessionId) === String(sessionId)) return true; } catch { /* 坏行跳 */ }
+    }
+  } catch { /* 无 spool */ }
+  return false;
+}
+// PID 消失≠立刻猝死（席一 D2 复审 #1 竞态）：SIGTERM 善终先跑 SessionEnd 钩子写 session-end（可能后到），
+// SIGKILL 猝死无钩子。判死前给宽限窗轮询 spool——见 session-end 即 'ended'（善终·**全程不闪 dead**），
+// 窗满（≤5s 内）仍无＝真猝死 'dead'。宽限中 producer 保持 'alive'（不预判），故无死相闪烁。
+function resolveProducerDeath(gen, key, reg) {
+  const graceMs = 2000, stepMs = 200;   // 2s PID 轮询 + 2s 宽限 = 猝死 ≤4s 判死（≤5s 要求内·留余量）
+  const t0 = Date.now();
+  const tick = () => {
+    if (gen !== producerGen || liveTranscript !== key) return;   // 代际过期/换带：弃（不覆盖新 producer·issue 1）
+    if (spoolHasSessionEnd(key, reg.sessionId)) { if (reg.terminal !== 'dead') reg.terminal = 'ended'; transportSetProducer('ended'); vlog(`[producer] PID ${reg.pid} 消失·见本会话 session-end→ended（善终·不闪 dead）`); return; }
+    if (Date.now() - t0 >= graceMs) { if (reg.terminal !== 'ended') reg.terminal = 'dead'; transportSetProducer('dead'); vlog(`[producer] PID ${reg.pid} 消失·宽限 ${graceMs}ms 无 session-end→dead（真猝死·死相如实）`); return; }
+    setTimeout(tick, stepMs);
+  };
+  tick();
+}
+function armProducerWatch() {
+  clearInterval(producerTimer); producerTimer = null;
+  const gen = ++producerGen;   // 新代际——作废任何在跑的旧 timer/resolver（issue 1：旧不覆盖新）
+  const key = liveTranscript;
+  const reg = key ? producerReg.get(key) : null;
+  if (!reg || !reg.pid) { transportSetProducer(null); return; }        // unknown：不判死
+  if (reg.terminal) { transportSetProducer(reg.terminal); return; }    // 持久终态（ended/dead）——已收工/猝死不复活（除非新 session-start）
+  if (!producerPidLooksSane(reg)) { transportSetProducer(null); return; }  // 报到即已亡/转租：按 unknown（勿谎报活）
+  transportSetProducer('alive');
+  producerTimer = setInterval(() => {
+    if (gen !== producerGen) { clearInterval(producerTimer); return; }   // 代际过期：旧 timer 自杀，绝不碰 producer（issue 1）
+    let alive = true;
+    try { process.kill(reg.pid, 0); } catch { alive = false; }
+    if (!alive) { clearInterval(producerTimer); producerTimer = null; resolveProducerDeath(gen, key, reg); }   // 宽限决断·不即判 dead（善终不闪）
+  }, 2000);
+}
+function disarmProducerWatch() {
+  producerGen++;   // 作废在跑的旧 resolver（issue 1：退带后旧 timer 不复活 producer）
+  clearInterval(producerTimer); producerTimer = null;
+  transportSetProducer(null);
+}
+function producerKey(p) {
+  // 路径归一：hook 的 transcript_path 与 live --latest 的扫描路径须同键（symlink/形态差 realpath 兜底）
+  try { return realpathSync(String(p ?? '')); } catch { return String(p ?? ''); }
+}
+function onSessionStartLine(e) {
+  const key = producerKey(e.transcriptPath);
+  if (!key) return;
+  producerReg.set(key, {
+    pid: Number(e.pid) || null,
+    command: String(e.pidCommand ?? ''),
+    sessionId: String(e.sessionId ?? ''),
+    at: Number(e.at) || Date.now(),
+    terminal: null,   // 新 session-start=复活（清 ended/dead·resume/重启天然发新行——复活唯一通道）
+  });
+  if (transport.live && liveTranscript === key) armProducerWatch();    // 尾随中的会话进程更迭（resume）→重协商
+}
+// 起动全量扫：cursor 断点续读会跳过历史 session-start——PID 注册册须整卷重建（只灌册，不动卡片 cursor）
+function primeProducerReg() {
+  try {
+    for (const line of readFileSync(SPOOL_EVENTS, 'utf8').split('\n')) {
+      try {
+        const e = JSON.parse(line);
+        if (e.kind === 'session-start') onSessionStartLine(e);
+        else if (e.kind === 'session-end' && e.reason !== 'resume') markSessionEnded(producerKey(e.transcriptPath), e.sessionId);   // 重建 terminal 持久态（重启后已收工会话仍判 ended·代际匹配）
+      } catch { /* 坏行照跳 */ }
+    }
+  } catch { /* 无 spool＝未接线 */ }
+}
 
 // ── 卡带架枚举（rule 4 标签＝仓名＋摘要＋时长）──
 const DEMO_TAPES = [
@@ -892,9 +1016,9 @@ createServer(async (req, res) => {
     let wired = false;
     try {
       const s = JSON.parse(await readFile(join(process.env.CLAUDE_CONFIG_DIR ?? join(homedir(), '.claude'), 'settings.json'), 'utf8'));
-      const groups = s?.hooks?.SessionEnd;
       const mine = (c) => /cli[\\/]hook\.ts/.test(c) || (/\shook(\s|$)/.test(c) && /cli[\\/]index\.ts|foley/.test(c));
-      wired = Array.isArray(groups) && groups.some(g => Array.isArray(g?.hooks) && g.hooks.some(h => mine(String(h?.command ?? ''))));
+      const has = (ev) => { const g = s?.hooks?.[ev]; return Array.isArray(g) && g.some(x => Array.isArray(x?.hooks) && x.hooks.some(h => mine(String(h?.command ?? '')))); };
+      wired = has('SessionEnd') && has('SessionStart');   // D2 迁移：两钩子俱在才算齐（旧装仅 SessionEnd＝未齐·催补心跳·席一 D2 复审 #迁移）
     } catch { /* 无档＝未接 */ }
     res.writeHead(200, { 'content-type': 'application/json', 'cache-control': 'no-store' });
     res.end(JSON.stringify({ wired, spool: existsSync(SPOOL_EVENTS) }));
@@ -903,6 +1027,12 @@ createServer(async (req, res) => {
   // ── E2 卡带架路由（第五号手令 丁-E2）──
   // GET /rack：架上磁带（仓名/摘要/时长）＋当前 transport 快照。POST /transport/{select,play,pause,eject}：
   // 服务端权威改态（rule 2/4），同源令牌闸（与写盘同刀）。
+  if (url.pathname === '/transport') {
+    // 只读快照（席二工单 2）：金测/probe/doctor 读 transport 态的正门——与 SSE 广播同一 snapshot 函数
+    res.writeHead(200, { 'content-type': 'application/json' });
+    res.end(JSON.stringify(transportSnapshot()));
+    return;
+  }
   if (url.pathname === '/rack') {
     try {
       // 本请求只许从开到关，不许从关到开；昂贵组装后及序列化后各重验一次，

@@ -111,6 +111,11 @@ export function runPost(h, opts = {}) {
 
     function frame(now) {
       const t = now - T0;
+      if (opts.abort && opts.abort()) {   // OFF/换档中止（席一复审二·issue 4）：归还借件·不再重借·不复活
+        if (vuSrc && vu.source === vuSrc) vu.source = vuPrev;
+        if (penEl) { penEl.style.transform = 'translateY(0px)'; chart.penHead = penEl; chart._penTy = null; }
+        lamps?.post?.(null); postGate.active = false; resolve(); return;
+      }
       if (t >= UNTIL) {
         if (UNTIL < POST_MS) {                      // TEST 驻留：电气借件已各自归还（vu 0.9s/pen 3.2s/牌 3.35s）；
           resolve(); return;                        // 灯保持自检态不还（lamps.post 通道持有=机器醒着）·闸不 flush 留给尾章

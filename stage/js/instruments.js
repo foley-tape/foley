@@ -426,7 +426,7 @@ export class Lamps {
     this.eye = document.getElementById('magic-eye');   // 魔眼（decree12）：活动强度持续开合
     this.askEnv = 0; this.heat = 0; this.surge = 0; this._wasOn = false;
     this.act = 0; this.actTarget = 0;
-    this.phase = 'IDLE';
+    this.pendingAsk = false; this.settled = false;   // D2 单写者：机器态由 main.js 经 derive 喂（非包旁路）
     this.lastNow = performance.now();
     this._post = null;
     // ⑥ LINE=线路灯（E5 第一件物理落地）：serve 链路健康=稳亮基底，断链=熄。
@@ -443,7 +443,7 @@ export class Lamps {
     this._post = o;
   }
   onPacket(pkt) {
-    this.phase = pkt.phase; this.pendingAsk = pkt.pendingAsk;
+    // D2 单写者：机器态（pendingAsk/settled）不经包旁路——只留魔眼活动强度（感官量·非机器态）
     this.actTarget = Math.min(1, (pkt.needle || 0) * 0.72 + (pkt.A || 0) * 0.55);
   }
   onMoment(m) { if (m.special === 'RESOLVE') this.surge = Math.min(0.8, this.surge + 0.4); }  // 一件成了=小点火
@@ -471,7 +471,7 @@ export class Lamps {
     this._put(this.tube, '--lit', (this.askEnv < 0.004 ? 0 : this.askEnv * trap).toFixed(3));
 
     // WRAP：这一场成了（DONE 常亮=灯丝在烧）；点火过冲+热衰减+余温红
-    const on = this._post ? !!this._post.wrap : this.phase === 'DONE';
+    const on = this._post ? !!this._post.wrap : this.settled;   // D2：DONE 态归 derive.settled（main.js 单写·非包 phase）
     if (on && !this._wasOn) this.surge = Math.max(this.surge, 0.32);   // 合闸涌流=点火泛光
     this._wasOn = on;
     this.surge = fall(this.surge, 380);

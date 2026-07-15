@@ -132,7 +132,8 @@ body.tape-loaded #rack:hover .rack-spine { opacity: 0; }
   opacity: 0; transition: opacity 0.8s ease;
 }
 #room[data-signal="lost"] #signal-cue,
-#room[data-signal="gone"] #signal-cue { opacity: 1; }
+#room[data-signal="gone"] #signal-cue,
+#room[data-signal="dead"] #signal-cue { opacity: 1; }
 #signal-cue .beacon {
   width: 12px; height: 12px; border-radius: 50%;
   background: #C6502E; box-shadow: 0 0 15px 3px rgba(198, 80, 46, 0.5);
@@ -142,6 +143,8 @@ body.tape-loaded #rack:hover .rack-spine { opacity: 0; }
 #signal-cue .label { font-size: 10px; letter-spacing: 0.4em; text-indent: 0.4em; color: #D9B79E; }
 #signal-cue .label::after { content: "Signal Lost"; }
 #room[data-signal="gone"] #signal-cue .label::after { content: "Source Gone"; }
+/* 席二工单 2：生产者亡（PID 心跳消失）——内部态独立（dead），外显文案暂同 Source Gone（丝印词候席一/设计终裁·换词零工程） */
+#room[data-signal="dead"] #signal-cue .label::after { content: "Source Gone"; }
 @keyframes signal-beacon { 0%, 100% { opacity: 0.32; transform: scale(0.82); } 50% { opacity: 1; transform: scale(1.12); } }
 /* 失信号：机器画面稍冷——没进来的东西可画，机器诚实地"没了画面"（不装活）。 */
 #room[data-signal] #machine {

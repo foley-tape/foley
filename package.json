@@ -46,7 +46,8 @@
     "check:media": "node scripts/check-heavy-media.mjs",
     "check:pack": "node scripts/check-pack-budget.mjs",
     "check:writeback": "node scripts/check-ledger-writeback.mjs",
-    "prepublishOnly": "node scripts/sync-readme.mjs --check && node scripts/check-pack-budget.mjs && node scripts/check-ledger-writeback.mjs --strict && npm test"
+    "check:readme": "node scripts/check-readme-contract.mjs",
+    "prepublishOnly": "node scripts/sync-readme.mjs --check && node scripts/check-readme-contract.mjs && node scripts/check-pack-budget.mjs && node scripts/check-ledger-writeback.mjs --strict && npm test"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",

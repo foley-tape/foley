@@ -34,10 +34,19 @@ for (const f of files.slice(0, TOP)) {
   console.log(`  ${(f.size / 1024).toFixed(0).padStart(8)}KB  ${f.path}${tag}`);
 }
 
+// fixtures 断言（统一席一 item2 规则·验收「无任何 fixture 在包」）：校准夹具不随包发行。
+const fixturesInPack = files.filter(f => /(^|\/)fixtures\//.test(f.path));
+let bad = false;
+if (fixturesInPack.length) {
+  console.error(`\n✗ fixtures 漏入包 ${fixturesInPack.length} 件（校准夹具不随包·package.json "files" 应含 !stage/fixtures/**）：`);
+  for (const f of fixturesInPack.slice(0, 8)) console.error(`    ${(f.size / 1024).toFixed(0)}KB  ${f.path}`);
+  bad = true;
+}
 if (packedKB > BUDGET_KB) {
   console.error(`\n✗ 超预算 ${(packedKB - BUDGET_KB).toFixed(0)}KB。包体归席一（README/包体）：剔非货件`);
   console.error(`  （dev 夹具如 captain/storm.curve.csv、旧渲染资产如 fascia/reel_*/vu_face/eye/paper.png——`);
   console.error(`   经 package.json "files" 白名单排除或迁 GitHub Releases），或经 --budget-kb 明示调数。`);
-  process.exit(1);
+  bad = true;
 }
-console.log(`\n✓ 包体在预算内。`);
+if (bad) process.exit(1);
+console.log(`\n✓ 包体在预算内·无 fixtures 漏入。`);

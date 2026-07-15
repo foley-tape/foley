@@ -13,7 +13,7 @@
 //
 // 用法：node audit/p0-1-wiring/repro/latecomer.mjs [--root <repoRoot>]
 // 收摊纪律：serve 为本进程直属子进程，SIGINT 逐收；hermetic HOME/CFG/PROJECTS 即用即删（禁 pkill·手令甲.3）。
-import { mkdirSync, writeFileSync, mkdtempSync, copyFileSync, readdirSync, rmSync, appendFileSync } from 'node:fs';
+import { mkdirSync, writeFileSync, mkdtempSync, copyFileSync, rmSync, appendFileSync } from 'node:fs';
 import { spawn } from 'node:child_process';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -28,8 +28,9 @@ const { chromium } = require('playwright-core');
 const exe = process.env.CHROMIUM_EXE
   ?? `${process.env.HOME}/Library/Caches/ms-playwright/chromium-1228/chrome-mac-arm64/Google Chrome for Testing.app/Contents/MacOS/Google Chrome for Testing`;
 
-const realDir = join(process.env.HOME, '.claude', 'projects', '-Users-shadow-tape0');
-const sampleJsonl = readdirSync(realDir).filter(f => f.endsWith('.jsonl'))[0];
+// 密闭化（夜审 L#9/右耳 D-8）：合成原始带替真实 ~/.claude 会话——确定性·零真实数据·可复现。
+// 夹具 golden/fixtures/latecomer.session.jsonl（发生器 make-latecomer-session.mjs·登录 500 排障+DB 池风暴簇）。
+const fixtureJsonl = join(root, 'golden', 'fixtures', 'latecomer.session.jsonl');
 
 // 起一台 hermetic serve；wired = settings.json 是否挂 foley 钩子。
 function bootServe({ wired }) {
@@ -41,7 +42,7 @@ function bootServe({ wired }) {
     null, 2));
   const proj = mkdtempSync(join(tmpdir(), 'p01-proj-'));
   mkdirSync(join(proj, 'p1'), { recursive: true });
-  copyFileSync(join(realDir, sampleJsonl), join(proj, 'p1', 'session.jsonl'));
+  copyFileSync(fixtureJsonl, join(proj, 'p1', 'session.jsonl'));
   const port = 45600 + Math.floor(Math.random() * 300);
   const serve = spawn('node', [join(root, 'stage', 'serve.mjs'), String(port)], {
     cwd: root, stdio: ['ignore', 'pipe', 'pipe'],
@@ -105,7 +106,7 @@ const results = {};
   await page.waitForTimeout(1500);
   const s = await snap();
   const roomPeak = await page.evaluate(() => window.__peak(1200));
-  await page.screenshot({ path: join(here, '..', 'shots', 'A-latecomer.png') });
+  if (!process.env.FOLEY_GATE) await page.screenshot({ path: join(here, '..', 'shots', 'A-latecomer.png') });  // 闸内不写工件（免脏树）
   results.A_latecomer = {
     serverWired: status.wired, needleCeremony: s.needleDrops, wireTag: s.tagPresent,
     motionInk: s.inkPixels, stateCount: s.stateCount, roomPeak, pageErrors: logs.length,
@@ -154,5 +155,7 @@ await browser.close();
 const PASS = Object.values(results).every(r => r.pass);
 const out = { decree: 'FOLEY_DECREE_005 乙 P0-1 接线倒置', PASS, ...results };
 console.log(JSON.stringify(out, null, 2));
-writeFileSync(join(here, '..', 'verdict.json'), JSON.stringify(out, null, 2) + '\n');
+// 闸内（FOLEY_GATE·由 golden/browser-wiring.test.ts 置）不落 verdict/截图——npm test 幂等不脏树；
+// 独立跑（人工审计）照写工件留证。
+if (!process.env.FOLEY_GATE) writeFileSync(join(here, '..', 'verdict.json'), JSON.stringify(out, null, 2) + '\n');
 process.exit(PASS ? 0 : 1);

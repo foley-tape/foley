@@ -1,0 +1,63 @@
+{
+  "sampledAt": "2026-07-14T17:21:34.973Z",
+  "ownedPids": {
+    "serve": 5102
+  },
+  "before": {
+    "mode": null,
+    "liveStatus": "live",
+    "stateCount": 30,
+    "wireTag": false,
+    "signal": "",
+    "soundPresent": false
+  },
+  "afterFirstGesture": {
+    "ctx": "running",
+    "needleDrops": 1,
+    "rmsPeak": 0.008,
+    "bridgeRmsPeak": 0.008,
+    "rmsAvg": 0.00608,
+    "firstAbove005Sec": 2.34,
+    "recordInfo": {
+      "idx": 0,
+      "name": "saturation",
+      "title": "Saturation",
+      "seconds": 155.95297052154194,
+      "count": 3,
+      "tapeStopped": false
+    },
+    "stats": {
+      "audio0": 0.17224489795918368,
+      "rows": 285,
+      "packets": 285,
+      "moments": 0,
+      "fired": 0,
+      "held": 0
+    },
+    "inkPixels": 69615,
+    "chartSize": {
+      "width": 595,
+      "height": 117
+    },
+    "motionStart": {
+      "pen": "transform: translateY(-32.34px);",
+      "reelL": "",
+      "reelR": ""
+    },
+    "motionEnd": {
+      "pen": "transform: translateY(32.99px);",
+      "reelL": "",
+      "reelR": ""
+    },
+    "stateCount": 318,
+    "signal": "",
+    "wireTag": false
+  },
+  "afterSecondGesture": {
+    "sameEngine": true,
+    "ctx": "running",
+    "needleDrops": 1
+  },
+  "pageErrors": [],
+  "PASS": true
+}

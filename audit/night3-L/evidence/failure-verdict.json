@@ -1,0 +1,77 @@
+{
+  "sampledAt": "2026-07-14T17:23:00.827Z",
+  "ownedPids": [
+    {
+      "kind": "serve",
+      "pid": 6198
+    },
+    {
+      "kind": "live",
+      "pid": 6199,
+      "parent": 6198
+    },
+    {
+      "kind": "serve",
+      "pid": 6216
+    },
+    {
+      "kind": "serve",
+      "pid": 6227
+    }
+  ],
+  "errors": [],
+  "killLiveSource": {
+    "baseline": {
+      "signal": "",
+      "liveStatus": "live",
+      "cueOpacity": 0,
+      "label": "\"Signal Lost\""
+    },
+    "after": {
+      "signal": "gone",
+      "liveStatus": "gone",
+      "cueOpacity": 1,
+      "label": "\"Source Gone\""
+    },
+    "pass": true
+  },
+  "killServe": {
+    "killedPid": 6216,
+    "baseline": {
+      "signal": "",
+      "liveStatus": "live",
+      "cueOpacity": 0,
+      "label": "\"Signal Lost\""
+    },
+    "lost": {
+      "signal": "lost",
+      "liveStatus": "lost",
+      "cueOpacity": 1,
+      "label": "\"Signal Lost\""
+    },
+    "recovered": {
+      "signal": "",
+      "liveStatus": "live",
+      "cueOpacity": 0,
+      "label": "\"Signal Lost\""
+    },
+    "passLost": true,
+    "passRecovered": true
+  },
+  "disconnectNetwork": {
+    "offline": {
+      "signal": "",
+      "liveStatus": "live",
+      "cueOpacity": 0,
+      "label": "\"Signal Lost\""
+    },
+    "onlineAgain": {
+      "signal": "",
+      "liveStatus": "live",
+      "cueOpacity": 0,
+      "label": "\"Signal Lost\""
+    },
+    "passLost": false,
+    "passRecovered": true
+  }
+}

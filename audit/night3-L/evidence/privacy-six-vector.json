@@ -1,0 +1,53 @@
+{
+  "sampledAt": "2026-07-15T01:57:44+08:00",
+  "codeAnchor": "6766d93e3fe214dff8d3e57fb610652fead93fac",
+  "objects": {
+    "stage/fixtures/captain.curve.csv": {
+      "sha256": "7d74a59295d6e71c582121fbaef98c752490e11b40d343a402b59f714814c96a",
+      "dataRows": 189913
+    },
+    "stage/fixtures/captain.moments.csv": {
+      "sha256": "fa56da5bfee2e4ee4aa4f8663690af17fda9eb92e42b30faa145c1618597bfc2",
+      "dataRows": 906
+    }
+  },
+  "vectors": {
+    "relativeTime": {
+      "min": 21222,
+      "max": 166644150,
+      "epochLikeValues": 0,
+      "pass": true
+    },
+    "toolNames": {
+      "verbs": ["OTHER", "READ", "RUN", "SAVE", "WRITE"],
+      "unexpected": [],
+      "pass": true
+    },
+    "errorText": {
+      "hasErrClassColumn": false,
+      "outcomes": ["FAIL", "NA", "OK"],
+      "clearedBy": ["ok"],
+      "pass": true
+    },
+    "saltedHashes": {
+      "sigCount": 871,
+      "badSig": 0,
+      "slotCount": 871,
+      "badSlot": 0,
+      "pass": true
+    },
+    "sourceFingerprint": {
+      "hasSourceHashColumn": false,
+      "pass": true
+    },
+    "freeText": {
+      "forbiddenPatternHits": 0,
+      "nonemptyTags": 0,
+      "nonNumericM": 0,
+      "screenedPatterns": ["absolute home paths", "URL", "email", "sk_ token", "ghp_ token", "Bearer token"],
+      "pass": true
+    }
+  },
+  "overallPass": true,
+  "honestyBoundary": "This is a six-vector pattern and schema scan, not proof of zero information leakage. The 46.3-hour relative duration remains a weak fingerprint."
+}

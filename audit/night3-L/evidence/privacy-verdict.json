@@ -1,0 +1,30 @@
+{
+  "sampledAt": "2026-07-14T17:59:56.653Z",
+  "ownedPid": 35266,
+  "mechanism": "missing rack.json -> GET /rack -> ensureCardMeta -> openingLine(synthetic JSONL) -> rack.json",
+  "sentinel": "SYNTHETIC_SECRET_DO_NOT_PERSIST sk-test-123 /Users/alice/SecretProject",
+  "httpStatus": 200,
+  "rackJsonCreatedByProduct": true,
+  "persistedInRackJson": true,
+  "exposedByRackApi": true,
+  "rackEntry": {
+    "id": "card:sentinel-session-0001",
+    "kind": "card",
+    "name": "repo",
+    "summary": "SYNTHETIC_SECRET_DO_NOT_PERSIST sk-test-123 /Users/alice/SecretProject",
+    "seconds": 0.16891891891891891,
+    "mtime": 1784051996557.679,
+    "ft": 1,
+    "c": "C30",
+    "seal": {
+      "id": "ONE_TAKE",
+      "en": "ONE TAKE",
+      "zh": "一条过",
+      "reason": "报错0≤1·峰值T=0≤0.55",
+      "draft": true,
+      "lawVer": 2,
+      "at": "2026-07-14T17:59:56.649Z"
+    }
+  },
+  "PASS_REPRO": true
+}

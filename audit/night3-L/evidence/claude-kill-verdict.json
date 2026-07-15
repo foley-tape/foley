@@ -1,0 +1,39 @@
+{
+  "evidenceRecordedAt": "2026-07-14T17:51:37.746Z",
+  "scenario": "owned real Claude Code process is terminated while Foley follows its session",
+  "claude": {
+    "version": "2.1.209",
+    "pid": 29181,
+    "mode": "safe-mode; tools disabled; synthetic prompt only",
+    "signal": "SIGTERM",
+    "processPresentAfter": false
+  },
+  "foley": {
+    "port": 4205,
+    "npxPids": [29895, 29935],
+    "servePid": 29946,
+    "livePid": 29963
+  },
+  "baseline": {
+    "signal": "",
+    "rec": true,
+    "cueOpacity": 0
+  },
+  "after6_5s": {
+    "elapsedAtLeastSeconds": 6.5,
+    "signal": "",
+    "rec": true,
+    "cueOpacity": 0
+  },
+  "after26s": {
+    "elapsedAtLeastSeconds": 26,
+    "signal": "",
+    "rec": true,
+    "cueOpacity": 0
+  },
+  "observation": "Claude is gone, but Foley still presents a healthy live recording state with no Source Gone or Signal Lost cue.",
+  "timingBoundary": "Elapsed checks are lower bounds. The evidence file was serialized later, so it does not claim per-check wall-clock timestamps.",
+  "machineHonestyPass": false,
+  "PASS_REPRO": true,
+  "sourceSessionLogRemovedAfterAudit": true
+}

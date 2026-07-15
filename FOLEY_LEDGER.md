@@ -94,6 +94,16 @@
 - 工单4·正典 ← 蓝光修宪（照左耳§7 文本·氩蓝 CUE `plate.css:218` 待七人远距盲测·暖琥珀对照·法先行例候验）／档案域数字条款（R:C-1·O-3 卡片战报·L:#7）／操作卡条款（R:C-2·无字≠无教学·DUB 完成率 R:D-4）。
 **72h/处置顺序（两耳各出一版·记录不裁决）**：左耳§8 六步＝先裁隐私口径→真公开入口→修 producer 真相→贯通拒绝并关黑入口→纸回产品→wiring/声桥/首分钟入默认密闭浏览器闸。右耳 O-7＝只许再做一件则 ASK 宗教级可靠／必砍 live 手动 DUB（保 replay DUB）。产品机会榜（O-1 发布即第0号带／O-2 ASK 可靠／O-3 卡片战报／O-4 Claude FM 差异化叙事／多轨提前解冻）归船长与席一发布叙事，非席三施工域。
 
+## 二·七续 · 扩编批交付回写（2026-07-15·席三继任·基 main=3fd00b1·工地 seat/gates·金测 189→231·tsc 绿）
+承接首轮交接（`docs/交接_席三_门禁与法典.md`）扩编批「可即推」项，逐条交付（seat/gates 本地五提交·**未推未合**·合入归操作员/船长）：
+- **工单二·回归族续**：`golden/transport-phase.test.ts`（18·hermetic serve 黑盒全格相位转移·CUEING×select=拒钉现状）＋`golden/spool-health.test.ts`（6·截断从头重放/半行不吞/坏行不崩）〔916646a〕。
+- **工单二·性能族**：`golden/stuck-choreography.test.ts`（10·借 ReelDeck 单源 thetaAt·「挣扎—歇」refute 节拍器/断电即松/CLEARED 解卡）；整机 CPU<5% 真表＝真机 P0 触发档·不在此〔9786712〕。
+- **工单二·物理族**：`golden/coords-geometry.test.ts`（8·维度为正/不逃逸画幅/旋钮⊂座环/**相机契约不漂移一像素**·补 coords-guard 未覆盖自洽面）〔9786712〕。
+- **工单三·治理真话（ledger/GATE 面·可先动者）**：冰箱#4 反转结案重写（默认脱敏+导出机制已在·不复活托管分享）＋GATE.md 去「302 演示卷」（serve.mjs:535 已不跳·`g8.bootstrap` 金测已同步）＋NIGHT-3 超覆盖旗〔e3f9bdf〕。
+- **治理三小刀**：工作法 +法12（机制归因待复验）/法13（跨席红态归 CI 档）·船长批／工程勘误录 +5 行（工具坑成册）／验收器 README +D4 触发档标注〔140c864〕。
+- **仍越界·未动（等/他席）**：状态族/derive 穷举/honesty3＝等 seat/state 合入 main；签名绑哈希＝等席一 item6；README「never stored」正文＋修宪三分域＝席一 README＋工单4；serve CUEING「排队而非拒」产品处方＝席二状态机域（金测仅钉现状·改行为须同改断言）。
+- 小账：`deck.js`/`instruments.js` 无 `.d.ts`（性能族借原型＋`@ts-ignore` import 绕过·不越界渲染域）——若后续多 `.ts` 消费渲染类，宜补最小 `.d.ts`（提纯律的类型侧·非阻塞）。
+
 ## 三、船长反馈总台账（两批·逐条·诚实状态）
 ### 第一批（decree5 走查）
 | 条目 | 状态 |

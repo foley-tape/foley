@@ -1,17 +1,26 @@
 {
-  "decree": "FOLEY_DECREE_005 丙 P0-2 单一传动＋暂停改判",
+  "decree": "FOLEY_DECREE_005 丙 P0-2 单一传动＋暂停改判（席三回归族修复 2026-07-15）",
   "A_singleEngine": true,
+  "base_playing": {
+    "playing": true,
+    "recordPaused": false
+  },
   "B_pause": {
     "wired": true,
     "recordPaused": true,
+    "replayerPaused": true,
     "recordPresent": true,
-    "roomBreathesDuringPause": 0.01698
+    "roomBreathesDuringPause": 0.00323,
+    "recordSilenced": true,
+    "rmsPlaying": 0.00665
   },
   "C_resume": {
     "wired": true,
-    "recordPaused": false
+    "recordPaused": false,
+    "replayerPlaying": true
   },
   "D_dubReady": true,
   "pageErrors": 0,
+  "pageErrorMsgs": [],
   "PASS": true
 }

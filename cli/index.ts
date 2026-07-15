@@ -27,7 +27,7 @@ function usage(): void {
   console.error('用法: foley [端口] [--no-open] [--replay-only]   起播磁带机（尾随你最近的 Claude Code 会话，浏览器里现出唱机）');
   console.error('                     裸命令即正门；端口/旗标直接透传（play/deck 为同义子命令）');
   console.error('      foley <命令>   命令行工具：');
-  console.error('  distill 原始 JSONL → 蒸馏带 .tape.jsonl（§3，唯一读原始处；默认脱敏，--raw 原始带勿外传）');
+  console.error('  distill 原始 JSONL → 蒸馏带 .tape.jsonl（事件蒸馏唯一入口；本地标题另只读首句；默认脱敏，--raw 保留精确源指纹/明文错误类，勿外传）');
   console.error('  scan    扫描 ~/.claude/projects，提名标准带候选（体检按 episode）');
   console.error('  replay  离线跑蒸馏带 → REPORT.md（判定表/占空比/拐点）[--hz 10|20]');
   console.error('  live    尾随生长中的原始 JSONL，20Hz 广播（M1.9 §1.1，bounded）');
@@ -35,7 +35,7 @@ function usage(): void {
   console.error('  ear     机器耳朵（SOUND-R3 v3）：离线渲染 G1–G8 门（含唱片路径；G7 唱片在位 −20 LUFS）');
   console.error('  calibrate 定标轮（R3 §4.4）：CALIB 四常数实测 vs 冻结对照（只测不改）');
   console.error('  probe   探针页（v1 声音相：床＋前景＋调音抽屉）');
-  console.error('  records 出厂音频（唱片+床音织体）：首启明示征询下载（哈希校验；拒绝照常起播——房间层/合成织体退路）');
+  console.error('  records 出厂音频（唱片+床音织体）：显式 records fetch 后明示征询下载（哈希校验；拒绝照常起播——房间层/合成织体退路）');
   console.error('  connect 接线：收工吐卡接进你的 Claude Code（征询后分层写 ~/.claude/settings.json 的 SessionEnd 钩子）');
   console.error('  doctor  体检：一条命令答"它到底接了啥"——项目/会话数/live 尾随谁/唱片在位/音频/serve 状态（只读）');
   console.error('  hook    （内部）SessionEnd 钩子落纸头——connect 代装；stdin 钩子 JSON → ~/.foley/spool/');

@@ -106,9 +106,11 @@ function needleDrop(): void {
 }
 
 function printTerms(): void {
+  const foleyHome = process.env.FOLEY_HOME || '~/.foley';
   console.log('接线单：把「收工吐卡」接进你的 Claude Code——');
   console.log('  · 写入 ~/.claude/settings.json 一条 SessionEnd 钩子（原有内容分层保留，写前留底 .foley-bak）');
-  console.log('  · 会话收工时钩子往 ~/.foley/spool/ 落一行纸；正在跑的 foley 据此蒸馏（默认脱敏）并自撕一张卡');
+  console.log(`  · 会话收工时钩子往 ${foleyHome}/spool/ 落一行纸；正在跑的 foley 据此蒸馏（默认脱敏）并自撕一张卡`);
+  console.log(`  · 首条真人发言默认成为本地磁带标题（最多 80 字）；启动时设 FOLEY_NO_LOCAL_TITLES=1，或在 ${foleyHome}/config.json 关闭；配置坏档会关闭并告警，读架即原子清旧缓存`);
   console.log('  · resume（延续会话）不落卡；clear（清屏翻章）落卡；同一会话后卡替前卡');
   console.log('  · 纯本地、零遥测；随时可从 settings.json 摘除该钩子');
 }

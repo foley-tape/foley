@@ -17,7 +17,7 @@ Glance at it from across the room and you know which kind of day it is: smooth s
 npx foley
 ```
 
-Foley finds your most recent Claude Code session and plays it — the tape deck comes up in your browser, live on `http://127.0.0.1:4173`. No account, no telemetry, fully offline. The deck plays its own ambient bed by default; run `npx foley records` to swap in the real factory music — an explicit, hash-verified download that is the only network call Foley ever makes.
+Foley finds your most recent Claude Code session and plays it — the tape deck comes up in your browser, live on `http://127.0.0.1:4173`. No account, no telemetry, fully offline. The deck plays its own ambient bed by default; run `npx foley records fetch` to swap in the real factory music — an explicit, hash-verified download that is Foley's only product-initiated external network path.
 
 Drive a past session from the terminal instead:
 
@@ -51,7 +51,7 @@ Two layers. **Foreground cues** mark the moments — a **pluck** for work, a **c
 
 The music is real, and the rule is simple: **factory records must be human-made.** The first pressing is [HoliznaCC0](https://freemusicarchive.org/music/holiznacc0/)'s *Public Domain Lofi* — three tracks (*Saturation*, *Still Life*, *Warm Fuzz*), released CC0, human-made (Free Music Archive's own field reads "AI generated? No"). The machine ages them and skips the needle across them; it never wrote them.
 
-Records ship via GitHub Releases, not the npm package — `npx foley records` fetches them on explicit confirmation, verifying each by hash. Want a different shelf? The [record-hunting guide](docs/guide/records-guide.md) keeps human-made CC0 crates up front and any AI-generated ones clearly labelled in their own aisle.
+Records ship via GitHub Releases, not the npm package — `npx foley records fetch` fetches them on explicit confirmation, verifying each by hash. Want a different shelf? The [record-hunting guide](docs/guide/records-guide.md) keeps human-made CC0 crates up front and any AI-generated ones clearly labelled in their own aisle.
 
 ## House rules
 
@@ -65,9 +65,11 @@ A few laws this machine lives by:
 
 ## Privacy
 
-Foley reads your local session logs and **distills** them into event skeletons — verbs, timings, sizes, hashed targets. Tool inputs and conversation text are never stored; a failed step keeps only a **redacted error class** — credentials, paths, tokens, and emails scrubbed to placeholders — for clustering. **Zero telemetry, and the machine never reaches the network on its own**: the single network call it can ever make is the optional, hash-verified download of the factory records — and only when you run `npx foley records` and confirm.
+Foley reads your Claude Code session logs locally; the conversation stays on your machine. By default, up to 80 characters of the first human utterance become that cassette's local title and are cached in `$FOLEY_HOME/cards/<session>/rack.json` (`~/.foley/cards/...` by default) for the local rack. Outside this local title, Foley **distills** the session into event skeletons — verbs, timings, sizes, hashed targets — without copying tool inputs or conversation text into the distilled tape. For failed steps, a default tape keeps a salted cluster hash of a best-effort-normalized error class; the `--raw` form keeps that normalized class as plaintext and may retain text its scrubber does not recognize.
 
-Distilled tapes are **redacted by default**: timestamps become relative offsets (no calendar or clock fingerprint), non-builtin tool names and error classes become salted hashes, and the source file is never fingerprinted (adversarially red-teamed, with a standing privacy gate in the test suite). Exported MP4s carry no wall-clock metadata either — container creation times are zeroed, and dub sidecars record no dates. A `--raw` switch keeps absolute times and plaintext tool names for local debugging; it warns loudly, and you shouldn't share what it produces.
+Local opening titles are optional. Set `FOLEY_NO_LOCAL_TITLES=1` when starting Foley, or put `{"privacy":{"localTitles":false}}` in `$FOLEY_HOME/config.json` (`~/.foley/config.json` by default). The environment variable applies to that process; use the config file to cover every Foley process sharing the same home. Foley re-checks that file on rack metadata reads and writes; if the file exists but is invalid or unreadable, local titles fail closed and Foley warns instead of guessing. With titles off, new cards do not copy the opening line, cached opening titles are atomically removed before a successful rack response, and the rack falls back to the repository name plus the session's chapter seal. Re-enabling titles can rebuild them from the original local transcript while it still exists.
+
+Foley's default distilled tape and its MP4/DUB export pipeline apply these specific **redaction and minimization** measures: distilled-tape timestamps become relative offsets, non-builtin tool names and error classes become salted hashes, and `sourceHash` becomes `redacted` (adversarially red-teamed, with a standing privacy gate in the test suite). Exported MP4 container creation/modification times are zeroed. Dub sidecars omit explicit `createdAt`/`liveEpoch` fields, but local DUB export filenames still contain the export date, and Film DUB metadata may embed those dated archive paths; DUB metadata also retains a stable opaque tape identifier (for an export started from a rack session card, `card:<session-id>`) and a content hash. This is not a promise of anonymity; inspect artifacts before sharing. The `--raw` switch additionally retains absolute times, plaintext tool names, the exact source hash, and a plaintext best-effort-normalized error class; it warns loudly, and you shouldn't share what it produces. **Zero telemetry, and the machine never reaches the network on its own**: its only product-initiated external network path is the optional, hash-verified factory-record download, and only after you run `npx foley records fetch` and confirm.
 
 ## Why "Foley"
 
@@ -77,7 +79,7 @@ The whole build is on the record — every order, round archive, and audit, mapp
 
 ## Status
 
-- ✅ Engine sealed (`v<!--version-->0.1.0<!--/version-->`) — deterministic, calibrated on real session tapes, <!--test-count-->128<!--/test-count--> golden tests
+- ✅ Engine sealed (`v<!--version-->0.1.0<!--/version-->`) — deterministic, calibrated on real session tapes, <!--test-count-->180<!--/test-count--> golden tests
 - ✅ The deck — needle, recorder, lamps, reels, counter — live or replay
 - ✅ Sound — foreground cues + an aging lo-fi bed over human-made CC0 records
 - ✅ Trailer export — DUB a highlight strip to a local MP4 (WebCodecs, ~9× realtime)

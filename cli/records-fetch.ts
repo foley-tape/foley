@@ -1,6 +1,6 @@
 // 出厂音频征询取回（M2.4 §A.4 落仓管道 → M2.5 §C 终形：唱片＋床音织体一体；
 // §0.2 零静默网络红线的唯一例外通道）。
-// 红线原文：机器永不自行联网；唯一例外＝首启【明示征询】的出厂唱片下载
+// 红线原文：机器永不自行联网；唯一例外＝显式 records fetch 后【明示征询】的出厂音频下载
 // （展示目标 URL／体积／SHA-256，同意才取，验哈希落盘；拒绝则房间层运行并提示唱片架路径）。
 // 本文件是该例外的全部实现——除本命令经同意后的 fetch 外，仓库无任何网络调用。
 // 落盘：唱片 → ~/.foley/records/factory/（records-node 回退位）；
@@ -74,7 +74,7 @@ export async function runRecordsFetch(args: string[]): Promise<void> {
   // —— 明示征询（§0.2 文案：URL/体积/SHA-256 全直呈；同意才动网络） ——
   const nRec = need.filter((r) => r.kind === '唱片').length, nAst = need.length - nRec;
   const totalMb = (need.reduce((s, r) => s + r.bytes, 0) / 1048576).toFixed(1);
-  console.log(`\n首启出厂音频征询（零静默网络红线：机器永不自行联网，本次下载需你明示同意）`);
+  console.log(`\n出厂音频下载征询（零静默网络红线：机器永不自行联网，本次显式 fetch 仍需你明示同意）`);
   console.log(`将从 GitHub Releases（tag ${m.releaseTag}）取回：唱片 ${nRec} 张＋床音织体 ${nAst} 件，共 ${totalMb}MB：`);
   for (const r of need) {
     console.log(`  [${r.kind}] ${r.file}  ${(r.bytes / 1048576).toFixed(1)}MB`);

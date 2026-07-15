@@ -23,11 +23,11 @@
 
 > Hi HN — I built a small instrument for a new kind of anxiety: my coding agent runs for minutes at a time, and I either stare at scrolling logs or walk away and worry.
 >
-> Foley is a third option. It's a local web app styled as a 1970s tape deck. It tails your Claude Code session files, distills them into event skeletons (verbs, timings, sizes — never your code or prompts), and runs them through a small physics engine: errors charge tension, fixes release it, repetition of the same failure is detected as a "stuck groove". The instruments are honest: the VU needle is a real spring-damper driven by the engine (the renderer adds no easing — every quiver is data), a strip-chart draws the session's cardiogram in ink, and an amber lamp breathes only when the agent is waiting for *you*.
+> Foley is a third option. It's a local web app styled as a 1970s tape deck. It tails your Claude Code session files, distills them into event skeletons (verbs, timings, sizes — no code, tool inputs, or conversation body in the distilled tape), and runs them through a small physics engine: errors charge tension, fixes release it, repetition of the same failure is detected as a "stuck groove". The instruments are honest: the VU needle is a real spring-damper driven by the engine (the renderer adds no easing — every quiver is data), a strip-chart draws the session's cardiogram in ink, and an amber lamp breathes only when the agent is waiting for *you*.
 >
 > Sound: it's a turntable, not a composer. We spent eleven painful listening rounds trying to synthesize "warm lo-fi" and failed — the honest fix was admitting a tape machine's job is to *play* records and age them. So real music plays (the factory records are human-made, CC0, credited — 【槽：艺术家/来源一句】), and the session controls the *machine*: tension makes the tape older (hiss, wow, duller highs), a stuck loop makes the needle skip on the melody, and when the session ends the record slows to a stop. There's also a DUB button: the machine proposes highlight cuts as perforations on the paper, you tear along them, and it renders a 45s MP4 "splice reel" locally (WebCodecs, ~9× realtime).
 >
-> Privacy, because you should ask: everything is local. Raw logs are read once and distilled; transcripts are never stored or shown. Zero telemetry. The only network call it can ever make is an optional, explicit, hash-verified download of the factory records on first run — decline it and it plays room tone.
+> Privacy, because you should ask: the conversation stays on your machine. By default, the first human line becomes a local cassette title (up to 80 characters); you can turn local titles off, which removes cached titles and falls back to repository + chapter seal. Default distilled tapes are redacted, and MP4 container wall-clock fields are zeroed; local DUB export filenames still contain the export date, Film DUB metadata may embed those dated paths, and DUB metadata retains an opaque local tape ID and content hash, so inspect before sharing. Zero telemetry. The only product-initiated external network path is an optional, explicit, hash-verified factory-record download — decline it and Foley keeps its offline fallback sound.
 >
 > Honest limits: Claude Code only for now (the adapter layer is thin; more agents planned). Export needs a Chromium browser. Tension constants were calibrated on my own 63 session tapes; yours may feel different — auto-tuning on your own library is on the roadmap.
 >
@@ -45,7 +45,7 @@
 >
 > 声音这块走了大弯路：试了十一轮合成"温暖 lo-fi"全部失败，最后承认磁带机的本分是放唱片不是当乐队——现在是真音乐在放（出厂唱片人类制作、CC0、署名【槽】），而会话控制的是"机器"：紧张时磁带变旧变闷、卡死时唱针在旋律上跳针、收工时唱片降速滑停。还有一颗 DUB 键：机器在纸带上打齿孔提议高光段，你顺着撕下来，本地渲染出 45 秒的"接带"MP4（WebCodecs，约 9 倍实时）。
 >
-> 隐私说清楚：全本地，原始日志只读一次并蒸馏成事件骨架（动词/时长/体量，永不存代码与对话文本），零遥测；唯一可能的联网是首启明示征询的出厂唱片下载（哈希校验，可拒绝）。已知限制也说清楚：目前只适配 Claude Code；导出需 Chromium 系；张力常数按我自己的会话库标定，开箱自动调音在路线图上。
+> 隐私说清楚：对话留在本机；首条真人发言默认作为本地磁带标题（最多 80 字，可退出，退出后回落仓名＋性格章名）。默认蒸馏带脱敏，不复制工具输入或对话正文；MP4 容器墙钟清零，但本地 DUB 导出文件名仍带日期，胶片 DUB 元数据还可能内嵌这些带日期的路径，DUB 元数据也保留不透明本地带标识与内容哈希，出屋前须检查。零遥测。Foley 产品代码唯一外网路径是用户明示确认的出厂唱片下载（哈希校验，可拒绝）。已知限制也说清楚：目前只适配 Claude Code；导出需 Chromium 系；张力常数按我自己的会话库标定，开箱自动调音在路线图上。
 >
 > `npx foley` 就能跑，MIT。demo 页（不装也能看一卷真实风暴的回放）：【槽：URL】。被喷和被建议都欢迎，特别想知道：那根针说的是不是真话。
 
@@ -63,7 +63,7 @@
 | 预判攻击 | 回应要点 |
 |---|---|
 | "玩具/花哨 gimmick" | 同意它首先是件乐器；但呼唤态是真功能：琥珀灯=等批准、跳针=同一目标连败三次、静默=收工——这三件事让我离开屏幕也不焦虑。剩下的美，是免费的。 |
-| "隐私？你在读我的会话" | 蒸馏架构一段（只读一次→事件骨架→原文永不落盘）；零遥测；唯一网络=明示唱片下载可拒绝；蒸馏器过了两轮对抗性红队，攻击脚本就在仓库的回归测试里，欢迎审计。 |
+| "隐私？你在读我的会话" | 对话留在本机；首句默认只作本地磁带标题（最多 80 字，可退出并清除缓存）；默认蒸馏带不带对话正文并脱敏，MP4 容器墙钟清零，但本地 DUB 导出文件名仍带日期，胶片 DUB 元数据还可能内嵌这些路径，DUB 元数据也保留不透明带标识/内容哈希，分享前检查。零遥测；产品代码唯一外网路径=明示唱片下载可拒绝。隐私攻击脚本与本地标题契约测试都在仓库里，欢迎审计。 |
 | "看终端不就行了" | 终端要求注视，Foley 供给余光与耳朵。核心是校准过的三种"值得回头"的信号，其余时间它替你安静地盯着。 |
 | "又是 AI slop？" | 引擎是确定性的手写物理（同一磁带两次回放逐字节一致）；出厂唱片**人类制造**、署名、CC0（AI 生成目录只出现在淘碟指南里且明示标注）；这个工具本身是我和 Claude Code 用一套"施工令/判据/红队/复核庭"流程建的，全套档案在仓库 docs/ 里——有据可查。 |
 | "Cursor/Codex 支持？" | 适配器层很薄（唯一认识日志格式的地方），Claude Code 先行，欢迎 PR/需求。 |

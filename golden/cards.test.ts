@@ -4,7 +4,7 @@
 import { test, describe, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { spawn, spawnSync, type ChildProcess } from 'node:child_process';
-import { readFileSync, writeFileSync, mkdtempSync, mkdirSync, rmSync, existsSync } from 'node:fs';
+import { appendFileSync, readFileSync, writeFileSync, mkdtempSync, mkdirSync, rmSync, existsSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
@@ -12,6 +12,8 @@ import { dirname, join } from 'node:path';
 const here = dirname(fileURLToPath(import.meta.url));
 const repoRoot = join(here, '..');
 const fixture = join(here, 'fixtures', 'unknown-tool.jsonl');
+const titleSentinel = 'NEW_CARD_OPENING_SENTINEL_91c2';
+const offTitleSentinel = 'OFF_CARD_OPENING_SENTINEL_2a71';
 
 // ─────────────────────────── 轨乙① · 钩子落纸头（cli/hook.ts）───────────────────────────
 describe('钩子落纸头（cli/hook.ts 即发即忘）', () => {
@@ -66,12 +68,20 @@ describe('serve 卡片值守（spool 尾随 → 蒸馏＋回放出纸 → 端点
   before(async () => {
     // 预置 spool：一枚正经收工＋一枚 resume（后者不得出卡——延续不是终章）
     mkdirSync(join(home, 'spool'), { recursive: true });
+    const transcriptDir = join(home, '-Users-shadow-atlas');
+    mkdirSync(transcriptDir, { recursive: true });
+    const transcript = join(transcriptDir, 'synthetic-session.jsonl');
+    writeFileSync(transcript,
+      `${JSON.stringify({ type: 'user', isSidechain: false, message: { content: [{ type: 'text', text: titleSentinel }] } })}\n`
+      + readFileSync(fixture, 'utf8'));
     writeFileSync(join(home, 'spool', 'events.ndjson'),
-      JSON.stringify({ v: 1, kind: 'session-end', sessionId: 'sess-golden-1', transcriptPath: fixture, reason: 'other' }) + '\n'
-      + JSON.stringify({ v: 1, kind: 'session-end', sessionId: 'sess-resume-1', transcriptPath: fixture, reason: 'resume' }) + '\n');
+      JSON.stringify({ v: 1, kind: 'session-end', sessionId: 'sess-golden-1', transcriptPath: transcript, reason: 'other' }) + '\n'
+      + JSON.stringify({ v: 1, kind: 'session-end', sessionId: 'sess-resume-1', transcriptPath: transcript, reason: 'resume' }) + '\n');
     base = `http://127.0.0.1:${port}`;
+    const env: NodeJS.ProcessEnv = { ...process.env, FOLEY_HOME: home, FOLEY_PROJECTS: emptyProjects };
+    delete env.FOLEY_NO_LOCAL_TITLES;
     proc = spawn('node', [join(repoRoot, 'stage', 'serve.mjs'), String(port)],
-      { cwd: repoRoot, stdio: ['ignore', 'pipe', 'pipe'], env: { ...process.env, FOLEY_HOME: home, FOLEY_PROJECTS: emptyProjects } });
+      { cwd: repoRoot, stdio: ['ignore', 'pipe', 'pipe'], env });
     await new Promise<void>((resolve, reject) => {
       const to = setTimeout(() => reject(new Error('serve 启动超时')), 8000);
       proc!.stdout!.on('data', (d) => { if (String(d).includes('stage @')) { clearTimeout(to); resolve(); } });
@@ -94,9 +104,49 @@ describe('serve 卡片值守（spool 尾随 → 蒸馏＋回放出纸 → 端点
     rmSync(emptyProjects, { recursive: true, force: true });
   });
 
-  test('收工事件出纸（curve/moments 就位）；resume 不出卡', async () => {
+  test('收工新卡默认落本地标题；运行中 config 退出后新卡不落首句且 /rack 清旧缓存', async () => {
     assert.ok(existsSync(join(home, 'cards', 'sess-golden-1', 'curve.csv')));
     assert.ok(existsSync(join(home, 'cards', 'sess-golden-1', 'moments.csv')));
+    const cardDir = join(home, 'cards', 'sess-golden-1');
+    const rackMeta = JSON.parse(readFileSync(join(cardDir, 'rack.json'), 'utf8'));
+    assert.equal(rackMeta.opening, titleSentinel, '默认新卡须经 writeRackMeta 登记首句标题');
+    const defaultRack = await (await fetch(`${base}/rack`)).json();
+    const defaultCard = defaultRack.rack.find((x: any) => x.id === 'card:sess-golden-1');
+    assert.equal(defaultCard.name, 'atlas');
+    assert.equal(defaultCard.summary, titleSentinel);
+    for (const file of ['session.tape.jsonl', 'curve.csv', 'moments.csv']) {
+      assert.ok(!readFileSync(join(cardDir, file), 'utf8').includes(titleSentinel), `${file} 不得复制对话首句`);
+    }
+
+    writeFileSync(join(home, 'config.json'), `${JSON.stringify({ privacy: { localTitles: false } })}\n`);
+    const offTranscriptDir = join(home, '-Users-shadow-offrepo');
+    mkdirSync(offTranscriptDir, { recursive: true });
+    const offTranscript = join(offTranscriptDir, 'synthetic-session.jsonl');
+    writeFileSync(offTranscript,
+      `${JSON.stringify({ type: 'user', isSidechain: false, message: { content: [{ type: 'text', text: offTitleSentinel }] } })}\n`
+      + readFileSync(fixture, 'utf8'));
+    appendFileSync(join(home, 'spool', 'events.ndjson'),
+      `${JSON.stringify({ v: 1, kind: 'session-end', sessionId: 'sess-golden-off', transcriptPath: offTranscript, reason: 'other' })}\n`);
+    for (let i = 0; i < 80 && !existsSync(join(home, 'cards', 'sess-golden-off', 'rack.json')); i++) {
+      await new Promise((resolve) => setTimeout(resolve, 500));
+    }
+    const offCardDir = join(home, 'cards', 'sess-golden-off');
+    assert.ok(existsSync(join(offCardDir, 'rack.json')), '40s 内应完成关闭态新卡出纸');
+    const offMeta = JSON.parse(readFileSync(join(offCardDir, 'rack.json'), 'utf8'));
+    assert.equal(offMeta.repo, 'offrepo');
+    assert.ok(!Object.hasOwn(offMeta, 'opening'), '标题退出：新卡不得登记 opening 字段');
+    for (const file of ['rack.json', 'session.tape.jsonl', 'curve.csv', 'moments.csv']) {
+      assert.ok(!readFileSync(join(offCardDir, file), 'utf8').includes(offTitleSentinel), `${file} 不得含关闭态合成首句`);
+    }
+    const rackBody = await (await fetch(`${base}/rack`)).json();
+    const card = rackBody.rack.find((x: any) => x.id === 'card:sess-golden-off');
+    assert.equal(card?.name, 'offrepo');
+    assert.ok(card?.seal?.zh || card?.seal?.en);
+    assert.equal(card.summary, card.seal.zh || card.seal.en);
+    assert.ok(!JSON.stringify(rackBody).includes(titleSentinel));
+    assert.ok(!JSON.stringify(rackBody).includes(offTitleSentinel));
+    assert.ok(!Object.hasOwn(JSON.parse(readFileSync(join(cardDir, 'rack.json'), 'utf8')), 'opening'),
+      '同一旧实例重读配置后须原子清除默认态旧标题');
     assert.ok(!existsSync(join(home, 'cards', 'sess-resume-1')), 'resume 不得出卡（延续不是终章）');
   });
 

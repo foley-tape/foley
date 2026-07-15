@@ -7,7 +7,10 @@
 // 中继与钟都不依赖标签页可见性——藏页照走（M2.0 §2 验证件二）。
 import { createServer } from 'node:http';
 import { readFile, writeFile, mkdir, mkdtemp, rm } from 'node:fs/promises';
-import { existsSync, readdirSync, statSync, readFileSync, writeFileSync, openSync, readSync, closeSync, fstatSync } from 'node:fs';
+import {
+  existsSync, readdirSync, statSync, readFileSync, writeFileSync, renameSync, rmSync,
+  openSync, readSync, closeSync, fstatSync,
+} from 'node:fs';
 import { homedir } from 'node:os';
 import { join, extname, normalize, dirname, basename } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -149,6 +152,89 @@ const SPOOL_CURSOR = join(FOLEY_HOME, 'spool', 'cursor.json');
 const CARDS_DIR = join(FOLEY_HOME, 'cards');
 const CARD_SID = /^[\w-]{4,64}$/;
 
+// 本地标题退出开关（席一·信任与入口）：标题法默认在位；用户可用环境变量，或在
+// $FOLEY_HOME/config.json 写 { "privacy": { "localTitles": false } } 退出。
+// 环境变量是强制关闭位。缺档＝从未选择，按默认开启；档案存在却坏/不可读＝用户意图
+// 无法安全判定，fail-closed 关闭并告警。每次货架元数据读写重验，避免多 serve 的旧快照补回标题。
+const TITLE_CONFIG_FILE = join(FOLEY_HOME, 'config.json');
+let titleConfigWarning = null;
+function titleConfigFailClosed(reason) {
+  const warning = `[privacy] 本地标题已关闭：${reason}（${TITLE_CONFIG_FILE}）`;
+  if (warning !== titleConfigWarning) console.error(warning);
+  titleConfigWarning = warning;
+  return false;
+}
+function localTitlesEnabled() {
+  if (process.env.FOLEY_NO_LOCAL_TITLES === '1') return false;
+  let raw;
+  try {
+    raw = readFileSync(TITLE_CONFIG_FILE, 'utf8');
+  } catch (error) {
+    if (error?.code === 'ENOENT') { titleConfigWarning = null; return true; }
+    return titleConfigFailClosed(`配置不可读：${error?.code || 'unknown error'}`);
+  }
+  let cfg;
+  try { cfg = JSON.parse(raw); }
+  catch { return titleConfigFailClosed('配置不是有效 JSON'); }
+  if (!cfg || typeof cfg !== 'object' || Array.isArray(cfg)) return titleConfigFailClosed('配置根必须是对象');
+  if (!Object.hasOwn(cfg, 'privacy')) { titleConfigWarning = null; return true; }
+  if (!cfg.privacy || typeof cfg.privacy !== 'object' || Array.isArray(cfg.privacy)) {
+    return titleConfigFailClosed('privacy 必须是对象');
+  }
+  if (!Object.hasOwn(cfg.privacy, 'localTitles')) { titleConfigWarning = null; return true; }
+  if (typeof cfg.privacy.localTitles !== 'boolean') {
+    return titleConfigFailClosed('privacy.localTitles 必须是布尔值');
+  }
+  titleConfigWarning = null;
+  return cfg.privacy.localTitles;
+}
+
+// rack.json 很小，但承担本地标题缓存契约：同目录临时件＋rename，确保读者只见旧版或新版，
+// 不见半截 JSON。调用者决定失败是否阻断响应；隐私清除失败必须阻断，不能吞错报 200。
+function writeJsonAtomicSync(file, value) {
+  const temp = join(dirname(file), `.${basename(file)}.${process.pid}.${randomBytes(6).toString('hex')}.tmp`);
+  try {
+    writeFileSync(temp, JSON.stringify(value) + '\n', { mode: 0o600 });
+    renameSync(temp, file);
+  } catch (error) {
+    try { rmSync(temp, { force: true }); } catch { /* 尽力清临时件 */ }
+    throw error;
+  }
+}
+
+function localTitlePurgeError(sid, cause) {
+  const detail = cause?.code || cause?.message || 'unknown error';
+  console.error(`[privacy] 无法清除 ${sid} 的本地标题缓存：${detail}`);
+  const error = new Error(`local title cache purge failed for ${sid}`, { cause });
+  error.code = 'FOLEY_LOCAL_TITLE_PURGE';
+  return error;
+}
+
+// 关闭标题时先扫全部有效卡目录，而非只扫有 curve.csv、能上架的卡；孤儿标签也不得留旧 opening。
+// 损坏/不可读的既有 rack 无法可靠辨认字段，故以最小空标签原子覆盖；覆盖失败则阻断 /rack。
+function purgeLocalTitleCache(dir, sid) {
+  const file = join(dir, 'rack.json');
+  let meta;
+  let invalidReason = null;
+  try {
+    meta = JSON.parse(readFileSync(file, 'utf8'));
+    if (!meta || typeof meta !== 'object' || Array.isArray(meta)) invalidReason = 'invalid root';
+  } catch (error) {
+    if (error?.code === 'ENOENT') return;
+    invalidReason = error?.code || 'invalid JSON';
+  }
+  if (invalidReason) {
+    try { writeJsonAtomicSync(file, { v: 3 }); }
+    catch (writeError) { throw localTitlePurgeError(sid, writeError); }
+    console.error(`[privacy] ${sid} 的旧标签损坏或不可读，已用无标题标签替换：${invalidReason}`);
+    return;
+  }
+  if (!Object.hasOwn(meta, 'opening')) return;
+  delete meta.opening;
+  try { writeJsonAtomicSync(file, meta); }
+  catch (error) { throw localTitlePurgeError(sid, error); }
+}
+
 // ── 阶段〇·FT 注册（增补包 v2 修正一）：入架注册即编号——会话首次被发现登记即获 FT 号，
 // 永久不可变；数带不数卡（后卡替前卡不换号）；厂带不占序（DEMO_TAPES 永不进注册表）。
 // 回填序＝curve.csv mtime 升序（最老的带＝FT-0001，「你的第 N 盘」时序）；注册表 append-only。
@@ -234,7 +320,8 @@ async function makeCard(sid, job) {
 async function writeRackMeta(dir, tapeFile, transcript) {
   const enc = dirname(transcript).split(/[\\/]/).filter(Boolean).pop() || '';
   const repo = enc.split('-').filter(Boolean).pop() || 'session';    // -Users-shadow-tape0 → tape0
-  const opening = openingLine(transcript) ?? '';
+  const titlesAtRead = localTitlesEnabled();
+  const opening = titlesAtRead ? (openingLine(transcript) ?? '') : null;
   let summary = '会话录音';
   try {
     const lines = (await readFile(tapeFile, 'utf8')).split('\n').slice(1, 60); // 跳 meta 行
@@ -250,12 +337,14 @@ async function writeRackMeta(dir, tapeFile, transcript) {
   const seconds = stageDurationSec(join(dir, 'curve.csv'));
   const ftMap = ensureFTs([{ sid, mtime: Date.now() }]);
   const seal = judgeCardSeal(dir);
-  await writeFile(join(dir, 'rack.json'), JSON.stringify({
-    v: 3, repo, opening, summary, seconds,
+  // 读首句后再验一次：若用户在工序运行期间关闭标题，敏感字段不落盘。
+  const includeOpening = titlesAtRead && localTitlesEnabled();
+  writeJsonAtomicSync(join(dir, 'rack.json'), {
+    v: 3, repo, ...(includeOpening ? { opening } : {}), summary, seconds,
     ft: Number.isInteger(ftMap[sid]) ? ftMap[sid] : null,
     c: snapC(seconds),
     ...(seal ? { seal } : {}),
-  }) + '\n');
+  });
 }
 
 async function drainCardJobs() {
@@ -457,16 +546,23 @@ function openingLine(path) {
   } catch { /* 母带读不动＝无开场白，不算错 */ } finally { if (fd !== undefined) { try { closeSync(fd); } catch { /* 已关 */ } } }
   return null;
 }
-function ensureCardMeta(dir, sid, ft) {
+function ensureCardMeta(dir, sid, ft, titlesRequested) {
+  const rackFile = join(dir, 'rack.json');
+  const rackExisted = existsSync(rackFile);
   let rj = {};
-  try { rj = JSON.parse(readFileSync(join(dir, 'rack.json'), 'utf8')); } catch { /* 老卡无标签 */ }
+  let rackReadable = true;
+  try { rj = JSON.parse(readFileSync(rackFile, 'utf8')); }
+  catch { rackReadable = false; /* 老卡无标签，或旧标签损坏/不可读 */ }
   let dirty = false;
-  // v2 遗产愈合（母带侧：仓名/开场白——依赖母带在场）
-  if (!(rj.repo && rj.opening !== undefined)) {
+  let privacyPurge = false;
+  let titlesEnabled = titlesRequested;
+  // v2 遗产愈合（母带侧：仓名始终可补；开场白只在本地标题法开启时补）。
+  // 关闭标题时删除旧 rack 缓存而非置空：/rack 当次立即不回显；以后重新开启仍可凭母带自愈。
+  if (!rj.repo || (titlesEnabled && rj.opening === undefined)) {
     const m = findMaster(sid);
     if (m) {
       if (!rj.repo) { rj.repo = m.repo; dirty = true; }
-      if (rj.opening === undefined) { rj.opening = openingLine(m.path) ?? ''; dirty = true; }
+      if (titlesEnabled && rj.opening === undefined) { rj.opening = openingLine(m.path) ?? ''; dirty = true; }
     }
   }
   if (rj.seconds === undefined) { rj.seconds = stageDurationSec(join(dir, 'curve.csv')); dirty = true; }
@@ -479,19 +575,47 @@ function ensureCardMeta(dir, sid, ft) {
     if (s) { rj.seal = s; dirty = true; }
   }
   if (rj.v !== 3) { rj.v = 3; dirty = true; }
-  if (dirty) writeFile(join(dir, 'rack.json'), JSON.stringify(rj) + '\n').catch(() => { /* 下次再愈 */ });
-  return rj;
+  // 昂贵的时长/判章组装之后、原子提交之前再验配置；只允许 true→false 收紧。
+  // 关闭态若旧标签存在但无法读取，也必须把整档视为待清缓存：覆盖失败就阻断 /rack。
+  titlesEnabled = titlesEnabled && localTitlesEnabled();
+  if (!titlesEnabled && Object.hasOwn(rj, 'opening')) {
+    delete rj.opening;
+    dirty = true;
+    privacyPurge = true;
+  }
+  if (!titlesEnabled && rackExisted && !rackReadable) {
+    dirty = true;
+    privacyPurge = true;
+  }
+  if (dirty) {
+    try { writeJsonAtomicSync(rackFile, rj); }
+    catch (error) {
+      const detail = error?.code || error?.message || 'unknown error';
+      if (privacyPurge) {
+        throw localTitlePurgeError(sid, error);
+      }
+      console.error(`[rack] 无法原子更新 ${sid} 的标签：${detail}`);
+    }
+  }
+  return { meta: rj, titlesEnabled };
 }
 // 架序（P0-4 → RACK_SPEC 一段）：真会话新在前（mtime 供前端算相对时间）→ 厂盘垫底。
 // LIVE 仍入枚举（rackHas/退带后再上架都要它）但 replay-only 不列（无 live 子进程＝无带可录）；
 // "LIVE 不上架"的日常形态由前端执行：在机之带从架上隐去、名归走带牌（货架只列不在机上的带）。
-function buildRack() {
+function buildRack(titlesRequested) {
   const items = replayOnly ? [] : [{ id: 'live', kind: 'live', name: 'LIVE', summary: '今晨·实时会话', seconds: null }];
   const cards = [];
+  const rackTitlesEnabled = titlesRequested;
   try {
+    const entries = readdirSync(CARDS_DIR, { withFileTypes: true });
+    if (!rackTitlesEnabled) {
+      for (const e of entries) {
+        if (e.isDirectory() && CARD_SID.test(e.name)) purgeLocalTitleCache(join(CARDS_DIR, e.name), e.name);
+      }
+    }
     // 先集中发现→FT 注册（修正一：入架即编号·回填按 mtime 升序），再逐卡愈合标签
     const discoveries = [];
-    for (const e of readdirSync(CARDS_DIR, { withFileTypes: true })) {
+    for (const e of entries) {
       if (!e.isDirectory() || !CARD_SID.test(e.name)) continue;
       const cv = join(CARDS_DIR, e.name, 'curve.csv');
       if (!existsSync(cv)) continue;
@@ -499,18 +623,32 @@ function buildRack() {
     }
     const ftMap = ensureFTs(discoveries);
     for (const d of discoveries) {
-      const rj = ensureCardMeta(join(CARDS_DIR, d.sid), d.sid, ftMap[d.sid]);
+      const { meta: rj, titlesEnabled } = ensureCardMeta(
+        join(CARDS_DIR, d.sid), d.sid, ftMap[d.sid], rackTitlesEnabled,
+      );
       cards.push({
         id: `card:${d.sid}`, kind: 'card',
         name: rj.repo || '无名带',
-        summary: rj.opening || rj.summary || '会话录音',
+        // 标题退出后，summary 只给性格章名；前端既有布局自然形成「仓名＋章名」，
+        // 且绝不回退到可能来自旧版本的 opening/summary 自由文本。
+        summary: titlesEnabled
+          ? (rj.opening || rj.summary || '会话录音')
+          : (rj.seal?.zh || rj.seal?.en || rj.repo || '会话录音'),
         seconds: rj.seconds ?? stageDurationSec(d.cv),
         mtime: d.mtime,
         // 阶段〇真相层随 API 供数（页面未渲染＝不动船长日视之物；阶段一候点头门再上架）
         ft: rj.ft ?? null, c: rj.c ?? null, seal: rj.seal ?? null,
       });
     }
-  } catch { /* 无卡房 */ }
+  } catch (error) {
+    if (error?.code === 'FOLEY_LOCAL_TITLE_PURGE') throw error;
+    // 关闭态只把明确 ENOENT 认作“确无卡房”；EACCES 等错误下 existsSync 也会给 false，
+    // 不能据此假装缓存不存在并回 200。
+    if (!rackTitlesEnabled && error?.code !== 'ENOENT') {
+      throw localTitlePurgeError('cards directory', error);
+    }
+    // 无卡房/单张坏卡沿用既有降级；隐私缓存清除失败是唯一必须阻断的例外。
+  }
   cards.sort((a, b) => b.mtime - a.mtime);
   items.push(...cards);
   for (const d of DEMO_TAPES) {
@@ -766,8 +904,28 @@ createServer(async (req, res) => {
   // GET /rack：架上磁带（仓名/摘要/时长）＋当前 transport 快照。POST /transport/{select,play,pause,eject}：
   // 服务端权威改态（rule 2/4），同源令牌闸（与写盘同刀）。
   if (url.pathname === '/rack') {
-    res.writeHead(200, { 'content-type': 'application/json', 'cache-control': 'no-store' });
-    res.end(JSON.stringify({ rack: buildRack(), transport: transportSnapshot() }));
+    try {
+      // 本请求只许从开到关，不许从关到开；昂贵组装后及序列化后各重验一次，
+      // 配置若在请求途中关闭，就以强制关闭态重建并完成磁盘清除后才回 200。
+      let titlesForResponse = localTitlesEnabled();
+      let rack = buildRack(titlesForResponse);
+      if (titlesForResponse && !localTitlesEnabled()) {
+        titlesForResponse = false;
+        rack = buildRack(false);
+      }
+      let body = JSON.stringify({ rack, transport: transportSnapshot() });
+      if (titlesForResponse && !localTitlesEnabled()) {
+        titlesForResponse = false;
+        rack = buildRack(false);
+        body = JSON.stringify({ rack, transport: transportSnapshot() });
+      }
+      res.writeHead(200, { 'content-type': 'application/json', 'cache-control': 'no-store' });
+      res.end(body);
+    } catch (error) {
+      console.error(`[rack] 标签更新失败，货架响应已阻断：${error?.message || 'unknown error'}`);
+      res.writeHead(500, { 'content-type': 'application/json', 'cache-control': 'no-store' });
+      res.end(JSON.stringify({ error: 'rack metadata update failed' }));
+    }
     return;
   }
   if (req.method === 'POST' && url.pathname.startsWith('/transport/')) {

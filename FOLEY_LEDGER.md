@@ -19,8 +19,9 @@
 13. **跨席红态归 CI 档（席三复盘§二.3·船长批 2026-07-15·并 D4）**：跨席未合之红态闸、release-only 闸一律入 `prepublishOnly`／CI 档，**不入例行 `npm test`**；默认 `npm test` 只放绿-able 自持闸，勿破他席开发绿。判例：README 对表/包体预算现红属席一未合，入 prepublishOnly 不入 default test。
 
 **等待栏（等待声明制·一行一等待；解锁即划除）**：
-- 席三 等 席一的〈item6 签名绑哈希规则正文〉以〈逐字机器化签名闸·诚约族补 4/4〉（captain 152KB 切片「待重新签署」·不倒填伪造）。
-- 席三 等 seat/state 合入 main 的〈deriveMachineState 纯函数＋状态契约 v1.2〉以〈状态族 模式-灯-指针真值表金测·honesty3〉。
+- ~~席三 等 席一的〈item6 签名绑哈希规则正文〉以〈逐字机器化签名闸·诚约族补 4/4〉~~ **✅解锁 2026-07-16**：item6 发布 `docs/canon/SIGNATURE-HASH-CONTRACT.md` v1→逐字机器化＋B8 重签绿·诚约族 4/4 齐（§二·七续二）。
+- ~~席三 等 seat/state 合入 main 的〈deriveMachineState 纯函数＋状态契约 v1.2〉以〈状态族 模式-灯-指针真值表金测·honesty3〉~~ **✅解锁 2026-07-16**：seat/state D2 合入 main（`573f370`·契约 v1.3）→状态族/honesty3 补 REC 单一写者源守（§二·七续二）。
+- （等待栏现空——无声明之等待。）
 
 ## 二、五项 P0（2026-07-11 施工侧全部交付·终审皆候船长——定义留档，证据见§证据规范）
 ### P0-1 性能崩坏（新·最高）
@@ -103,6 +104,13 @@
 - **治理三小刀**：工作法 +法12（机制归因待复验）/法13（跨席红态归 CI 档）·船长批／工程勘误录 +5 行（工具坑成册）／验收器 README +D4 触发档标注〔140c864〕。
 - **仍越界·未动（等/他席）**：状态族/derive 穷举/honesty3＝等 seat/state 合入 main；签名绑哈希＝等席一 item6；README「never stored」正文＋修宪三分域＝席一 README＋工单4；serve CUEING「排队而非拒」产品处方＝席二状态机域（金测仅钉现状·改行为须同改断言）。
 - 小账：`deck.js`/`instruments.js` 无 `.d.ts`（性能族借原型＋`@ts-ignore` import 绕过·不越界渲染域）——若后续多 `.ts` 消费渲染类，宜补最小 `.d.ts`（提纯律的类型侧·非阻塞）。
+
+## 二·七续二 · 整合批回写（2026-07-16·席三继任·船长令「从 main 新开整合分支·迁 seat/gates·完成状态族/derive/honesty·item6 发布即施工签名闸」）
+**整合分支 `integ/gates-on-main`（基 main=`efffb94`·工地 `/Users/shadow/tape0-integ`·未推未合·合入归操作员/船长）**：seat/gates 17 提交 rebase 上当前 main（冲突面仅 `FOLEY_LEDGER.md`+`package.json`·3-way 自动并·**零冲突**），再续整合工。金测 189→**289**·tsc 绿·**诚约族四闸全绿**（readme/pack/writeback/signatures）。
+- **迁移净迁**：席一 item1/2＋席二 D2/wo4 已在 main（异文件无撞）。整合修正 `d98c626`：latecomer 接线夹具随 D2 迁移补 SessionStart 钩子（main `573f370` 收紧 `wired=has(SessionEnd)&&has(SessionStart)`·A 案复绿）。
+- **状态族/honesty3 解锁**（seat/state D2 合入 main）`689cc48`：`golden/rec-honesty-guard.test.ts`（3 例静态源守·**引用**席二 `derive.test.ts` 3072 穷举不重复）——REC 灯 `rec-live` 唯 `d.recording` 投影·无 add/remove/异源旁路（夜审 D-5「死 Claude 仍亮 REC」结构面）·写者皆 derive 消费者·derive 五出无孤儿。负控证拦 tailer 私点。
+- **诚约族 4/4 解锁**（item6 发布）`6bcd4f4`+`7d0d461`：逐字机器化 `SIGNATURE-HASH-CONTRACT` v1——`scripts/check-signature-hashes.mjs`（§4 七层执法·只读不回填）+`golden/signature-hash.test.ts`（§7 八自证·合成 git 仓）+入 `prepublishOnly`；**B8 重签**：当前 captain 切片（curve 152,465B/moments 1,301B）六向量重扫全过→写机器块（`signedCommit=3fd00b1`·不倒填旧判词·禁伪签 §6）→闸转绿。
+- **仍界外·未动**：serve CUEING「排队而非拒」产品处方＝席二状态机域（金测仅钉现状）；README 本体文案＝席一（仅机械同步 test-count 289·`fdacc58`·非文案）。
 
 ## 三、船长反馈总台账（两批·逐条·诚实状态）
 ### 第一批（decree5 走查）

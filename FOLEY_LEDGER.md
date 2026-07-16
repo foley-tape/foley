@@ -106,7 +106,8 @@
 - 小账：`deck.js`/`instruments.js` 无 `.d.ts`（性能族借原型＋`@ts-ignore` import 绕过·不越界渲染域）——若后续多 `.ts` 消费渲染类，宜补最小 `.d.ts`（提纯律的类型侧·非阻塞）。
 
 ## 二·七续二 · 整合批回写（2026-07-16·席三继任·船长令「从 main 新开整合分支·迁 seat/gates·完成状态族/derive/honesty·item6 发布即施工签名闸」）
-**整合分支 `integ/gates-on-main`（基 main=`efffb94`·工地 `/Users/shadow/tape0-integ`·未推未合·合入归操作员/船长）**：seat/gates 17 提交 rebase 上当前 main（冲突面仅 `FOLEY_LEDGER.md`+`package.json`·3-way 自动并·**零冲突**），再续整合工。金测 189→**289**·tsc 绿·**诚约族四闸全绿**（readme/pack/writeback/signatures）。
+**整合分支 `integ/gates-on-main`（工地 `/Users/shadow/tape0-integ`·未推未合·合入归操作员/船长）**：seat/gates 17 提交 rebase 上 main（冲突面仅 `FOLEY_LEDGER.md`+`package.json`·3-way 自动并·**零冲突**），再续整合工。**诚约族四闸全绿**（readme/pack/writeback/signatures）。
+- **重整批（2026-07-16·船长令「基当前 main 重整+带契约正文+法典缺席即红+三负控+sync 293」）**：分支 rebase 上 **main=`45fa5d4`**（+席二批次三工单5/6 camera·**零冲突**·带入 b3-gesture-lens 4 例）金测 289→**293**。签名闸加固（`221b2c8`）：带入席一 98b8246 冻结契约正文 `docs/canon/SIGNATURE-HASH-CONTRACT.md` 入本批→**受管登记表改从契约 §5 表解析**（`loadRegistry`·非硬编码）·**法典缺席即拒绿**；`statSync`→`lstatSync`（符号链接非普通文件拒·§4.7 真化）；三负控折入既有块不增测数（法典缺席/现存非祖先 commit/双 subject 换序/符号链接 subject）。`prepublishOnly` 五闸全绿·npm test 293·tsc 绿·**交新 HEAD SHA**（见分支尖）。
 - **迁移净迁**：席一 item1/2＋席二 D2/wo4 已在 main（异文件无撞）。整合修正 `d98c626`：latecomer 接线夹具随 D2 迁移补 SessionStart 钩子（main `573f370` 收紧 `wired=has(SessionEnd)&&has(SessionStart)`·A 案复绿）。
 - **状态族/honesty3 解锁**（seat/state D2 合入 main）`689cc48`：`golden/rec-honesty-guard.test.ts`（3 例静态源守·**引用**席二 `derive.test.ts` 3072 穷举不重复）——REC 灯 `rec-live` 唯 `d.recording` 投影·无 add/remove/异源旁路（夜审 D-5「死 Claude 仍亮 REC」结构面）·写者皆 derive 消费者·derive 五出无孤儿。负控证拦 tailer 私点。
 - **诚约族 4/4 解锁**（item6 发布）`6bcd4f4`+`7d0d461`：逐字机器化 `SIGNATURE-HASH-CONTRACT` v1——`scripts/check-signature-hashes.mjs`（§4 七层执法·只读不回填）+`golden/signature-hash.test.ts`（§7 八自证·合成 git 仓）+入 `prepublishOnly`；**B8 重签**：当前 captain 切片（curve 152,465B/moments 1,301B）六向量重扫全过→写机器块（`signedCommit=3fd00b1`·不倒填旧判词·禁伪签 §6）→闸转绿。

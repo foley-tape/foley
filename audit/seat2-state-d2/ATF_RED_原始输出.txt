@@ -1,0 +1,60 @@
+      at async Test.run (node:internal/test_runner/test:1208:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:385:3) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 'undefined',
+    expected: 'string',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at golden/producer-lifecycle.integration.atf.test.ts:1095:11
+✖ ATF-I07 A 在 GRACE 时 B 上代：旧 A resolver 成熟不得覆盖 B (8754.396125ms)
+  AssertionError [ERR_ASSERTION]: 等待 transport 条件超时 8000ms；末态={"phase":"PLAYING","selected":"live","loaded":"live","cursor":0,"paused":false,"pendingAsk":false,"producer":"alive","live":true,"locked":false,"epoch":1784192433384,"seq":3,"phases":["EMPTY","CUEING","PLAYING","PAUSED"]}
+      at waitTransport (file:///Users/shadow/tape0-seat-d2/golden/producer-lifecycle.integration.atf.test.ts:229:10)
+      at async TestContext.<anonymous> (file:///Users/shadow/tape0-seat-d2/golden/producer-lifecycle.integration.atf.test.ts:1106:7)
+      at async Test.run (node:internal/test_runner/test:1208:7)
+      at async TestContext.<anonymous> (file:///Users/shadow/tape0-seat-d2/golden/producer-lifecycle.integration.atf.test.ts:1095:3)
+      at async Test.run (node:internal/test_runner/test:1208:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:385:3) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: undefined,
+    operator: 'fail',
+    diff: 'simple'
+  }
+
+test at golden/producer-lifecycle.integration.atf.test.ts:1162:11
+✖ ATF-I08 GRACE 中 eject：旧 timer 成熟后仍 EMPTY/null (8769.902584ms)
+  AssertionError [ERR_ASSERTION]: 等待 transport 条件超时 8000ms；末态={"phase":"PLAYING","selected":"live","loaded":"live","cursor":0,"paused":false,"pendingAsk":false,"producer":"alive","live":true,"locked":false,"epoch":1784192442164,"seq":3,"phases":["EMPTY","CUEING","PLAYING","PAUSED"]}
+      at waitTransport (file:///Users/shadow/tape0-seat-d2/golden/producer-lifecycle.integration.atf.test.ts:229:10)
+      at async TestContext.<anonymous> (file:///Users/shadow/tape0-seat-d2/golden/producer-lifecycle.integration.atf.test.ts:1173:7)
+      at async Test.run (node:internal/test_runner/test:1208:7)
+      at async TestContext.<anonymous> (file:///Users/shadow/tape0-seat-d2/golden/producer-lifecycle.integration.atf.test.ts:1162:3)
+      at async Test.run (node:internal/test_runner/test:1208:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:385:3) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: undefined,
+    operator: 'fail',
+    diff: 'simple'
+  }
+
+test at golden/producer-lifecycle.integration.atf.test.ts:1235:11
+✖ ATF-I09 adapter UNKNOWN：pid:null／错指纹不猜 alive，也不挂死亡 timer (6703.384334ms)
+  AssertionError [ERR_ASSERTION]: 等待 transport 条件超时 6000ms；末态={"phase":"PLAYING","selected":"live","loaded":"live","cursor":0,"paused":false,"pendingAsk":false,"producer":null,"live":true,"locked":false,"epoch":1784192450945,"seq":2,"phases":["EMPTY","CUEING","PLAYING","PAUSED"]}
+      at waitTransport (file:///Users/shadow/tape0-seat-d2/golden/producer-lifecycle.integration.atf.test.ts:229:10)
+      at async TestContext.<anonymous> (file:///Users/shadow/tape0-seat-d2/golden/producer-lifecycle.integration.atf.test.ts:1243:7)
+      at async Test.run (node:internal/test_runner/test:1208:7)
+      at async TestContext.<anonymous> (file:///Users/shadow/tape0-seat-d2/golden/producer-lifecycle.integration.atf.test.ts:1235:3)
+      at async Test.run (node:internal/test_runner/test:1208:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:385:3) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: undefined,
+    operator: 'fail',
+    diff: 'simple'
+  }

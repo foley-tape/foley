@@ -1,0 +1,211 @@
+
+> foley@0.1.0 test:producer-atf
+> node --test golden/producer-lifecycle.atf.test.ts golden/producer-lifecycle.integration.atf.test.ts
+
+✖ Producer lifecycle ATF · 纯状态机 (1.260625ms)
+▶ Producer lifecycle ATF · serve 集成
+  ✖ ATF-I01 同-session 历史 End 不得把新代猝死判成 ended (2681.28125ms)
+  ✖ ATF-I02 dead 跨真实 serve 重启：订阅先于首个 PLAYING，首帧即 dead (10920.302083ms)
+  ✖ ATF-I02E ended 跨真实 serve 重启：首个 PLAYING 即 ended (7958.089917ms)
+  ✔ ATF-I03 End 先到、PID 后亡：真实 SSE 去重轨迹严格 alive→ended (7223.37075ms)
+  ✖ ATF-I04 同-session 新代后迟到旧 End 必须按 incarnation 忽略 (8807.49925ms)
+  ✖ ATF-I05 默认 ATF 全隔离：live output 只进 tmp，真 Claude trap 零击发 (680.967ms)
+  ✖ ATF-I06 生产接线：同一存活父进程 resume 也须新 incarnation/producerEpoch (189.4245ms)
+  ✖ ATF-I07 A 在 GRACE 时 B 上代：旧 A resolver 成熟不得覆盖 B (8773.760792ms)
+  ✖ ATF-I08 GRACE 中 eject：旧 timer 成熟后仍 EMPTY/null (8771.705417ms)
+  ✖ ATF-I09 adapter UNKNOWN：pid:null／错指纹不猜 alive，也不挂死亡 timer (6691.338833ms)
+  ✔ ATF-I10 工装自证：所有可写根均在 tmp，目标代码仅从沙箱执行 (4.21775ms)
+✖ Producer lifecycle ATF · serve 集成 (62742.654958ms)
+ℹ tests 13
+ℹ suites 0
+ℹ pass 2
+ℹ fail 11
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 62837.601167
+
+✖ failing tests:
+
+test at golden/producer-lifecycle.atf.test.ts:96:1
+✖ Producer lifecycle ATF · 纯状态机 (1.260625ms)
+  AssertionError [ERR_ASSERTION]: ATF-M00 缺显式状态机：/private/tmp/claude-501/-Users-shadow-tape0/3dc46793-8192-4938-befb-6a4024ccf04d/scratchpad/red-baseline/stage/producer-lifecycle.mjs。先建纯 reducer，不得继续在 serve.mjs 里堆 timer/flag。
+      at loadProducerModule (file:///private/tmp/claude-501/-Users-shadow-tape0/3dc46793-8192-4938-befb-6a4024ccf04d/scratchpad/red-baseline/golden/producer-lifecycle.atf.test.ts:57:10)
+      at TestContext.<anonymous> (file:///private/tmp/claude-501/-Users-shadow-tape0/3dc46793-8192-4938-befb-6a4024ccf04d/scratchpad/red-baseline/golden/producer-lifecycle.atf.test.ts:97:19)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.start (node:internal/test_runner/test:1096:17)
+      at startSubtestAfterBootstrap (node:internal/test_runner/harness:385:17) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+
+test at golden/producer-lifecycle.integration.atf.test.ts:607:11
+✖ ATF-I01 同-session 历史 End 不得把新代猝死判成 ended (2681.28125ms)
+  AssertionError [ERR_ASSERTION]: B 无本代 End，必须 dead；不得捞 A 历史 End 判 ended
+  
+  'ended' !== 'dead'
+  
+      at TestContext.<anonymous> (file:///private/tmp/claude-501/-Users-shadow-tape0/3dc46793-8192-4938-befb-6a4024ccf04d/scratchpad/red-baseline/golden/producer-lifecycle.integration.atf.test.ts:647:14)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async Test.run (node:internal/test_runner/test:1208:7)
+      at async TestContext.<anonymous> (file:///private/tmp/claude-501/-Users-shadow-tape0/3dc46793-8192-4938-befb-6a4024ccf04d/scratchpad/red-baseline/golden/producer-lifecycle.integration.atf.test.ts:607:3)
+      at async Test.run (node:internal/test_runner/test:1208:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:385:3) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 'ended',
+    expected: 'dead',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at golden/producer-lifecycle.integration.atf.test.ts:667:11
+✖ ATF-I02 dead 跨真实 serve 重启：订阅先于首个 PLAYING，首帧即 dead (10920.302083ms)
+  AssertionError [ERR_ASSERTION]: 等待 SSE 轨迹条件超时；轨迹=[{"phase":"CUEING","selected":"live","loaded":null,"cursor":0,"paused":false,"pendingAsk":false,"producer":null,"live":false,"locked":true,"epoch":1784194147875,"seq":1,"phases":["EMPTY","CUEING","PLAYING","PAUSED"]},{"phase":"PLAYING","selected":"live","loaded":"live","cursor":0,"paused":false,"pendingAsk":false,"producer":null,"live":true,"locked":false,"epoch":1784194147875,"seq":2,"phases":["EMPTY","CUEING","PLAYING","PAUSED"]}]
+      at waitTrace (file:///private/tmp/claude-501/-Users-shadow-tape0/3dc46793-8192-4938-befb-6a4024ccf04d/scratchpad/red-baseline/golden/producer-lifecycle.integration.atf.test.ts:541:10)
+      at async assertBootHeld (file:///private/tmp/claude-501/-Users-shadow-tape0/3dc46793-8192-4938-befb-6a4024ccf04d/scratchpad/red-baseline/golden/producer-lifecycle.integration.atf.test.ts:553:3)
+      at async TestContext.<anonymous> (file:///private/tmp/claude-501/-Users-shadow-tape0/3dc46793-8192-4938-befb-6a4024ccf04d/scratchpad/red-baseline/golden/producer-lifecycle.integration.atf.test.ts:686:7)
+      at async Test.run (node:internal/test_runner/test:1208:7)
+      at async TestContext.<anonymous> (file:///private/tmp/claude-501/-Users-shadow-tape0/3dc46793-8192-4938-befb-6a4024ccf04d/scratchpad/red-baseline/golden/producer-lifecycle.integration.atf.test.ts:667:3)
+      at async Test.run (node:internal/test_runner/test:1208:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:385:3) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: undefined,
+    operator: 'fail',
+    diff: 'simple'
+  }
+
+test at golden/producer-lifecycle.integration.atf.test.ts:711:11
+✖ ATF-I02E ended 跨真实 serve 重启：首个 PLAYING 即 ended (7958.089917ms)
+  AssertionError [ERR_ASSERTION]: 等待 SSE 轨迹条件超时；轨迹=[{"phase":"CUEING","selected":"live","loaded":null,"cursor":0,"paused":false,"pendingAsk":false,"producer":null,"live":false,"locked":true,"epoch":1784194155821,"seq":1,"phases":["EMPTY","CUEING","PLAYING","PAUSED"]},{"phase":"PLAYING","selected":"live","loaded":"live","cursor":0,"paused":false,"pendingAsk":false,"producer":"ended","live":true,"locked":false,"epoch":1784194155821,"seq":2,"phases":["EMPTY","CUEING","PLAYING","PAUSED"]},{"phase":"PLAYING","selected":"live","loaded":"live","cursor":0,"paused":false,"pendingAsk":false,"producer":"ended","live":true,"locked":false,"epoch":1784194155821,"seq":3,"phases":["EMPTY","CUEING","PLAYING","PAUSED"]}]
+      at waitTrace (file:///private/tmp/claude-501/-Users-shadow-tape0/3dc46793-8192-4938-befb-6a4024ccf04d/scratchpad/red-baseline/golden/producer-lifecycle.integration.atf.test.ts:541:10)
+      at async assertBootHeld (file:///private/tmp/claude-501/-Users-shadow-tape0/3dc46793-8192-4938-befb-6a4024ccf04d/scratchpad/red-baseline/golden/producer-lifecycle.integration.atf.test.ts:553:3)
+      at async TestContext.<anonymous> (file:///private/tmp/claude-501/-Users-shadow-tape0/3dc46793-8192-4938-befb-6a4024ccf04d/scratchpad/red-baseline/golden/producer-lifecycle.integration.atf.test.ts:732:7)
+      at async Test.run (node:internal/test_runner/test:1208:7)
+      at async TestContext.<anonymous> (file:///private/tmp/claude-501/-Users-shadow-tape0/3dc46793-8192-4938-befb-6a4024ccf04d/scratchpad/red-baseline/golden/producer-lifecycle.integration.atf.test.ts:711:3)
+      at async Test.run (node:internal/test_runner/test:1208:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:385:3) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: undefined,
+    operator: 'fail',
+    diff: 'simple'
+  }
+
+test at golden/producer-lifecycle.integration.atf.test.ts:801:11
+✖ ATF-I04 同-session 新代后迟到旧 End 必须按 incarnation 忽略 (8807.49925ms)
+  AssertionError [ERR_ASSERTION]: 等待 transport 条件超时 8000ms；末态={"phase":"PLAYING","selected":"live","loaded":"live","cursor":0,"paused":false,"pendingAsk":false,"producer":"alive","live":true,"locked":false,"epoch":1784194169310,"seq":3,"phases":["EMPTY","CUEING","PLAYING","PAUSED"]}
+      at waitTransport (file:///private/tmp/claude-501/-Users-shadow-tape0/3dc46793-8192-4938-befb-6a4024ccf04d/scratchpad/red-baseline/golden/producer-lifecycle.integration.atf.test.ts:229:10)
+      at async TestContext.<anonymous> (file:///private/tmp/claude-501/-Users-shadow-tape0/3dc46793-8192-4938-befb-6a4024ccf04d/scratchpad/red-baseline/golden/producer-lifecycle.integration.atf.test.ts:820:7)
+      at async Test.run (node:internal/test_runner/test:1208:7)
+      at async TestContext.<anonymous> (file:///private/tmp/claude-501/-Users-shadow-tape0/3dc46793-8192-4938-befb-6a4024ccf04d/scratchpad/red-baseline/golden/producer-lifecycle.integration.atf.test.ts:801:3)
+      at async Test.run (node:internal/test_runner/test:1208:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:385:3) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: undefined,
+    operator: 'fail',
+    diff: 'simple'
+  }
+
+test at golden/producer-lifecycle.integration.atf.test.ts:866:11
+✖ ATF-I05 默认 ATF 全隔离：live output 只进 tmp，真 Claude trap 零击发 (680.967ms)
+  AssertionError [ERR_ASSERTION]: live output 必须只进 FOLEY_RUNS_DIR；tmp=[] escaped=["/var/folders/s_/jyj2mk250k56kxj25b7tcyk00000gn/T/foley-producer-atf-repo-QyIZlH/runs/live-2026-07-16/curve.csv","/var/folders/s_/jyj2mk250k56kxj25b7tcyk00000gn/T/foley-producer-atf-repo-QyIZlH/runs/live-2026-07-16/moments.csv"]
+  
+  false !== true
+  
+      at TestContext.<anonymous> (file:///private/tmp/claude-501/-Users-shadow-tape0/3dc46793-8192-4938-befb-6a4024ccf04d/scratchpad/red-baseline/golden/producer-lifecycle.integration.atf.test.ts:887:14)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async Test.run (node:internal/test_runner/test:1208:7)
+      at async TestContext.<anonymous> (file:///private/tmp/claude-501/-Users-shadow-tape0/3dc46793-8192-4938-befb-6a4024ccf04d/scratchpad/red-baseline/golden/producer-lifecycle.integration.atf.test.ts:866:3)
+      at async Test.run (node:internal/test_runner/test:1208:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:385:3) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at golden/producer-lifecycle.integration.atf.test.ts:898:11
+✖ ATF-I06 生产接线：同一存活父进程 resume 也须新 incarnation/producerEpoch (189.4245ms)
+  AssertionError [ERR_ASSERTION]: SessionStart spool 必须携 incarnation
+  + actual - expected
+  
+  + 'undefined'
+  - 'string'
+  
+      at TestContext.<anonymous> (file:///private/tmp/claude-501/-Users-shadow-tape0/3dc46793-8192-4938-befb-6a4024ccf04d/scratchpad/red-baseline/golden/producer-lifecycle.integration.atf.test.ts:918:14)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async Test.run (node:internal/test_runner/test:1208:7)
+      at async TestContext.<anonymous> (file:///private/tmp/claude-501/-Users-shadow-tape0/3dc46793-8192-4938-befb-6a4024ccf04d/scratchpad/red-baseline/golden/producer-lifecycle.integration.atf.test.ts:898:3)
+      at async Test.run (node:internal/test_runner/test:1208:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:385:3) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 'undefined',
+    expected: 'string',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at golden/producer-lifecycle.integration.atf.test.ts:1095:11
+✖ ATF-I07 A 在 GRACE 时 B 上代：旧 A resolver 成熟不得覆盖 B (8773.760792ms)
+  AssertionError [ERR_ASSERTION]: 等待 transport 条件超时 8000ms；末态={"phase":"PLAYING","selected":"live","loaded":"live","cursor":0,"paused":false,"pendingAsk":false,"producer":"alive","live":true,"locked":false,"epoch":1784194178961,"seq":3,"phases":["EMPTY","CUEING","PLAYING","PAUSED"]}
+      at waitTransport (file:///private/tmp/claude-501/-Users-shadow-tape0/3dc46793-8192-4938-befb-6a4024ccf04d/scratchpad/red-baseline/golden/producer-lifecycle.integration.atf.test.ts:229:10)
+      at async TestContext.<anonymous> (file:///private/tmp/claude-501/-Users-shadow-tape0/3dc46793-8192-4938-befb-6a4024ccf04d/scratchpad/red-baseline/golden/producer-lifecycle.integration.atf.test.ts:1106:7)
+      at async Test.run (node:internal/test_runner/test:1208:7)
+      at async TestContext.<anonymous> (file:///private/tmp/claude-501/-Users-shadow-tape0/3dc46793-8192-4938-befb-6a4024ccf04d/scratchpad/red-baseline/golden/producer-lifecycle.integration.atf.test.ts:1095:3)
+      at async Test.run (node:internal/test_runner/test:1208:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:385:3) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: undefined,
+    operator: 'fail',
+    diff: 'simple'
+  }
+
+test at golden/producer-lifecycle.integration.atf.test.ts:1162:11
+✖ ATF-I08 GRACE 中 eject：旧 timer 成熟后仍 EMPTY/null (8771.705417ms)
+  AssertionError [ERR_ASSERTION]: 等待 transport 条件超时 8000ms；末态={"phase":"PLAYING","selected":"live","loaded":"live","cursor":0,"paused":false,"pendingAsk":false,"producer":"alive","live":true,"locked":false,"epoch":1784194187770,"seq":3,"phases":["EMPTY","CUEING","PLAYING","PAUSED"]}
+      at waitTransport (file:///private/tmp/claude-501/-Users-shadow-tape0/3dc46793-8192-4938-befb-6a4024ccf04d/scratchpad/red-baseline/golden/producer-lifecycle.integration.atf.test.ts:229:10)
+      at async TestContext.<anonymous> (file:///private/tmp/claude-501/-Users-shadow-tape0/3dc46793-8192-4938-befb-6a4024ccf04d/scratchpad/red-baseline/golden/producer-lifecycle.integration.atf.test.ts:1173:7)
+      at async Test.run (node:internal/test_runner/test:1208:7)
+      at async TestContext.<anonymous> (file:///private/tmp/claude-501/-Users-shadow-tape0/3dc46793-8192-4938-befb-6a4024ccf04d/scratchpad/red-baseline/golden/producer-lifecycle.integration.atf.test.ts:1162:3)
+      at async Test.run (node:internal/test_runner/test:1208:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:385:3) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: undefined,
+    operator: 'fail',
+    diff: 'simple'
+  }
+
+test at golden/producer-lifecycle.integration.atf.test.ts:1235:11
+✖ ATF-I09 adapter UNKNOWN：pid:null／错指纹不猜 alive，也不挂死亡 timer (6691.338833ms)
+  AssertionError [ERR_ASSERTION]: 等待 transport 条件超时 6000ms；末态={"phase":"PLAYING","selected":"live","loaded":"live","cursor":0,"paused":false,"pendingAsk":false,"producer":null,"live":true,"locked":false,"epoch":1784194196540,"seq":2,"phases":["EMPTY","CUEING","PLAYING","PAUSED"]}
+      at waitTransport (file:///private/tmp/claude-501/-Users-shadow-tape0/3dc46793-8192-4938-befb-6a4024ccf04d/scratchpad/red-baseline/golden/producer-lifecycle.integration.atf.test.ts:229:10)
+      at async TestContext.<anonymous> (file:///private/tmp/claude-501/-Users-shadow-tape0/3dc46793-8192-4938-befb-6a4024ccf04d/scratchpad/red-baseline/golden/producer-lifecycle.integration.atf.test.ts:1243:7)
+      at async Test.run (node:internal/test_runner/test:1208:7)
+      at async TestContext.<anonymous> (file:///private/tmp/claude-501/-Users-shadow-tape0/3dc46793-8192-4938-befb-6a4024ccf04d/scratchpad/red-baseline/golden/producer-lifecycle.integration.atf.test.ts:1235:3)
+      at async Test.run (node:internal/test_runner/test:1208:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:385:3) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: undefined,
+    operator: 'fail',
+    diff: 'simple'
+  }

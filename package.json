@@ -37,6 +37,7 @@
     "probe": "node cli/index.ts probe",
     "typecheck": "tsc --noEmit",
     "test": "node --test \"golden/**/*.test.ts\"",
+    "test:producer-atf": "node --test golden/producer-lifecycle.atf.test.ts golden/producer-lifecycle.integration.atf.test.ts",
     "runs": "node cli/index.ts runs",
     "ear": "node cli/index.ts ear",
     "hunt": "node cli/index.ts hunt",

@@ -11,19 +11,33 @@
 //
 // 用法：node scripts/check-signature-hashes.mjs [--root <repoRoot>]（--root 供对审/测试指别处工作树）。
 import { execFileSync } from 'node:child_process';
-import { readFileSync, statSync } from 'node:fs';
+import { readFileSync, lstatSync } from 'node:fs';
 import { createHash } from 'node:crypto';
 import { join, isAbsolute } from 'node:path';
 
-// ── v1 受管登记表（契约 §5·逐字镜像；新增登记项须先改契约 §5 表再改此处·不得通配推定）──
-export const REGISTRY = [
-  {
-    id: 'B8_CAPTAIN_SIX_VECTOR',
-    doc: 'audit/B8_captain第六带_六向量扫描签署.md',
-    scope: 'redaction-six-vector/v1',
-    subjects: ['stage/fixtures/captain.curve.csv', 'stage/fixtures/captain.moments.csv'],
-  },
-];
+// ── 受管登记表：从契约 §5 表**解析**（法典单源·非硬编码镜像）。契约 §5 明令闸不得靠通配推定受管范围；
+// 更进一步（船长令 2026-07-16）：**法典缺席即拒绿**——签名契约正文（法典）不在，闸一律红，不容许在无
+// 受管范围声明时冒充「无签署失效」而放行。新增登记项属契约修订：先改契约 §5 表，闸自动跟随。──
+const CONTRACT_DOC = 'docs/canon/SIGNATURE-HASH-CONTRACT.md';
+export function loadRegistry(root) {
+  let text;
+  try { text = readFileSync(join(root, CONTRACT_DOC), 'utf8'); }
+  catch { return { err: `法典缺席：${CONTRACT_DOC} 不在——闸拒绿（签名契约正文是受管登记表唯一真相）` }; }
+  const from = text.search(/^##\s*5\b/m);
+  if (from < 0) return { err: `法典 §5 受管登记表节缺失——闸拒绿（格式变更须复核 loadRegistry）` };
+  let body = text.slice(from);
+  const to = body.search(/^##\s*6\b/m);
+  if (to >= 0) body = body.slice(0, to);
+  const registry = [];
+  for (const line of body.split('\n')) {
+    if (!line.trim().startsWith('|')) continue;
+    const cells = line.split('|').slice(1, -1).map((c) => c.trim().replace(/`/g, ''));
+    if (cells.length < 4 || !cells[0] || cells[0] === 'id' || /^-+$/.test(cells[0])) continue;  // 跳表头/分隔
+    registry.push({ id: cells[0], doc: cells[1], scope: cells[2], subjects: cells[3].split('、').map((s) => s.trim()).filter(Boolean) });
+  }
+  if (!registry.length) return { err: `法典 §5 受管登记表解析为空——闸拒绿（格式变更须复核 loadRegistry）` };
+  return { registry };
+}
 const SCHEMA = 'foley-signature/v1';
 const ALLOWED_KEYS = ['schema', 'id', 'scope', 'verdict', 'signer', 'signedAt', 'signedCommit', 'subjects'];
 const HEX40 = /^[0-9a-f]{40}$/;
@@ -111,10 +125,10 @@ export function verifyEntry(root, entry) {
     if (sc.bytes !== s.bytes || sc.hash !== s.sha256) reasons.push(`signedCommit:${s.path} 字节/哈希不符机器块`);
     try { hd = blobAt('HEAD'); } catch { reasons.push(`HEAD 树中无 ${s.path}（工件被删/移·须重签）`); continue; }
     if (hd.bytes !== s.bytes || hd.hash !== s.sha256) reasons.push(`HEAD:${s.path} 字节/哈希不符机器块（工件已换·须重签）`);
-    // 磁盘（§4.7）：普通文件·字节+哈希仍等于机器块
+    // 磁盘（§4.7）：**普通文件**·字节+哈希仍等于机器块。lstat（不跟随）——符号链接即使指向同容也非普通文件，拒之
     try {
-      const st = statSync(join(root, s.path));
-      if (!st.isFile()) { reasons.push(`磁盘 ${s.path} 非普通文件`); continue; }
+      const st = lstatSync(join(root, s.path));
+      if (!st.isFile()) { reasons.push(`磁盘 ${s.path} 非普通文件（符号链接/目录/特殊文件·§4.7 拒）`); continue; }
       const disk = readFileSync(join(root, s.path));
       if (disk.length !== s.bytes || sha256(disk) !== s.sha256) reasons.push(`磁盘 ${s.path} 字节/哈希不符（未提交改动·须重签）`);
     } catch { reasons.push(`磁盘 ${s.path} 读取失败`); }
@@ -126,14 +140,16 @@ export function verifyEntry(root, entry) {
 function main() {
   const rootArg = process.argv.indexOf('--root');
   const root = rootArg >= 0 ? process.argv[rootArg + 1] : process.cwd();
+  const { registry, err } = loadRegistry(root);
+  if (err) { console.error(`✗ ${err}`); process.exit(1); }   // 法典缺席/§5 不可解析 → 拒绿
   let bad = 0;
-  for (const entry of REGISTRY) {
+  for (const entry of registry) {
     const v = verifyEntry(root, entry);
     if (v.valid) { console.log(`✓ ${v.id} 签署有效（工件身份绑定成立）`); }
     else { bad++; console.error(`✗ ${v.id} 签署失效：`); for (const r of v.reasons) console.error(`    · ${r}`); }
   }
-  if (bad) { console.error(`\n${bad}/${REGISTRY.length} 项签署失效——发布诚约闸红（契约 §6：重签由完成扫描的审计席明确提交，闸不自动回填）。`); process.exit(1); }
-  console.log(`\n✓ 全部 ${REGISTRY.length} 项工件签署绑哈希有效。`);
+  if (bad) { console.error(`\n${bad}/${registry.length} 项签署失效——发布诚约闸红（契约 §6：重签由完成扫描的审计席明确提交，闸不自动回填）。`); process.exit(1); }
+  console.log(`\n✓ 全部 ${registry.length} 项工件签署绑哈希有效（受管范围来自法典 §5）。`);
 }
 
 if (import.meta.url === `file://${process.argv[1]}`) main();

@@ -423,11 +423,31 @@ async function boot() {
     },
   });
   if (postOff) { selector?.setOn(); S.power = 'on'; refreshMachineState(); }   // 素面：旋钮直接 ON 姿态（板同相）
-  // 机身任意首手势=自动快拧+压缩版 POST；手势落在旋钮上则让位（正门自理·不消费路由）
+  // ── 工单5 一击三事仲裁：机身任意首手势=自动快拧+压缩版 POST，且**一击恰一事** ──
+  // 病案两桩（右耳 D-3·工单3 轨迹仪定罪）：空白首击=通电+POST+下摇并发；首击落 #deck=通电+暂停竞速。
+  // 法：首手势归通电（快拧同刻·POST t0 不迟），同一击派生的器件语义与导航一律让位——
+  // 器件语义全走 click（deck/货架/琴键/servo/架沿·普查在案），故在捕获层吞掉本击的 click；
+  // 触摸拖的 touchstart 同吞（tower 拍手不劫首触）。第二击起器件各归各。
+  // 豁免两路：①旋钮=电源正门自理（不消费不吞）；②机器已通电（旋钮先拧过/素面 ?post=0）＝
+  // 本击不是首手势，路由退场不吞——正门通电后的第一击器件语义照常。
+  const swallowFirstGestureSemantics = () => {
+    const swallowClick = (ev) => { ev.stopPropagation(); ev.preventDefault(); };
+    const swallowTouch = (ev) => ev.stopPropagation();   // 只断传播；touchstart 处于被动域，不碰 preventDefault
+    window.addEventListener('click', swallowClick, { capture: true, once: true });
+    window.addEventListener('touchstart', swallowTouch, { capture: true, once: true });
+    const disarm = () => setTimeout(() => {              // click 紧随 pointerup 派发；60ms 未耗尽即拆（绝不吞到第二击）
+      window.removeEventListener('click', swallowClick, { capture: true });
+      window.removeEventListener('touchstart', swallowTouch, { capture: true });
+    }, 60);
+    window.addEventListener('pointerup', disarm, { capture: true, once: true });
+    window.addEventListener('pointercancel', disarm, { capture: true, once: true });
+  };
   const gestureRoute = (e) => {
     if (e.target?.closest?.('#selector')) return;
     window.removeEventListener('pointerdown', gestureRoute);
-    selector?.autoTwist();                            // 快拧与通电同刻（拧下去那一刻电已到——POST t0 不迟）
+    if (S.power !== 'off') return;                      // 已由正门通电：非首手势，不拧不吞
+    swallowFirstGestureSemantics();
+    selector?.autoTwist();                              // 快拧与通电同刻（拧下去那一刻电已到——POST t0 不迟）
     S.power = 'on'; refreshMachineState();
     if (!postOff && !postDone) firePost();
   };

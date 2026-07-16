@@ -1,0 +1,14 @@
+工单5/6 探针 · 2026-07-16T11:37:29.904Z
+[t+4.4s] FAIL W5-A 首击落 #deck 不得暂停（恰一事=通电） — before=PLAYING after=PAUSED
+[t+4.4s] PASS W5-A 电到（S.power=on） — "on"
+[t+4.5s] PASS W5-A 声桥仍随首触上位（吞语义不吞唤醒）
+[t+5.7s] PASS W5-B 次击 #deck 器件语义归位（PAUSED） — after2=PAUSED
+[t+9.9s] FAIL W5-C 首击架沿：镜头不下摇（tower 恒位） — towerY=-784.0
+[t+9.9s] PASS W5-C 电到
+[t+13.8s] PASS W5-D 首击货架条目：不得选带（selected 不变） — selected storm→storm
+[t+13.8s] PASS W5-D 电到
+[t+17.3s] PASS W5-E 旋钮首击：正门通电 — "on"
+[t+18.5s] PASS W5-E 正门通电后首个 #deck 击正常暂停（豁免路径不吞） — after=PAUSED
+[t+23.5s] PASS W6-前提 下摇入带库（towerY 负移·lib-view 在） — towerY=-900.0 lib=true
+[t+26.0s] PASS W6-A Escape 回程（≤2.5s 到 0·lib-view 退场） — towerY=0.00 libOff=true
+[t+29.0s] PASS W6-B 回程后 3s 恒 0（无缓动残余/慢漂） — towerY=0.00

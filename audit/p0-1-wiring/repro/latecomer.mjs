@@ -37,8 +37,11 @@ function bootServe({ wired }) {
   const home = mkdtempSync(join(tmpdir(), 'p01-home-'));
   mkdirSync(join(home, 'spool'), { recursive: true });
   const cfg = mkdtempSync(join(tmpdir(), 'p01-cfg-'));
+  // D2 迁移（main 573f370）：/onboard/status wired = has('SessionEnd') && has('SessionStart')——两钩子俱在才算「已接线」
+  // （SessionStart=生产者心跳·死 Claude 检测所需）。「已接线」夹具须装两钩子，旧单 SessionEnd 装＝未齐（催补心跳）。
+  const foleyHook = [{ hooks: [{ type: 'command', command: `node ${join(root, 'cli', 'hook.ts')}` }] }];
   writeFileSync(join(cfg, 'settings.json'), JSON.stringify(
-    wired ? { hooks: { SessionEnd: [{ hooks: [{ type: 'command', command: `node ${join(root, 'cli', 'hook.ts')}` }] }] } } : {},
+    wired ? { hooks: { SessionStart: foleyHook, SessionEnd: foleyHook } } : {},
     null, 2));
   const proj = mkdtempSync(join(tmpdir(), 'p01-proj-'));
   mkdirSync(join(proj, 'p1'), { recursive: true });

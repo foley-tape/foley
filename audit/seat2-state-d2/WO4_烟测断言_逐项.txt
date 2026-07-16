@@ -1,0 +1,19 @@
+工单4 真机烟测 · 2026-07-16T10:27:50.519Z
+[t+0.6s] PASS serve 起机＝厂带 PLAYING（live:false） — {"phase":"PLAYING","selected":"storm","loaded":"storm","cursor":0,"paused":false,"pendingAsk":false,"producer":null,"live":false,"locked":false,"epoch":1784197670584,"seq":3,"phases":["EMPTY","CUEING","PLAYING","PAUSED"]}
+[t+4.1s] PASS ① 走带牌＝厂带（印刷名·非 LIVE） — {"tape":"STORM","meta":"FACTORY · LEN 1H09M","mode":"replay"}
+[t+4.1s] PASS ① 档案行标 FACTORY — FACTORY · LEN 1H09M
+[t+5.8s] PASS ① 盘在转（#deck 1.5s 两帧像素不同） — 239465B vs 235004B
+[t+6.0s] PASS ③ 预置 declinedAt→开页无接线单（首查）
+[t+6.6s] PASS ② 一次通电手势→声桥上位（audiotap 起录）
+[t+32.8s] 投带：会话 JSONL 已落 FOLEY_PROJECTS（页面不刷新）
+[t+36.0s] PASS ④ 牌面自动转 LIVE（零刷新） — {"tape":"LIVE","mode":"live"}
+[t+36.0s] PASS ④ transport 已 live PLAYING（同纪元自动换带） — {"live":true,"loaded":"live","phase":"PLAYING"}
+[t+60.0s] PASS ④ 链路回魂（S.link=live·无死相残留） — {"link":"live","signalCue":null,"sourceKind":"live"}
+[t+60.0s] PASS ④ 页面无 SIGNAL LOST/SOURCE GONE 蚀刻残留 — null
+[t+60.0s] PASS ③ 全程无接线单（终查）
+[t+60.0s] PASS 全程零页面错误
+[t+102.5s] PASS ② 出片带声（全片 RMS dB） — -34.663240 dB
+[t+102.5s] PASS serve stderr 无 ENOENT/裸堆栈（W4-01 口径全程） — （空）
+
+帧 7477 张 · 声轨 在手 · 全片 RMS -34.663240 dB
+结论：全项 PASS

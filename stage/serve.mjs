@@ -110,12 +110,12 @@ function factoryFallback(p) {
   return null;
 }
 
-// ── G8 空盘自举（M2.6 热修·前置静音雷）──
-// bare 起播（live 默认）时若最近会话**缺席或已歇场**，机器只能诚实地播「沉睡」：针零、纸平、无声——
-// 开箱第一分钟成死机观感。裁：正门（裸 `/`，无 query）302 落厂演示卷 `?tape=storm&speed=8`
-// （URL 明示演示带＋倍速，素材诚实；live 视图 `/?mode=live` 照旧可达）。带任何 query 尊重来意。
+// ── G8 空盘自举 → 工单4 厂带自举（零会话首分钟 P0-1·验收单 ZERO_SESSION_FIRST_MINUTE_ATF）──
+// 病灶：空会话房裸起机把「不存在的 live」演成故障——cli live --latest 空目录裸失败（ENOENT/exit 2）、
+// 盘死灯暗、页面死寂。法：起机时房里一卷 .jsonl 都没有 → 自动上一盘厂带（PLAYING·live:false·
+// 零 CLI 故障外泄）；值守员盯房，第一卷会话后至即拉起 live 并重协商换带（P0-3·同纪元零刷新）。
+// 房里有会话（含歇场旧带·待机法归待机法）与显式 --raw 喂带仍走原路上 live。决策在 bootMachine（文末）。
 // FOLEY_PROJECTS 供测试/CI 指别处会话根。
-const FRESH_MS = 15 * 60 * 1000;
 function newestJsonlMtime(dir) {
   let best = -1, entries;
   try { entries = readdirSync(dir, { recursive: true }); } catch { return -1; }
@@ -124,12 +124,6 @@ function newestJsonlMtime(dir) {
     try { const m = statSync(join(dir, e)).mtimeMs; if (m > best) best = m; } catch { /* 消失即略 */ }
   }
   return best;
-}
-let demoBoot = false;
-if (!replayOnly && !rawPath) {
-  const newest = newestJsonlMtime(process.env.FOLEY_PROJECTS ?? join(homedir(), '.claude', 'projects'));
-  demoBoot = newest < 0 || Date.now() - newest > FRESH_MS;
-  if (demoBoot) vlog(`[boot] 最近会话${newest < 0 ? '缺席' : '已歇场(>15min)'} → 正门上厂演示卷 storm@8×（live 视图 /?mode=live 照旧）`);
 }
 
 // ---- live 中继：child stdout NDJSON → SSE 扇出（写出即丢，bounded 纪律同源）----
@@ -458,6 +452,25 @@ function startLive() {
     for (const res of clients) res.write(`event: gone\ndata: {}\n\n`);
     liveChild = null;
   });
+}
+
+// ── 工单4 P0-3 会话后至值守：厂带自举后盯 FOLEY_PROJECTS，第一卷 .jsonl 落地即拉起 live
+// 并重协商换带——同一 serve 纪元、零刷新（ATF-W4-03）。只在「机器仍停在自举厂带」时替用户
+// 换带（先开机后开工重协商）；用户已动过 transport（选带/退带）即不夺权，live 拉起归走带牌候自选。
+let sessionWatchTimer = null;
+function watchForFirstSession(bootTape) {
+  clearInterval(sessionWatchTimer);
+  sessionWatchTimer = setInterval(() => {
+    if (newestJsonlMtime(PROJECTS_DIR) < 0) return;   // 仍空房
+    clearInterval(sessionWatchTimer); sessionWatchTimer = null;
+    vlog('[boot] 会话后至——拉起 live·重协商换带');
+    startLive();
+    autoSwitchToLive(bootTape, 0);
+  }, 2000);
+}
+function autoSwitchToLive(bootTape, tries) {
+  if (transport.selected !== bootTape || transport.loaded !== bootTape || transport.live) return;   // 用户已接管/已在 live
+  if (!transportSelect('live') && tries < 20) setTimeout(() => autoSwitchToLive(bootTape, tries + 1), 300);   // CUEING 锁窗重试
 }
 
 // ═══ E2 卡带架·transport 状态机（第五号手令 丁-E2）═══════════════════════════════════
@@ -1091,8 +1104,15 @@ createServer(async (req, res) => {
       const has = (ev) => { const g = s?.hooks?.[ev]; return Array.isArray(g) && g.some(x => Array.isArray(x?.hooks) && x.hooks.some(h => mine(String(h?.command ?? '')))); };
       wired = has('SessionEnd') && has('SessionStart');   // D2 迁移：两钩子俱在才算齐（旧装仅 SessionEnd＝未齐·催补心跳·席一 D2 复审 #迁移）
     } catch { /* 无档＝未接 */ }
+    // 工单4 P0-2 declined 穿透（ATF-W4-02·状态 API 首日冻结字段）：onboard.json 的持久拒绝
+    // 必须成为明确字段——页面据此不再递接线单（谢绝过＝尊重·与 connect offerConnect 同账本同判读）。
+    let declined = false;
+    try {
+      const ob = JSON.parse(await readFile(join(FOLEY_HOME, 'onboard.json'), 'utf8'));
+      declined = Number.isFinite(ob?.declinedAt) && ob.declinedAt > 0;
+    } catch { /* 无账本＝未拒绝 */ }
     res.writeHead(200, { 'content-type': 'application/json', 'cache-control': 'no-store' });
-    res.end(JSON.stringify({ wired, spool: existsSync(SPOOL_EVENTS) }));
+    res.end(JSON.stringify({ wired, declined, spool: existsSync(SPOOL_EVENTS) }));
     return;
   }
   // ── E2 卡带架路由（第五号手令 丁-E2）──
@@ -1227,13 +1247,22 @@ createServer(async (req, res) => {
 async function bootMachine() {
   if (!replayOnly) initProducer();
   if (BOOT_HOLD) { await bootHoldReleased; bootHeld = false; }
-  if (!replayOnly) {
-    startLive();
-    startCardDuty(); // 收工吐卡值守（轨乙①）：replay-only 是静态服务器，不背卡片工序
-    // RACK_SPEC 一.3（第一段）：有 LIVE，醒来即"带已在机上转"——起动自装 live 带（LIVE 不上架，
-    // 归走带牌）。声音仍候浏览器手势法，不违静默律；replay-only 无 live，醒在带架（EMPTY）。
-    transportSelect('live');
+  if (replayOnly) return;
+  startCardDuty(); // 收工吐卡值守（轨乙①）：replay-only 是静态服务器，不背卡片工序
+  // 工单4 P0-1 厂带自举：空会话房（无一卷 .jsonl）不演「死 LIVE」——先上厂带等开工，
+  // 值守员见首卷会话即拉起 live 重协商换带（P0-3）。厂带选 storm（G8 演示卷成例），缺件按架序兜底。
+  if (!rawPath && newestJsonlMtime(PROJECTS_DIR) < 0) {
+    const factory = ['storm', ...DEMO_TAPES.map((d) => d.id)].find((id) => rackHas(id));
+    if (factory && transportSelect(factory)) {
+      vlog(`[boot] 空会话房 → 厂带自举 ${factory}·值守候首卷会话`);
+      watchForFirstSession(factory);
+      return;
+    }
   }
+  startLive();
+  // RACK_SPEC 一.3（第一段）：有 LIVE，醒来即"带已在机上转"——起动自装 live 带（LIVE 不上架，
+  // 归走带牌）。声音仍候浏览器手势法，不违静默律；replay-only 无 live，醒在带架（EMPTY）。
+  transportSelect('live');
 }
 bootMachine();
 // P1-② 纵深兜底：任何漏网的未捕获 rejection 只记日志不崩进程（防 F1 同类"异步处理器内同步抛"再打断 live 广播/在制 dub）。

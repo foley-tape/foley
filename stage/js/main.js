@@ -236,7 +236,8 @@ async function boot() {
       else if (t.phase === 'PLAYING' && !replayer.playing) replayer.play();
     }
   }
-  live.es?.addEventListener('transport', e => { try { applyTransport(JSON.parse(e.data)); } catch { /* 坏包 */ } });
+  // 经登记口挂具名监听（工单4 P0-3）：ES 因 503 致命关闭后会换新实例重连，直挂 live.es 会失联
+  live.addEsListener('transport', e => { try { applyTransport(JSON.parse(e.data)); } catch { /* 坏包 */ } });
 
   // ── 卡带架 UI（左纵列货架） ──
   const rackEl = document.getElementById('rack-list');
@@ -482,7 +483,7 @@ function setupCardsAndWiring({ live, getDub, setOnSoundReady, hasSound }) {
   const enqueue = (sid) => { if (sid && !cardQ.includes(sid) && getDub()) { cardQ.push(sid); pump(); } };
   const sweep = () => fetch('/cards/pending').then(r => (r.ok ? r.json() : { pending: [] })).then(j => (j.pending ?? []).forEach(enqueue)).catch(() => {});
   sweep(); setInterval(sweep, 15000);
-  live.es?.addEventListener('card', e => { try { enqueue(JSON.parse(e.data).sid); } catch { /* 坏包 */ } });
+  live.addEsListener('card', e => { try { enqueue(JSON.parse(e.data).sid); } catch { /* 坏包 */ } });
 
   // 接线状态机（P0-1）：wired 为可查询态；到场自愈落针，永不作离场收据。
   let wired = false, needleRung = false;
@@ -493,8 +494,13 @@ function setupCardsAndWiring({ live, getDub, setOnSoundReady, hasSound }) {
   };
   setOnSoundReady(ringNeedleIfReady);
   const markWired = () => { wired = true; dismissWireTag(); ringNeedleIfReady(); };
-  live.es?.addEventListener('wired', markWired);
-  fetch('/onboard/status').then(r => (r.ok ? r.json() : null)).then(st => { if (st?.wired) markWired(); else mountWireTag(st); }).catch(() => {});
+  live.addEsListener('wired', markWired);
+  fetch('/onboard/status').then(r => (r.ok ? r.json() : null)).then(st => {
+    if (st?.wired) { markWired(); return; }
+    // 工单4 P0-2：持久拒绝（onboard.json declinedAt）穿透到页——谢绝过＝尊重，不再递接线单
+    if (st?.declined) return;
+    mountWireTag(st);
+  }).catch(() => {});
 }
 
 // —— 接线签（轨乙③）——

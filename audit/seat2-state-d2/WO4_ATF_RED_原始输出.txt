@@ -1,0 +1,87 @@
+
+> foley@0.1.0 test:wo4-atf
+> node --test golden/zero-session-first-minute.atf.test.ts
+
+▶ 工单 4 ATF · 零会话首分钟
+  ✖ ATF-W4-01 空 FOLEY_PROJECTS 自动上厂带，不伪装 dead LIVE/CLI 故障 (557.962958ms)
+  ✖ ATF-W4-02 declinedAt 必须穿透 /onboard/status (111.360083ms)
+  ✖ ATF-W4-02B 页面必须消费 declined，禁止再挂接线单 (0.219917ms)
+  ✖ ATF-W4-03 同一 serve 先厂带、后会话：自动拉起 live 并换带，无需刷新 (8203.751ms)
+✖ 工单 4 ATF · 零会话首分钟 (8874.744541ms)
+ℹ tests 4
+ℹ suites 1
+ℹ pass 0
+ℹ fail 4
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 10162.314709
+
+✖ failing tests:
+
+test at golden/zero-session-first-minute.atf.test.ts:148:3
+✖ ATF-W4-01 空 FOLEY_PROJECTS 自动上厂带，不伪装 dead LIVE/CLI 故障 (557.962958ms)
+  AssertionError [ERR_ASSERTION]: 空会话应自动上厂带，而不是 live
+  
+  'live' !== 'demo'
+  
+      at TestContext.<anonymous> (file:///Users/shadow/tape0-seat-d2/golden/zero-session-first-minute.atf.test.ts:158:14)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async Test.run (node:internal/test_runner/test:1208:7)
+      at async Promise.all (index 0)
+      at async Suite.run (node:internal/test_runner/test:1619:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:385:3) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 'live',
+    expected: 'demo',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at golden/zero-session-first-minute.atf.test.ts:168:3
+✖ ATF-W4-02 declinedAt 必须穿透 /onboard/status (111.360083ms)
+  AssertionError [ERR_ASSERTION]: 持久拒绝必须成为状态 API 的明确字段
+  + actual - expected
+  
+  + undefined
+  - true
+  
+      at TestContext.<anonymous> (file:///Users/shadow/tape0-seat-d2/golden/zero-session-first-minute.atf.test.ts:175:14)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async Test.run (node:internal/test_runner/test:1208:7)
+      at async Suite.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: true,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at golden/zero-session-first-minute.atf.test.ts:181:3
+✖ ATF-W4-02B 页面必须消费 declined，禁止再挂接线单 (0.219917ms)
+  AssertionError [ERR_ASSERTION]: 页面接线状态机必须读取 /onboard/status.declined；sessionStorage 不能替代持久拒绝
+      at TestContext.<anonymous> (file:///Users/shadow/tape0-seat-d2/golden/zero-session-first-minute.atf.test.ts:183:12)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Suite.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async Suite.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+
+test at golden/zero-session-first-minute.atf.test.ts:189:3
+✖ ATF-W4-03 同一 serve 先厂带、后会话：自动拉起 live 并换带，无需刷新 (8203.751ms)
+  Error: 初始厂带 超时；last={"phase":"PLAYING","selected":"live","loaded":"live","cursor":0,"paused":false,"pendingAsk":false,"producer":null,"live":true,"locked":false,"epoch":1784196767165,"seq":3,"phases":["EMPTY","CUEING","PLAYING","PAUSED"]} error=
+      at waitFor (file:///Users/shadow/tape0-seat-d2/golden/zero-session-first-minute.atf.test.ts:72:9)
+      at async TestContext.<anonymous> (file:///Users/shadow/tape0-seat-d2/golden/zero-session-first-minute.atf.test.ts:192:23)
+      at async Test.run (node:internal/test_runner/test:1208:7)
+      at async Suite.processPendingSubtests (node:internal/test_runner/test:831:7)

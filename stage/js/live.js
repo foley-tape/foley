@@ -30,6 +30,16 @@ export class LiveStream {
     this._lastRecvAt = 0;
     this._lostTimer = null;
     this._watchdog = null;
+    this.es = null;
+    this._namedListeners = [];   // 具名 SSE 监听登记（transport/card/wired…）——重连换 ES 后自动复挂
+    this._reconnectTimer = null;
+  }
+
+  // 具名 SSE 旁路通告一律经此登记（勿直挂 live.es）：EventSource 致命关闭后 connect() 会换新实例，
+  // 直挂的监听会随旧实例失联——transport 推送就乘此线，失联=页面失聪（工单4 P0-3 病灶之一）。
+  addEsListener(name, fn) {
+    this._namedListeners.push([name, fn]);
+    this.es?.addEventListener(name, fn);
   }
 
   _setStatus(s) {
@@ -96,13 +106,16 @@ export class LiveStream {
   }
 
   connect() {
+    clearTimeout(this._reconnectTimer); this._reconnectTimer = null;
+    clearInterval(this._watchdog);       // 重连不叠看门狗
+    if (this.es) { try { this.es.close(); } catch { /* 已死 */ } }
     const es = new EventSource('/live');
     this._lastRecvAt = performance.now(); // 宽限起点：连上到首包之间不误判静默
     es.onmessage = (e) => {
       this._lastRecvAt = performance.now();
       clearTimeout(this._lostTimer);            // 有数据＝信号在，撤销待判丢失
-      if (this.status !== 'gone' && this.status !== 'live') this._setStatus('live');
-      else if (this.status === 'live') { /* 保持 */ }
+      // 数据在流＝live——含 gone 后新 live 子进程复活（工单4 P0-3：gone 不再粘滞，源回来灯语跟着回）
+      if (this.status !== 'live') { this.gone = false; this._setStatus('live'); }
       let obj;
       try { obj = JSON.parse(e.data); } catch { return; }
       if (this._buffering) { this._buffer.push(obj); return; }
@@ -110,11 +123,17 @@ export class LiveStream {
     };
     es.addEventListener('gone', () => { this.gone = true; this._setStatus('gone'); }); // live 子进程退出：源没了
     es.onerror = () => {
-      // EventSource 自动重连；瞬断不该闪红——去抖 1.2s 未恢复才判信号丢失（serve 亡/断网）
+      // EventSource 对网络瞬断会自动重连；但非 200 应答（空会话房厂带期 /live=503）是**致命关闭**
+      // （readyState=CLOSED·规范不重试）。工单4 P0-3：transport 推送与包流同乘此线，
+      // 断线＝页面失聪——CLOSED 即定时重开新 ES，直到 live 后至（serve 连上即喂 transport 快照，零漏拍）。
+      if (es.readyState === EventSource.CLOSED && this.es === es && !this._reconnectTimer) {
+        this._reconnectTimer = setTimeout(() => { this._reconnectTimer = null; this.connect(); }, 2000);
+      }
       if (this.status === 'gone') return;
       clearTimeout(this._lostTimer);
       this._lostTimer = setTimeout(() => this._setStatus('lost'), 1200);
     };
+    for (const [name, fn] of this._namedListeners) es.addEventListener(name, fn);   // 登记过的具名监听复挂
     this.es = es;
     // 静默看门狗：live 有 20Hz 心跳，>2.5s 无包＝喂食断（子进程挂/卡），也判丢失
     this._watchdog = setInterval(() => {
